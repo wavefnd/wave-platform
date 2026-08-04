@@ -1,0 +1,7 @@
+.git
+.env
+backups
+build
+data
+frontend/dist
+frontend/node_modules

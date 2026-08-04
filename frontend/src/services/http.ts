@@ -1,0 +1,916 @@
+import { booleanAttribute, parseXml, textOf } from '../xml/parser'
+import type {
+  SourceBlob,
+  SourceCommitDetail,
+  SourceCommit,
+  SourceEntry,
+  SourceLanguage,
+  SourceRefs,
+  SourceRepository,
+  SourceTree,
+} from '../components/source/types'
+
+export interface PlatformStatus {
+  name: string
+  status: string
+  version: string
+  environment: string
+}
+
+export interface ModuleStatus {
+  name: string
+  enabled: boolean
+  status: string
+}
+
+export interface ReleaseSummary {
+  slug: string
+  title: string
+  publishedAt: string
+  summary: string
+}
+
+export interface Release extends ReleaseSummary {
+  content: string
+}
+
+export interface DocumentSummary {
+  id: string
+  path: string
+  locale: 'en' | 'ko'
+  group: string
+  order: number
+  title: string
+  summary: string
+  version: string
+}
+
+export interface DocumentBlock {
+  kind: 'heading' | 'paragraph' | 'note' | 'warning' | 'code' | 'list' | 'table'
+  anchor: string
+  level: number
+  language: string
+  title: string
+  text: string
+  items: string[]
+  rows: Array<{ header: boolean; cells: string[] }>
+}
+
+export interface DocumentView extends DocumentSummary {
+  sourceRevision: string
+  updatedAt: string
+  markdown: string
+  blocks: DocumentBlock[]
+}
+
+export interface PlatformStats {
+  accounts: number
+  messagesToday: number
+  gitMirrors: number
+}
+
+export interface AuthConfig {
+	mailDomain: string
+	registrationOpen: boolean
+	totpConfigured: boolean
+	turnstileSiteKey: string
+}
+
+export interface TOTPEnrollment {
+	token: string
+	secret: string
+	uri: string
+	expiresAt: string
+}
+
+export interface AccountSecurity {
+	totpEnabled: boolean
+	recoveryEmail: string
+	recoveryVerified: boolean
+}
+
+export interface SponsorMember {
+	name: string
+	profile: string
+	imageUrl: string
+	website: string
+	type: string
+}
+
+export interface SponsorTier {
+	name: string
+	slug: string
+	amount: number
+	currency: string
+	interval: string
+	members: SponsorMember[]
+}
+
+export interface SponsorsView {
+	name: string
+	url: string
+	refreshedAt: string
+	tiers: SponsorTier[]
+}
+
+export interface AccountSession {
+	id: string
+	username: string
+	displayName: string
+	email: string
+	administrator: boolean
+	owner: boolean
+	expiresAt: string
+}
+
+export interface MailboxItem {
+	id: string
+	messageId: string
+	from: string
+	to: string[]
+	subject: string
+	receivedAt: string
+	preview: string
+	flags: string[]
+	deliveryStatus: string
+}
+
+export interface MailboxView {
+	address: string
+	folder: string
+	items: MailboxItem[]
+}
+
+export interface MailMessageView {
+	entryId: string
+	messageId: string
+	from: string
+	to: string[]
+	cc: string[]
+	subject: string
+	date: string
+	body: string
+	flags: string[]
+	deliveryStatus: string
+}
+
+export interface CommunitySpace {
+  id: string
+  slug: string
+  name: string
+  visibility: string
+  postingPolicy: 'members' | 'owner'
+}
+
+export interface CommunityThreadSummary {
+  id: string
+  spaceId: string
+  title: string
+  author: string
+  excerpt: string
+  createdAt: string
+  replyCount: number
+	viewCount: number
+	score: number
+	viewerVote: number
+	lastActivityAt: string
+  tags: string[]
+  pinned: boolean
+  locked: boolean
+}
+
+export interface CommunityMessage {
+  id: string
+  parentMessageId: string
+	authorAccountId: string
+  author: string
+  createdAt: string
+  body: string
+	score: number
+	viewerVote: number
+}
+
+export interface CommunityThread {
+  id: string
+  spaceId: string
+  title: string
+  tags: string[]
+  pinned: boolean
+  locked: boolean
+  root: CommunityMessage
+  replies: CommunityMessage[]
+	score: number
+	viewCount: number
+	viewerVote: number
+	subscribed: boolean
+}
+
+export interface QuestionSummary {
+	id: string
+	title: string
+	excerpt: string
+	author: string
+	authorAccountId: string
+	createdAt: string
+	lastActivityAt: string
+	tags: string[]
+	waveVersion: string
+	platform: string
+	status: string
+	score: number
+	viewerVote: number
+	answerCount: number
+	viewCount: number
+	accepted: boolean
+}
+
+export interface QuestionMessage {
+	id: string
+	parentMessageId: string
+	authorAccountId: string
+	author: string
+	createdAt: string
+	body: string
+	score: number
+	viewerVote: number
+	accepted: boolean
+}
+
+export interface QuestionView {
+	id: string
+	title: string
+	status: string
+	tags: string[]
+	waveVersion: string
+	platform: string
+	acceptedMessageId: string
+	root: QuestionMessage
+	answers: QuestionMessage[]
+	score: number
+	viewCount: number
+	viewerVote: number
+}
+
+async function getXml(path: string): Promise<XMLDocument> {
+  const response = await fetch(path, {
+    headers: { Accept: 'application/xml' },
+  })
+
+  const body = await response.text()
+  if (!response.ok) {
+    throw new Error(`요청 실패 (${response.status})`)
+  }
+
+  return parseXml(body)
+}
+
+async function requestXml(path: string, method: string, document?: XMLDocument): Promise<XMLDocument | null> {
+	const response = await fetch(path, {
+		method,
+		credentials: 'same-origin',
+		headers: {
+			Accept: 'application/xml',
+			...(document ? { 'Content-Type': 'application/xml; charset=utf-8' } : {}),
+		},
+		body: document ? new XMLSerializer().serializeToString(document) : undefined,
+	})
+	const body = await response.text()
+	if (!response.ok) {
+		if (body) {
+			try {
+				const xml = parseXml(body)
+				throw new Error(textOf(xml, 'message') || `Request failed (${response.status})`)
+			} catch (error) {
+				if (error instanceof Error && !error.message.includes('올바르지 않은 XML')) throw error
+			}
+		}
+		throw new Error(`Request failed (${response.status})`)
+	}
+	return body ? parseXml(body) : null
+}
+
+function authDocument(name: string, values: Record<string, string>): XMLDocument {
+	const namespace = 'https://wave-lang.dev/ns/platform/api/v1'
+	const document = window.document.implementation.createDocument(namespace, name)
+	for (const [key, value] of Object.entries(values)) {
+		const element = document.createElementNS(namespace, key)
+		element.textContent = value
+		document.documentElement.append(element)
+	}
+	return document
+}
+
+function parseAccountSession(xml: XMLDocument): AccountSession {
+	return {
+		id: textOf(xml, 'id'),
+		username: textOf(xml, 'username'),
+		displayName: textOf(xml, 'display-name'),
+		email: textOf(xml, 'email'),
+		administrator: textOf(xml, 'administrator') === 'true',
+		owner: textOf(xml, 'owner') === 'true',
+		expiresAt: textOf(xml, 'expires-at'),
+	}
+}
+
+export async function getAuthConfig(): Promise<AuthConfig> {
+	const xml = await getXml('/api/v1/auth/config')
+	return {
+		mailDomain: textOf(xml, 'mail-domain'),
+		registrationOpen: textOf(xml, 'registration-open') === 'true',
+		totpConfigured: textOf(xml, 'totp-configured') === 'true',
+		turnstileSiteKey: textOf(xml, 'turnstile-site-key'),
+	}
+}
+
+export async function getCurrentAccount(): Promise<AccountSession | null> {
+	try {
+		const xml = await getXml('/api/v1/auth/session')
+		return parseAccountSession(xml)
+	} catch (error) {
+		if (error instanceof Error && error.message.includes('(401)')) return null
+		throw error
+	}
+}
+
+function parseEnrollment(xml: XMLDocument | null): TOTPEnrollment {
+	if (!xml) throw new Error('The server returned an empty enrollment response.')
+	return { token: textOf(xml, 'token'), secret: textOf(xml, 'secret'), uri: textOf(xml, 'uri'), expiresAt: textOf(xml, 'expires-at') }
+}
+
+export async function login(identifier: string, code: string, challenge = ''): Promise<AccountSession> {
+	const xml = await requestXml('/api/v1/auth/login', 'POST', authDocument('login', { identifier, code, 'challenge-token': challenge }))
+	if (!xml) throw new Error('The server returned an empty login response.')
+	return parseAccountSession(xml)
+}
+
+export async function beginRegistration(displayName: string, recoveryEmail: string, challenge = ''): Promise<TOTPEnrollment> {
+	return parseEnrollment(await requestXml('/api/v1/auth/register/begin', 'POST', authDocument('registration', {
+		'display-name': displayName, 'recovery-email': recoveryEmail, 'challenge-token': challenge,
+	})))
+}
+
+export async function finishRegistration(token: string, code: string): Promise<AccountSession> {
+	const xml = await requestXml('/api/v1/auth/register/finish', 'POST', authDocument('enrollment', { token, code }))
+	if (!xml) throw new Error('The server returned an empty registration response.')
+	return parseAccountSession(xml)
+}
+
+export async function requestRecovery(identifier: string, challenge = ''): Promise<void> {
+	await requestXml('/api/v1/auth/recovery/request', 'POST', authDocument('recovery', { identifier, 'challenge-token': challenge }))
+}
+
+export async function getRecoveryEnrollment(token: string): Promise<TOTPEnrollment> {
+	return parseEnrollment(await requestXml('/api/v1/auth/recovery/enrollment', 'POST', authDocument('recovery', { token })))
+}
+
+export async function finishRecovery(token: string, code: string): Promise<void> {
+	await requestXml('/api/v1/auth/recovery/finish', 'POST', authDocument('recovery', { token, code }))
+}
+
+export async function getAccountSecurity(): Promise<AccountSecurity> {
+	const xml = await getXml('/api/v1/auth/security')
+	return { totpEnabled: textOf(xml, 'totp-enabled') === 'true', recoveryEmail: textOf(xml, 'recovery-email'), recoveryVerified: textOf(xml, 'recovery-verified') === 'true' }
+}
+
+export async function beginTOTPRotation(code: string): Promise<TOTPEnrollment> {
+	return parseEnrollment(await requestXml('/api/v1/auth/security/totp/begin', 'POST', authDocument('rotation', { code })))
+}
+
+export async function finishTOTPRotation(token: string, code: string): Promise<void> {
+	await requestXml('/api/v1/auth/security/totp/finish', 'POST', authDocument('enrollment', { token, code }))
+}
+
+export async function changeRecoveryEmail(email: string, code: string): Promise<void> {
+	await requestXml('/api/v1/auth/security/recovery-email', 'POST', authDocument('recovery-email', { email, code }))
+}
+
+export async function verifyRecoveryEmail(token: string): Promise<void> {
+	await requestXml('/api/v1/auth/recovery-email/verify', 'POST', authDocument('verification', { token }))
+}
+
+export async function getSponsors(): Promise<SponsorsView> {
+	const xml = await getXml('/api/v1/sponsors')
+	return {
+		name: textOf(xml, 'name'), url: textOf(xml, 'url'), refreshedAt: textOf(xml, 'refreshed-at'),
+		tiers: Array.from(xml.querySelectorAll('tiers > tier')).map((tier) => ({
+			name: childText(tier, 'name'), slug: childText(tier, 'slug'), amount: Number(childText(tier, 'amount')),
+			currency: childText(tier, 'currency'), interval: childText(tier, 'interval'),
+			members: Array.from(tier.querySelectorAll('members > member')).map((member) => ({
+				name: childText(member, 'name'), profile: childText(member, 'profile'), imageUrl: childText(member, 'image-url'),
+				website: childText(member, 'website'), type: childText(member, 'type'),
+			})),
+		})),
+	}
+}
+
+export async function logout(): Promise<void> {
+	await requestXml('/api/v1/auth/logout', 'POST')
+}
+
+export async function getMailbox(folder = 'Inbox', q = ''): Promise<MailboxView> {
+	const query = new URLSearchParams({ folder })
+	if (q) query.set('q', q)
+	const xml = await getXml(`/api/v1/mailbox?${query}`)
+	return {
+		address: textOf(xml, 'address'),
+		folder: textOf(xml, 'folder'),
+		items: Array.from(xml.querySelectorAll('items > item')).map((item) => ({
+			id: item.getAttribute('id') ?? '',
+			messageId: childText(item, 'message-id'),
+			from: childText(item, 'from'),
+			to: Array.from(item.children).filter((child) => child.localName === 'to').map((child) => child.textContent?.trim() ?? '').filter(Boolean),
+			subject: childText(item, 'subject'),
+			receivedAt: childText(item, 'received-at'),
+			preview: childContent(item, 'preview'),
+			flags: Array.from(item.querySelectorAll('flags > flag')).map((flag) => flag.textContent?.trim() ?? '').filter(Boolean),
+			deliveryStatus: childText(item, 'delivery-status'),
+		})),
+	}
+}
+
+function parseMailMessage(xml: XMLDocument): MailMessageView {
+	const root = xml.documentElement
+	return {
+		entryId: childText(root, 'entry-id'), messageId: childText(root, 'message-id'),
+		from: childText(root, 'from'),
+		to: Array.from(root.children).filter((child) => child.localName === 'to').map((child) => child.textContent?.trim() ?? '').filter(Boolean),
+		cc: Array.from(root.children).filter((child) => child.localName === 'cc').map((child) => child.textContent?.trim() ?? '').filter(Boolean),
+		subject: childText(root, 'subject'), date: childText(root, 'date'), body: childContent(root, 'body'),
+		flags: Array.from(root.querySelectorAll('flags > flag')).map((flag) => flag.textContent?.trim() ?? '').filter(Boolean),
+		deliveryStatus: childText(root, 'delivery-status'),
+	}
+}
+
+export async function getMailMessage(entryId: string): Promise<MailMessageView> {
+	return parseMailMessage(await getXml(`/api/v1/mailbox/messages/${encodeURIComponent(entryId)}`))
+}
+
+export async function sendMail(to: string, subject: string, body: string): Promise<MailMessageView> {
+	const xml = await requestXml('/api/v1/mailbox/messages', 'POST', authDocument('send-mail', { to, subject, body }))
+	if (!xml) throw new Error('The server returned an empty mail response.')
+	return parseMailMessage(xml)
+}
+
+export async function updateMailEntry(entryId: string, action: 'archive' | 'trash' | 'read' | 'unread'): Promise<MailMessageView> {
+	const xml = await requestXml(`/api/v1/mailbox/messages/${encodeURIComponent(entryId)}/action`, 'POST', authDocument('mailbox-action', { action }))
+	if (!xml) throw new Error('The server returned an empty mailbox response.')
+	return parseMailMessage(xml)
+}
+
+const languageColors: Record<string, string> = {
+  Wave: '#6654f1', Rust: '#dea584', Python: '#3572a5', Shell: '#89e051',
+  Assembly: '#6e4c13', Makefile: '#427819', Dockerfile: '#384d54',
+}
+
+function childText(parent: ParentNode, name: string): string {
+  return Array.from(parent.children).find((child) => child.localName === name)?.textContent?.trim() ?? ''
+}
+
+function childContent(parent: ParentNode, name: string): string {
+  return Array.from(parent.children).find((child) => child.localName === name)?.textContent ?? ''
+}
+
+function parseCommit(element: Element | null): SourceCommit | undefined {
+  if (!element) return undefined
+  return {
+    oid: childText(element, 'oid'),
+    shortOid: childText(element, 'short-oid'),
+    author: childText(element, 'author'),
+    authoredAt: childText(element, 'authored-at'),
+    subject: childText(element, 'subject'),
+  }
+}
+
+function parseRepository(element: Element): SourceRepository {
+  return {
+    id: childText(element, 'id'), owner: childText(element, 'owner'),
+    name: childText(element, 'name'), description: childText(element, 'description'),
+    defaultBranch: childText(element, 'default-branch'), headOid: childText(element, 'head-oid'),
+    status: childText(element, 'status'),
+    headCommit: parseCommit(Array.from(element.children).find((child) => child.localName === 'head-commit') ?? null),
+  }
+}
+
+function parseBlob(element: Element): SourceBlob {
+  const highlight = Array.from(element.children).find((child) => child.localName === 'wave-highlight')
+  return {
+    path: childText(element, 'path'),
+    oid: childText(element, 'oid'),
+    size: Number(childText(element, 'size')),
+    binary: childText(element, 'binary') === 'true',
+    truncated: childText(element, 'truncated') === 'true',
+    content: childContent(element, 'content'),
+    waveHighlight: highlight ? {
+      engine: highlight.getAttribute('engine') ?? 'wave',
+      abi: Number(highlight.getAttribute('abi')) || 1,
+      tokens: Array.from(highlight.getElementsByTagName('token')).map((token) => ({
+        kind: token.getAttribute('kind') as 'keyword' | 'type' | 'string' | 'comment' | 'number',
+        start: Number(token.getAttribute('start')),
+        end: Number(token.getAttribute('end')),
+      })),
+    } : undefined,
+  }
+}
+
+export async function getPlatformStatus(): Promise<PlatformStatus> {
+  const xml = await getXml('/api/v1/platform')
+  return {
+    name: textOf(xml, 'name'),
+    status: textOf(xml, 'status'),
+    version: textOf(xml, 'version'),
+    environment: textOf(xml, 'environment'),
+  }
+}
+
+export async function getPlatformStats(): Promise<PlatformStats> {
+  const xml = await getXml('/api/v1/platform/stats')
+  return {
+    accounts: Number(textOf(xml, 'accounts')) || 0,
+    messagesToday: Number(textOf(xml, 'messages-today')) || 0,
+    gitMirrors: Number(textOf(xml, 'git-mirrors')) || 0,
+  }
+}
+
+export async function getModules(): Promise<ModuleStatus[]> {
+  const xml = await getXml('/api/v1/modules')
+  return Array.from(xml.querySelectorAll('module')).map((element) => ({
+    name: element.getAttribute('name') ?? '',
+    enabled: booleanAttribute(element, 'enabled'),
+    status: element.getAttribute('status') ?? 'unknown',
+  }))
+}
+
+export async function getReleases(limit = 0): Promise<ReleaseSummary[]> {
+  const query = limit > 0 ? `?limit=${limit}` : ''
+  const xml = await getXml(`/api/v1/releases${query}`)
+  return Array.from(xml.querySelectorAll('release')).map((element) => ({
+    slug: textOf(element, 'slug'),
+    title: textOf(element, 'title'),
+    publishedAt: textOf(element, 'published-at'),
+    summary: textOf(element, 'summary'),
+  }))
+}
+
+export async function getRelease(slug: string): Promise<Release> {
+  const xml = await getXml(`/api/v1/releases/${encodeURIComponent(slug)}`)
+  return {
+    slug: textOf(xml, 'slug'),
+    title: textOf(xml, 'title'),
+    publishedAt: textOf(xml, 'published-at'),
+    summary: textOf(xml, 'summary'),
+    content: textOf(xml, 'content'),
+  }
+}
+
+function parseDocumentSummary(element: Element): DocumentSummary {
+  return {
+    id: childText(element, 'id'),
+    path: childText(element, 'path'),
+    locale: childText(element, 'locale') === 'ko' ? 'ko' : 'en',
+    group: childText(element, 'group'),
+    order: Number(childText(element, 'order')) || 0,
+    title: childText(element, 'title'),
+    summary: childText(element, 'summary'),
+    version: childText(element, 'version'),
+  }
+}
+
+export async function getDocuments(locale: 'en' | 'ko'): Promise<DocumentSummary[]> {
+  const xml = await getXml(`/api/v1/documents?locale=${locale}`)
+  return Array.from(xml.documentElement.children)
+    .filter((element) => element.localName === 'document')
+    .map(parseDocumentSummary)
+}
+
+export async function getDocument(path: string, locale: 'en' | 'ko'): Promise<DocumentView> {
+  const xml = await getXml(`/api/v1/documents/${path.split('/').map(encodeURIComponent).join('/')}?locale=${locale}`)
+  const root = xml.documentElement
+  const content = Array.from(root.children).find((element) => element.localName === 'content')
+  const blocks = content ? Array.from(content.children).filter((element) => element.localName === 'block').map((element) => ({
+    kind: (element.getAttribute('kind') ?? 'paragraph') as DocumentBlock['kind'],
+    anchor: element.getAttribute('anchor') ?? '',
+    level: Number(element.getAttribute('level')) || 0,
+    language: element.getAttribute('language') ?? '',
+    title: element.getAttribute('title') ?? '',
+    text: Array.from(element.childNodes).filter((node) => node.nodeType === Node.TEXT_NODE || node.nodeType === Node.CDATA_SECTION_NODE).map((node) => node.textContent ?? '').join('').trim(),
+    items: Array.from(element.children).filter((child) => child.localName === 'item').map((child) => child.textContent?.trim() ?? ''),
+    rows: Array.from(element.children).filter((child) => child.localName === 'row').map((row) => ({
+      header: row.getAttribute('header') === 'true',
+      cells: Array.from(row.children).filter((cell) => cell.localName === 'cell').map((cell) => cell.textContent?.trim() ?? ''),
+    })),
+  })) : []
+  return {
+    ...parseDocumentSummary(root),
+    sourceRevision: childText(root, 'source-revision'),
+    updatedAt: childText(root, 'updated-at'),
+    markdown: content ? childText(content, 'markdown') : '',
+    blocks,
+  }
+}
+
+export async function getCommunitySpaces(): Promise<CommunitySpace[]> {
+  const xml = await getXml('/api/v1/community/spaces')
+  return Array.from(xml.documentElement.children)
+    .filter((element) => element.localName === 'space')
+    .map((element) => ({
+      id: element.getAttribute('id') ?? '',
+      slug: childText(element, 'slug'),
+      name: childText(element, 'name'),
+      visibility: childText(element, 'visibility'),
+      postingPolicy: childText(element, 'posting-policy') === 'owner' ? 'owner' : 'members',
+    }))
+}
+
+export async function getCommunityThreads(space = '', options: { sort?: string; q?: string; limit?: number; offset?: number } = {}): Promise<CommunityThreadSummary[]> {
+  const query = new URLSearchParams()
+	if (space) query.set('space', space)
+	if (options.sort) query.set('sort', options.sort)
+	if (options.q) query.set('q', options.q)
+	if (options.limit) query.set('limit', String(options.limit))
+	if (options.offset) query.set('offset', String(options.offset))
+	const suffix = query.size ? `?${query}` : ''
+  const xml = await getXml(`/api/v1/community/threads${suffix}`)
+  return Array.from(xml.documentElement.children)
+    .filter((element) => element.localName === 'thread')
+    .map((element) => ({
+      id: childText(element, 'id'),
+      spaceId: childText(element, 'space-id'),
+      title: childText(element, 'title'),
+      author: childText(element, 'author'),
+      excerpt: childContent(element, 'excerpt'),
+      createdAt: childText(element, 'created-at'),
+      replyCount: Number(childText(element, 'reply-count')) || 0,
+		viewCount: Number(childText(element, 'view-count')) || 0,
+		score: Number(childText(element, 'score')) || 0,
+		viewerVote: Number(childText(element, 'viewer-vote')) || 0,
+		lastActivityAt: childText(element, 'last-activity-at'),
+      tags: Array.from(element.querySelectorAll('tags > tag')).map((tag) => tag.textContent?.trim() ?? '').filter(Boolean),
+      pinned: childText(element, 'pinned') === 'true',
+      locked: childText(element, 'locked') === 'true',
+    }))
+}
+
+function parseCommunityMessage(element: Element | undefined): CommunityMessage {
+  return {
+    id: element ? childText(element, 'id') : '',
+    parentMessageId: element ? childText(element, 'parent-message-id') : '',
+		authorAccountId: element ? childText(element, 'author-account-id') : '',
+    author: element ? childText(element, 'author') : '',
+    createdAt: element ? childText(element, 'created-at') : '',
+    body: element ? childContent(element, 'body') : '',
+		score: element ? Number(childText(element, 'score')) || 0 : 0,
+		viewerVote: element ? Number(childText(element, 'viewer-vote')) || 0 : 0,
+  }
+}
+
+export async function getCommunityThread(id: string): Promise<CommunityThread> {
+  const xml = await getXml(`/api/v1/community/threads/${encodeURIComponent(id)}`)
+	return parseCommunityThread(xml)
+}
+
+function communityDocument(name: string): XMLDocument {
+	return window.document.implementation.createDocument('https://wave-lang.dev/ns/platform/api/v1', name)
+}
+
+function appendXmlValue(document: XMLDocument, parent: Element, name: string, value: string) {
+	const element = document.createElementNS(document.documentElement.namespaceURI, name)
+	element.textContent = value
+	parent.append(element)
+}
+
+export async function createCommunityPost(input: { spaceId: string; title: string; body: string; tags: string[] }): Promise<CommunityThread> {
+	const document = communityDocument('community-post')
+	appendXmlValue(document, document.documentElement, 'space-id', input.spaceId)
+	appendXmlValue(document, document.documentElement, 'title', input.title)
+	appendXmlValue(document, document.documentElement, 'body', input.body)
+	if (input.tags.length) {
+		const tags = document.createElementNS(document.documentElement.namespaceURI, 'tags')
+		for (const tag of input.tags) appendXmlValue(document, tags, 'tag', tag)
+		document.documentElement.append(tags)
+	}
+	const xml = await requestXml('/api/v1/community/threads', 'POST', document)
+	if (!xml) throw new Error('The server returned an empty post response.')
+	return parseCommunityThread(xml)
+}
+
+export async function createCommunityReply(threadId: string, body: string, parentMessageId = ''): Promise<CommunityThread> {
+	const document = communityDocument('community-reply')
+	if (parentMessageId) appendXmlValue(document, document.documentElement, 'parent-message-id', parentMessageId)
+	appendXmlValue(document, document.documentElement, 'body', body)
+	const xml = await requestXml(`/api/v1/community/threads/${encodeURIComponent(threadId)}/comments`, 'POST', document)
+	if (!xml) throw new Error('The server returned an empty reply response.')
+	return parseCommunityThread(xml)
+}
+
+export async function voteCommunity(threadId: string, targetType: 'thread' | 'message', targetId: string, value: -1 | 0 | 1): Promise<{ score: number; viewerVote: number }> {
+	const document = communityDocument('community-vote')
+	appendXmlValue(document, document.documentElement, 'target-type', targetType)
+	appendXmlValue(document, document.documentElement, 'target-id', targetId)
+	appendXmlValue(document, document.documentElement, 'value', String(value))
+	const xml = await requestXml(`/api/v1/community/threads/${encodeURIComponent(threadId)}/vote`, 'POST', document)
+	if (!xml) throw new Error('The server returned an empty vote response.')
+	return { score: Number(textOf(xml, 'score')) || 0, viewerVote: Number(textOf(xml, 'viewer-vote')) || 0 }
+}
+
+export async function subscribeCommunity(threadId: string, subscribed: boolean): Promise<void> {
+	const document = communityDocument('community-subscription')
+	appendXmlValue(document, document.documentElement, 'subscribed', String(subscribed))
+	await requestXml(`/api/v1/community/threads/${encodeURIComponent(threadId)}/subscription`, 'POST', document)
+}
+
+function parseQuestionMessage(element: Element | undefined): QuestionMessage {
+	return {
+		id: element ? childText(element, 'id') : '',
+		parentMessageId: element ? childText(element, 'parent-message-id') : '',
+		authorAccountId: element ? childText(element, 'author-account-id') : '',
+		author: element ? childText(element, 'author') : '',
+		createdAt: element ? childText(element, 'created-at') : '',
+		body: element ? childContent(element, 'body') : '',
+		score: element ? Number(childText(element, 'score')) || 0 : 0,
+		viewerVote: element ? Number(childText(element, 'viewer-vote')) || 0 : 0,
+		accepted: element ? childText(element, 'accepted') === 'true' : false,
+	}
+}
+
+function parseQuestionView(xml: XMLDocument): QuestionView {
+	const root = xml.documentElement
+	const metadata = Array.from(root.children).find((element) => element.localName === 'question')
+	const rootMessage = Array.from(root.children).find((element) => element.localName === 'root')
+	const answers = Array.from(root.querySelector('answers')?.children ?? [])
+		.filter((element) => element.localName === 'answer').map((element) => parseQuestionMessage(element))
+	return {
+		id: metadata?.getAttribute('id') ?? '', title: childText(root, 'title'),
+		status: metadata ? childText(metadata, 'status') : '',
+		tags: Array.from(metadata?.querySelectorAll('tags > tag') ?? []).map((tag) => tag.textContent?.trim() ?? '').filter(Boolean),
+		waveVersion: metadata ? childText(metadata, 'wave-version') : '',
+		platform: metadata ? childText(metadata, 'platform') : '',
+		acceptedMessageId: metadata ? childText(metadata, 'accepted-message-id') : '',
+		root: parseQuestionMessage(rootMessage), answers,
+		score: Number(childText(root, 'score')) || 0,
+		viewCount: Number(childText(root, 'view-count')) || 0,
+		viewerVote: Number(childText(root, 'viewer-vote')) || 0,
+	}
+}
+
+export async function getQuestions(options: { sort?: string; q?: string; tag?: string; limit?: number; offset?: number } = {}): Promise<QuestionSummary[]> {
+	const query = new URLSearchParams()
+	if (options.sort) query.set('sort', options.sort)
+	if (options.q) query.set('q', options.q)
+	if (options.tag) query.set('tag', options.tag)
+	if (options.limit) query.set('limit', String(options.limit))
+	if (options.offset) query.set('offset', String(options.offset))
+	const xml = await getXml(`/api/v1/questions${query.size ? `?${query}` : ''}`)
+	return Array.from(xml.documentElement.children).filter((element) => element.localName === 'question').map((element) => ({
+		id: childText(element, 'id'), title: childText(element, 'title'), excerpt: childContent(element, 'excerpt'),
+		author: childText(element, 'author'), authorAccountId: childText(element, 'author-account-id'),
+		createdAt: childText(element, 'created-at'), lastActivityAt: childText(element, 'last-activity-at'),
+		tags: Array.from(element.querySelectorAll('tags > tag')).map((tag) => tag.textContent?.trim() ?? '').filter(Boolean),
+		waveVersion: childText(element, 'wave-version'), platform: childText(element, 'platform'),
+		status: childText(element, 'status'), score: Number(childText(element, 'score')) || 0,
+		viewerVote: Number(childText(element, 'viewer-vote')) || 0,
+		answerCount: Number(childText(element, 'answer-count')) || 0,
+		viewCount: Number(childText(element, 'view-count')) || 0,
+		accepted: childText(element, 'accepted') === 'true',
+	}))
+}
+
+export async function getQuestion(id: string): Promise<QuestionView> {
+	return parseQuestionView(await getXml(`/api/v1/questions/${encodeURIComponent(id)}`))
+}
+
+export async function createQuestion(input: { title: string; body: string; tags: string[]; waveVersion: string; platform: string }): Promise<QuestionView> {
+	const document = communityDocument('question-create')
+	appendXmlValue(document, document.documentElement, 'title', input.title)
+	appendXmlValue(document, document.documentElement, 'body', input.body)
+	const tags = document.createElementNS(document.documentElement.namespaceURI, 'tags')
+	for (const tag of input.tags) appendXmlValue(document, tags, 'tag', tag)
+	document.documentElement.append(tags)
+	if (input.waveVersion) appendXmlValue(document, document.documentElement, 'wave-version', input.waveVersion)
+	if (input.platform) appendXmlValue(document, document.documentElement, 'platform', input.platform)
+	const xml = await requestXml('/api/v1/questions', 'POST', document)
+	if (!xml) throw new Error('The server returned an empty question response.')
+	return parseQuestionView(xml)
+}
+
+export async function createQuestionAnswer(questionId: string, body: string): Promise<QuestionView> {
+	const document = communityDocument('question-answer')
+	appendXmlValue(document, document.documentElement, 'body', body)
+	const xml = await requestXml(`/api/v1/questions/${encodeURIComponent(questionId)}/answers`, 'POST', document)
+	if (!xml) throw new Error('The server returned an empty answer response.')
+	return parseQuestionView(xml)
+}
+
+export async function voteQuestion(questionId: string, targetType: 'question' | 'answer', targetId: string, value: -1 | 0 | 1): Promise<{ score: number; viewerVote: number }> {
+	const document = communityDocument('question-vote')
+	appendXmlValue(document, document.documentElement, 'target-type', targetType)
+	appendXmlValue(document, document.documentElement, 'target-id', targetId)
+	appendXmlValue(document, document.documentElement, 'value', String(value))
+	const xml = await requestXml(`/api/v1/questions/${encodeURIComponent(questionId)}/vote`, 'POST', document)
+	if (!xml) throw new Error('The server returned an empty vote response.')
+	return { score: Number(textOf(xml, 'score')) || 0, viewerVote: Number(textOf(xml, 'viewer-vote')) || 0 }
+}
+
+export async function acceptQuestionAnswer(questionId: string, answerId: string): Promise<QuestionView> {
+	const document = communityDocument('question-accept')
+	if (answerId) appendXmlValue(document, document.documentElement, 'answer-id', answerId)
+	const xml = await requestXml(`/api/v1/questions/${encodeURIComponent(questionId)}/accept`, 'POST', document)
+	if (!xml) throw new Error('The server returned an empty accept response.')
+	return parseQuestionView(xml)
+}
+
+function parseCommunityThread(xml: XMLDocument): CommunityThread {
+	const root = xml.documentElement
+	const thread = Array.from(root.children).find((element) => element.localName === 'thread')
+	const rootMessage = Array.from(root.children).find((element) => element.localName === 'root')
+	const replies = Array.from(root.querySelector('replies')?.children ?? [])
+		.filter((element) => element.localName === 'reply')
+		.map((element) => parseCommunityMessage(element))
+	return {
+		id: thread?.getAttribute('id') ?? '',
+		spaceId: thread ? childText(thread, 'space-id') : '',
+		title: childText(root, 'title'),
+		tags: Array.from(thread?.querySelectorAll('tags > tag') ?? []).map((tag) => tag.textContent?.trim() ?? '').filter(Boolean),
+		pinned: thread ? childText(thread, 'pinned') === 'true' : false,
+		locked: thread ? childText(thread, 'locked') === 'true' : false,
+		root: parseCommunityMessage(rootMessage), replies,
+		score: Number(childText(root, 'score')) || 0,
+		viewCount: Number(childText(root, 'view-count')) || 0,
+		viewerVote: Number(childText(root, 'viewer-vote')) || 0,
+		subscribed: childText(root, 'subscribed') === 'true',
+	}
+}
+
+export async function getSourceRepositories(): Promise<SourceRepository[]> {
+  const xml = await getXml('/api/v1/source/repositories')
+  return Array.from(xml.documentElement.children)
+    .filter((element) => element.localName === 'repository')
+    .map(parseRepository)
+}
+
+function sourceQuery(values: Record<string, string>) {
+  const query = new URLSearchParams()
+  for (const [key, value] of Object.entries(values)) if (value) query.set(key, value)
+  const encoded = query.toString()
+  return encoded ? `?${encoded}` : ''
+}
+
+export async function getSourceTree(repository: string, path = '', ref = ''): Promise<SourceTree> {
+  const xml = await getXml(`/api/v1/source/repositories/${encodeURIComponent(repository)}/tree${sourceQuery({ path, ref })}`)
+  const root = xml.documentElement
+  const repositoryElement = Array.from(root.children).find((child) => child.localName === 'repository') as Element
+  const entriesElement = Array.from(root.children).find((child) => child.localName === 'entries')
+  const languagesElement = Array.from(root.children).find((child) => child.localName === 'languages')
+  const readmeElement = Array.from(root.children).find((child) => child.localName === 'readme')
+  const entries: SourceEntry[] = Array.from(entriesElement?.children ?? []).map((element) => ({
+    name: childText(element, 'name'), path: childText(element, 'path'),
+    type: childText(element, 'type') as 'tree' | 'blob', oid: childText(element, 'oid'),
+    size: Number(childText(element, 'size')) || 0,
+    lastCommit: parseCommit(Array.from(element.children).find((child) => child.localName === 'last-commit') ?? null),
+  }))
+  const languages: SourceLanguage[] = Array.from(languagesElement?.children ?? []).map((element) => {
+    const name = childText(element, 'name')
+    return { name, bytes: Number(childText(element, 'bytes')), files: Number(childText(element, 'files')), percent: Number(childText(element, 'percentage')), color: languageColors[name] ?? '#8b86a6' }
+  })
+  const readme: SourceBlob | undefined = readmeElement ? parseBlob(readmeElement as Element) : undefined
+  return {
+    repository: parseRepository(repositoryElement), ref: childText(root, 'ref'), path: childText(root, 'path'),
+    commit: parseCommit(Array.from(root.children).find((child) => child.localName === 'commit') ?? null)!,
+    entries, readme, languages,
+  }
+}
+
+export async function getSourceBlob(repository: string, path: string, ref = ''): Promise<SourceBlob> {
+  const xml = await getXml(`/api/v1/source/repositories/${encodeURIComponent(repository)}/blob${sourceQuery({ path, ref })}`)
+  return parseBlob(xml.documentElement)
+}
+
+export async function getSourceCommits(repository: string, path = '', ref = ''): Promise<SourceCommit[]> {
+  const xml = await getXml(`/api/v1/source/repositories/${encodeURIComponent(repository)}/commits${sourceQuery({ path, ref })}`)
+  return Array.from(xml.documentElement.children).map((element) => parseCommit(element)!).filter(Boolean)
+}
+
+export async function getSourceCommitDetail(repository: string, oid: string): Promise<SourceCommitDetail> {
+  const xml = await getXml(`/api/v1/source/repositories/${encodeURIComponent(repository)}/commits/${encodeURIComponent(oid)}`)
+  const root = xml.documentElement
+  const commitElement = Array.from(root.children).find((child) => child.localName === 'commit') as Element
+  const filesElement = Array.from(root.children).find((child) => child.localName === 'files')
+  const parentsElement = Array.from(root.children).find((child) => child.localName === 'parents')
+  return {
+    commit: parseCommit(commitElement)!,
+    body: childContent(root, 'body').trim(),
+    parents: Array.from(parentsElement?.children ?? []).map((parent) => parent.textContent?.trim() ?? '').filter(Boolean),
+    files: Array.from(filesElement?.children ?? []).map((file) => ({
+      status: childText(file, 'status'),
+      path: childText(file, 'path'),
+      oldPath: childText(file, 'old-path'),
+    })),
+    patch: childContent(root, 'patch'),
+    patchTruncated: childText(root, 'patch-truncated') === 'true',
+  }
+}
+
+export async function getSourceRefs(repository: string): Promise<SourceRefs> {
+  const xml = await getXml(`/api/v1/source/repositories/${encodeURIComponent(repository)}/refs`)
+  const parse = (container: string) => Array.from(xml.querySelector(container)?.children ?? []).map((element) => ({ name: childText(element, 'name'), oid: childText(element, 'oid'), updatedAt: childText(element, 'updated-at') }))
+  return { branches: parse('branches'), tags: parse('tags') }
+}

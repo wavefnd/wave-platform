@@ -1,0 +1,158 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema
+    xmlns:xs="http://www.w3.org/2001/XMLSchema"
+    targetNamespace="https://wave-lang.dev/ns/platform/api/v1"
+    xmlns="https://wave-lang.dev/ns/platform/api/v1"
+    elementFormDefault="qualified">
+    <xs:element name="platform">
+        <xs:complexType><xs:sequence>
+            <xs:element name="name" type="xs:string"/>
+            <xs:element name="status" type="xs:string"/>
+            <xs:element name="version" type="xs:string"/>
+            <xs:element name="environment" type="xs:string"/>
+        </xs:sequence></xs:complexType>
+    </xs:element>
+    <xs:element name="health">
+        <xs:complexType><xs:sequence>
+            <xs:element name="status" type="xs:string"/>
+            <xs:element name="ready" type="xs:boolean"/>
+            <xs:element name="timestamp" type="xs:dateTime"/>
+            <xs:element name="database" type="xs:string"/>
+        </xs:sequence></xs:complexType>
+    </xs:element>
+    <xs:element name="stats">
+        <xs:complexType><xs:sequence>
+            <xs:element name="accounts" type="xs:nonNegativeInteger"/>
+            <xs:element name="messages-today" type="xs:nonNegativeInteger"/>
+            <xs:element name="git-mirrors" type="xs:nonNegativeInteger"/>
+        </xs:sequence></xs:complexType>
+    </xs:element>
+    <xs:element name="modules">
+        <xs:complexType><xs:sequence>
+            <xs:element name="module" minOccurs="0" maxOccurs="unbounded">
+                <xs:complexType>
+                    <xs:attribute name="name" type="xs:string" use="required"/>
+                    <xs:attribute name="enabled" type="xs:boolean" use="required"/>
+                    <xs:attribute name="status" type="xs:string" use="required"/>
+                </xs:complexType>
+            </xs:element>
+        </xs:sequence></xs:complexType>
+    </xs:element>
+	<xs:element name="auth-config">
+		<xs:complexType><xs:sequence>
+			<xs:element name="mail-domain" type="xs:string"/>
+			<xs:element name="registration-open" type="xs:boolean"/>
+		</xs:sequence></xs:complexType>
+	</xs:element>
+	<xs:element name="register">
+		<xs:complexType><xs:sequence>
+			<xs:element name="display-name" type="xs:string"/>
+			<xs:element name="recovery-email" type="xs:string"/>
+		</xs:sequence></xs:complexType>
+	</xs:element>
+	<xs:element name="login">
+		<xs:complexType><xs:sequence>
+			<xs:element name="identifier" type="xs:string"/>
+			<xs:element name="code" type="xs:string"/>
+		</xs:sequence></xs:complexType>
+	</xs:element>
+	<xs:element name="account-session">
+		<xs:complexType><xs:sequence>
+			<xs:element name="id" type="xs:string"/>
+			<xs:element name="username" type="xs:string"/>
+			<xs:element name="display-name" type="xs:string"/>
+			<xs:element name="email" type="xs:string"/>
+			<xs:element name="administrator" type="xs:boolean"/>
+			<xs:element name="expires-at" type="xs:dateTime"/>
+		</xs:sequence></xs:complexType>
+	</xs:element>
+	<xs:element name="mailbox">
+		<xs:complexType><xs:sequence>
+			<xs:element name="address" type="xs:string"/>
+			<xs:element name="folder" type="xs:string"/>
+			<xs:element name="items">
+				<xs:complexType><xs:sequence>
+					<xs:element name="item" minOccurs="0" maxOccurs="unbounded">
+						<xs:complexType><xs:sequence>
+							<xs:element name="message-id" type="xs:string"/>
+							<xs:element name="from" type="xs:string"/>
+							<xs:element name="subject" type="xs:string"/>
+							<xs:element name="received-at" type="xs:dateTime"/>
+							<xs:element name="preview" type="xs:string"/>
+							<xs:element name="flags" minOccurs="0">
+								<xs:complexType><xs:sequence><xs:element name="flag" type="xs:string" minOccurs="0" maxOccurs="unbounded"/></xs:sequence></xs:complexType>
+							</xs:element>
+						</xs:sequence><xs:attribute name="id" type="xs:string" use="required"/></xs:complexType>
+					</xs:element>
+				</xs:sequence></xs:complexType>
+			</xs:element>
+		</xs:sequence></xs:complexType>
+	</xs:element>
+	<xs:element name="send-mail">
+		<xs:complexType><xs:sequence>
+			<xs:element name="to" type="xs:string"/>
+			<xs:element name="subject" type="xs:string"/>
+			<xs:element name="body" type="xs:string"/>
+		</xs:sequence></xs:complexType>
+	</xs:element>
+	<xs:element name="mailbox-action">
+		<xs:complexType><xs:sequence><xs:element name="action" type="xs:string"/></xs:sequence></xs:complexType>
+	</xs:element>
+	<xs:element name="mail-message">
+		<xs:complexType><xs:sequence>
+			<xs:element name="entry-id" type="xs:string"/>
+			<xs:element name="message-id" type="xs:string"/>
+			<xs:element name="from" type="xs:string"/>
+			<xs:element name="to" type="xs:string" minOccurs="1" maxOccurs="unbounded"/>
+			<xs:element name="cc" type="xs:string" minOccurs="0" maxOccurs="unbounded"/>
+			<xs:element name="subject" type="xs:string"/>
+			<xs:element name="date" type="xs:dateTime"/>
+			<xs:element name="body" type="xs:string"/>
+			<xs:element name="flags" minOccurs="0">
+				<xs:complexType><xs:sequence><xs:element name="flag" type="xs:string" minOccurs="0" maxOccurs="unbounded"/></xs:sequence></xs:complexType>
+			</xs:element>
+		</xs:sequence></xs:complexType>
+	</xs:element>
+	<xs:element name="community-post">
+		<xs:complexType><xs:sequence>
+			<xs:element name="space-id" type="xs:string"/>
+			<xs:element name="title" type="xs:string"/>
+			<xs:element name="body" type="xs:string"/>
+			<xs:element name="tags" minOccurs="0">
+				<xs:complexType><xs:sequence>
+					<xs:element name="tag" type="xs:string" minOccurs="0" maxOccurs="5"/>
+				</xs:sequence></xs:complexType>
+			</xs:element>
+		</xs:sequence></xs:complexType>
+	</xs:element>
+	<xs:element name="community-reply">
+		<xs:complexType><xs:sequence>
+			<xs:element name="parent-message-id" type="xs:string" minOccurs="0"/>
+			<xs:element name="body" type="xs:string"/>
+		</xs:sequence></xs:complexType>
+	</xs:element>
+	<xs:element name="community-vote">
+		<xs:complexType><xs:sequence>
+			<xs:element name="target-type" type="xs:string"/>
+			<xs:element name="target-id" type="xs:string"/>
+			<xs:element name="value" type="xs:integer"/>
+		</xs:sequence></xs:complexType>
+	</xs:element>
+	<xs:element name="community-vote-result">
+		<xs:complexType><xs:sequence>
+			<xs:element name="score" type="xs:integer"/>
+			<xs:element name="viewer-vote" type="xs:integer"/>
+		</xs:sequence></xs:complexType>
+	</xs:element>
+	<xs:element name="community-subscription">
+		<xs:complexType><xs:sequence>
+			<xs:element name="subscribed" type="xs:boolean"/>
+		</xs:sequence></xs:complexType>
+	</xs:element>
+	<xs:element name="error">
+		<xs:complexType><xs:sequence>
+			<xs:element name="code" type="xs:string"/>
+			<xs:element name="message" type="xs:string"/>
+		</xs:sequence></xs:complexType>
+	</xs:element>
+</xs:schema>

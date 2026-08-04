@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema
+    xmlns:xs="http://www.w3.org/2001/XMLSchema"
+    targetNamespace="https://wave-lang.dev/ns/platform/community/v1"
+    xmlns="https://wave-lang.dev/ns/platform/community/v1"
+    elementFormDefault="qualified">
+
+    <xs:complexType name="thread-type">
+        <xs:sequence>
+            <xs:element name="space-id" type="xs:string"/>
+            <xs:element name="root-message-id" type="xs:string"/>
+            <xs:element name="tags" minOccurs="0">
+                <xs:complexType><xs:sequence>
+                    <xs:element name="tag" type="xs:string" minOccurs="0" maxOccurs="5"/>
+                </xs:sequence></xs:complexType>
+            </xs:element>
+            <xs:element name="pinned" type="xs:boolean"/>
+            <xs:element name="locked" type="xs:boolean"/>
+        </xs:sequence>
+        <xs:attribute name="id" type="xs:string" use="required"/>
+    </xs:complexType>
+
+    <xs:complexType name="message-view-type">
+        <xs:sequence>
+            <xs:element name="id" type="xs:string"/>
+            <xs:element name="parent-message-id" type="xs:string" minOccurs="0"/>
+            <xs:element name="author-account-id" type="xs:string" minOccurs="0"/>
+            <xs:element name="author" type="xs:string"/>
+            <xs:element name="created-at" type="xs:dateTime"/>
+            <xs:element name="body" type="xs:string"/>
+            <xs:element name="score" type="xs:integer"/>
+            <xs:element name="viewer-vote" type="xs:integer"/>
+        </xs:sequence>
+    </xs:complexType>
+
+    <xs:element name="space">
+        <xs:complexType><xs:sequence>
+            <xs:element name="slug" type="xs:string"/>
+            <xs:element name="name" type="xs:string"/>
+            <xs:element name="visibility" type="xs:string"/>
+        </xs:sequence><xs:attribute name="id" type="xs:string" use="required"/></xs:complexType>
+    </xs:element>
+
+    <xs:element name="thread" type="thread-type"/>
+
+    <xs:element name="thread-view">
+        <xs:complexType><xs:sequence>
+            <xs:element name="thread" type="thread-type"/>
+            <xs:element name="title" type="xs:string"/>
+            <xs:element name="root" type="message-view-type"/>
+            <xs:element name="replies">
+                <xs:complexType><xs:sequence>
+                    <xs:element name="reply" type="message-view-type" minOccurs="0" maxOccurs="unbounded"/>
+                </xs:sequence></xs:complexType>
+            </xs:element>
+            <xs:element name="score" type="xs:integer"/>
+            <xs:element name="view-count" type="xs:nonNegativeInteger"/>
+            <xs:element name="viewer-vote" type="xs:integer"/>
+            <xs:element name="subscribed" type="xs:boolean"/>
+        </xs:sequence></xs:complexType>
+    </xs:element>
+
+    <xs:element name="vote">
+        <xs:complexType><xs:sequence>
+            <xs:element name="target-type" type="xs:string"/>
+            <xs:element name="target-id" type="xs:string"/>
+            <xs:element name="account-id" type="xs:string"/>
+            <xs:element name="value" type="xs:integer"/>
+            <xs:element name="updated-at" type="xs:dateTime"/>
+        </xs:sequence></xs:complexType>
+    </xs:element>
+
+    <xs:element name="subscription">
+        <xs:complexType><xs:sequence>
+            <xs:element name="thread-id" type="xs:string"/>
+            <xs:element name="account-id" type="xs:string"/>
+            <xs:element name="created-at" type="xs:dateTime"/>
+        </xs:sequence></xs:complexType>
+    </xs:element>
+</xs:schema>

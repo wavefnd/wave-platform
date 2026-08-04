@@ -1,0 +1,204 @@
+fun is_identifier_byte(value: u8) -> bool {
+    if ((value >= 'a' && value <= 'z') || (value >= 'A' && value <= 'Z')) {
+        return true;
+    }
+    if ((value >= '0' && value <= '9') || value == '_') {
+        return true;
+    }
+    return false;
+}
+
+fun is_number_byte(value: u8) -> bool {
+    if (is_identifier_byte(value)) {
+        return true;
+    }
+    return value == '.';
+}
+
+fun string_length(value: str) -> i64 {
+    let mut data: ptr<u8> = value;
+    let mut length: i64 = 0;
+    while (data[length] != 0) {
+        length += 1;
+    }
+    return length;
+}
+
+fun matches_word(source: ptr<u8>, source_length: i64, offset: i64, word: str) -> bool {
+    let word_length: i64 = string_length(word);
+    if (offset + word_length > source_length) {
+        return false;
+    }
+    if (offset > 0) {
+        let previous_offset: i64 = offset - 1;
+        if (is_identifier_byte(source[previous_offset])) {
+            return false;
+        }
+    }
+
+    let mut word_data: ptr<u8> = word;
+    let mut index: i64 = 0;
+    while (index < word_length) {
+        let source_index: i64 = offset + index;
+        if (source[source_index] != word_data[index]) {
+            return false;
+        }
+        index += 1;
+    }
+
+    let end_offset: i64 = offset + word_length;
+    if (end_offset < source_length && is_identifier_byte(source[end_offset])) {
+        return false;
+    }
+    return true;
+}
+
+fun keyword_length(source: ptr<u8>, source_length: i64, offset: i64) -> i64 {
+    if (matches_word(source, source_length, offset, "continue")) { return 8; }
+    if (matches_word(source, source_length, offset, "import")) { return 6; }
+    if (matches_word(source, source_length, offset, "export")) { return 6; }
+    if (matches_word(source, source_length, offset, "extern")) { return 6; }
+    if (matches_word(source, source_length, offset, "struct")) { return 6; }
+    if (matches_word(source, source_length, offset, "return")) { return 6; }
+    if (matches_word(source, source_length, offset, "proto")) { return 5; }
+    if (matches_word(source, source_length, offset, "while")) { return 5; }
+    if (matches_word(source, source_length, offset, "break")) { return 5; }
+    if (matches_word(source, source_length, offset, "false")) { return 5; }
+    if (matches_word(source, source_length, offset, "enum")) { return 4; }
+    if (matches_word(source, source_length, offset, "else")) { return 4; }
+    if (matches_word(source, source_length, offset, "true")) { return 4; }
+    if (matches_word(source, source_length, offset, "fun")) { return 3; }
+    if (matches_word(source, source_length, offset, "let")) { return 3; }
+    if (matches_word(source, source_length, offset, "mut")) { return 3; }
+    if (matches_word(source, source_length, offset, "var")) { return 3; }
+    if (matches_word(source, source_length, offset, "for")) { return 3; }
+    if (matches_word(source, source_length, offset, "if")) { return 2; }
+    if (matches_word(source, source_length, offset, "as")) { return 2; }
+    return 0;
+}
+
+fun type_length(source: ptr<u8>, source_length: i64, offset: i64) -> i64 {
+    if (matches_word(source, source_length, offset, "array")) { return 5; }
+    if (matches_word(source, source_length, offset, "bool")) { return 4; }
+    if (matches_word(source, source_length, offset, "void")) { return 4; }
+    if (matches_word(source, source_length, offset, "str")) { return 3; }
+    if (matches_word(source, source_length, offset, "ptr")) { return 3; }
+    if (matches_word(source, source_length, offset, "u8")) { return 2; }
+    if (matches_word(source, source_length, offset, "u16")) { return 3; }
+    if (matches_word(source, source_length, offset, "u32")) { return 3; }
+    if (matches_word(source, source_length, offset, "u64")) { return 3; }
+    if (matches_word(source, source_length, offset, "i8")) { return 2; }
+    if (matches_word(source, source_length, offset, "i16")) { return 3; }
+    if (matches_word(source, source_length, offset, "i32")) { return 3; }
+    if (matches_word(source, source_length, offset, "i64")) { return 3; }
+    if (matches_word(source, source_length, offset, "f32")) { return 3; }
+    if (matches_word(source, source_length, offset, "f64")) { return 3; }
+    return 0;
+}
+
+fun mark_range(kinds: ptr<u8>, start: i64, end: i64, kind: u8) {
+    let mut index: i64 = start;
+    while (index < end) {
+        deref kinds[index] = kind;
+        index += 1;
+    }
+}
+
+fun quoted_end(source: ptr<u8>, source_length: i64, offset: i64, quote: u8) -> i64 {
+    let mut index: i64 = offset + 1;
+    while (index < source_length) {
+        if (source[index] == '\\') {
+            index += 2;
+        } else if (source[index] == quote) {
+            return index + 1;
+        } else {
+            index += 1;
+        }
+    }
+    return source_length;
+}
+
+export(c, "wave_source_analyzer_abi_version") fun source_analyzer_abi_version() -> i32 {
+    return 2;
+}
+
+export(c, "wave_source_analyzer_highlight") fun source_analyzer_highlight(
+    source: ptr<u8>,
+    source_length: i64,
+    out_kinds: ptr<u8>,
+    out_length: i64
+) -> i32 {
+    if (source_length < 0 || out_length < source_length) {
+        return -1;
+    }
+
+    let mut clear_index: i64 = 0;
+    while (clear_index < source_length) {
+        deref out_kinds[clear_index] = 0;
+        clear_index += 1;
+    }
+
+    let mut index: i64 = 0;
+    while (index < source_length) {
+        let current: u8 = source[index];
+
+        if (current == '"' || current == '\'') {
+            let end: i64 = quoted_end(source, source_length, index, current);
+            mark_range(out_kinds, index, end, 3);
+            index = end;
+        } else if (current == '/' && index + 1 < source_length) {
+            let next_index: i64 = index + 1;
+            if (source[next_index] == '/') {
+                let start: i64 = index;
+                index += 2;
+                while (index < source_length && source[index] != '\n') {
+                    index += 1;
+                }
+                mark_range(out_kinds, start, index, 4);
+            } else if (source[next_index] == '*') {
+                let start: i64 = index;
+                index += 2;
+                let mut comment_closed: bool = false;
+                while (index + 1 < source_length && !comment_closed) {
+                    let comment_next: i64 = index + 1;
+                    if (source[index] == '*' && source[comment_next] == '/') {
+                        index += 2;
+                        comment_closed = true;
+                    } else {
+                        index += 1;
+                    }
+                }
+                if (!comment_closed) {
+                    index = source_length;
+                }
+                mark_range(out_kinds, start, index, 4);
+            } else {
+                index += 1;
+            }
+        } else if (current >= '0' && current <= '9') {
+            let start: i64 = index;
+            index += 1;
+            while (index < source_length && is_number_byte(source[index])) {
+                index += 1;
+            }
+            mark_range(out_kinds, start, index, 5);
+        } else {
+            let keyword: i64 = keyword_length(source, source_length, index);
+            if (keyword > 0) {
+                let end: i64 = index + keyword;
+                mark_range(out_kinds, index, end, 1);
+                index = end;
+            } else {
+                let type_name: i64 = type_length(source, source_length, index);
+                if (type_name > 0) {
+                    let end: i64 = index + type_name;
+                    mark_range(out_kinds, index, end, 2);
+                    index = end;
+                } else {
+                    index += 1;
+                }
+            }
+        }
+    }
+    return 0;
+}

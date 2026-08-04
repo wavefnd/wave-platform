@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema
+    xmlns:xs="http://www.w3.org/2001/XMLSchema"
+    targetNamespace="https://wave-lang.dev/ns/platform/config/v1"
+    xmlns="https://wave-lang.dev/ns/platform/config/v1"
+    elementFormDefault="qualified">
+    <xs:element name="platform">
+        <xs:complexType>
+            <xs:sequence>
+                <xs:element name="server">
+                    <xs:complexType><xs:sequence>
+                        <xs:element name="address" type="xs:string"/>
+                        <xs:element name="environment" type="xs:string"/>
+                    </xs:sequence></xs:complexType>
+                </xs:element>
+                <xs:element name="storage">
+                    <xs:complexType><xs:sequence>
+                        <xs:element name="root" type="xs:string"/>
+                    </xs:sequence></xs:complexType>
+                </xs:element>
+                <xs:element name="frontend">
+                    <xs:complexType><xs:sequence>
+                        <xs:element name="distribution" type="xs:string"/>
+                    </xs:sequence></xs:complexType>
+                </xs:element>
+                <xs:element name="wave">
+                    <xs:complexType><xs:sequence>
+                        <xs:element name="executable" type="xs:string"/>
+                        <xs:element name="modules" type="xs:string"/>
+                        <xs:element name="enabled" type="xs:boolean"/>
+                    </xs:sequence></xs:complexType>
+                </xs:element>
+				<xs:element name="identity" minOccurs="0">
+					<xs:complexType><xs:sequence>
+						<xs:element name="mail-domain" type="xs:string"/>
+						<xs:element name="registration-open" type="xs:boolean"/>
+						<xs:element name="session-hours" type="xs:positiveInteger"/>
+						<xs:element name="secure-cookies" type="xs:boolean"/>
+					</xs:sequence></xs:complexType>
+				</xs:element>
+				<xs:element name="mail" minOccurs="0">
+					<xs:complexType><xs:sequence>
+						<xs:element name="hostname" type="xs:string"/>
+						<xs:element name="smtp-address" type="xs:string"/>
+						<xs:element name="max-message-bytes" type="xs:positiveInteger"/>
+						<xs:element name="tls-certificate" type="xs:string" minOccurs="0"/>
+						<xs:element name="tls-key" type="xs:string" minOccurs="0"/>
+						<xs:element name="relay-address" type="xs:string" minOccurs="0"/>
+						<xs:element name="relay-implicit-tls" type="xs:boolean" minOccurs="0"/>
+						<xs:element name="direct-delivery" type="xs:boolean"/>
+						<xs:element name="dkim-domain" type="xs:string" minOccurs="0"/>
+						<xs:element name="dkim-selector" type="xs:string" minOccurs="0"/>
+						<xs:element name="dkim-private-key" type="xs:string" minOccurs="0"/>
+					</xs:sequence></xs:complexType>
+				</xs:element>
+                <xs:element name="modules">
+                    <xs:complexType><xs:all>
+                        <xs:element name="account" type="moduleToggle"/>
+                        <xs:element name="auth" type="moduleToggle"/>
+                        <xs:element name="session" type="moduleToggle"/>
+                        <xs:element name="permission" type="moduleToggle"/>
+                        <xs:element name="document" type="moduleToggle"/>
+                        <xs:element name="mail" type="moduleToggle"/>
+                        <xs:element name="mailbox" type="moduleToggle"/>
+                        <xs:element name="mailingList" type="moduleToggle"/>
+                        <xs:element name="community" type="moduleToggle"/>
+                        <xs:element name="question" type="moduleToggle"/>
+                        <xs:element name="gitMirror" type="moduleToggle"/>
+                        <xs:element name="search" type="moduleToggle"/>
+                        <xs:element name="audit" type="moduleToggle"/>
+                    </xs:all></xs:complexType>
+                </xs:element>
+            </xs:sequence>
+            <xs:attribute name="version" type="xs:positiveInteger" use="required"/>
+        </xs:complexType>
+    </xs:element>
+    <xs:complexType name="moduleToggle">
+        <xs:attribute name="enabled" type="xs:boolean" use="required"/>
+    </xs:complexType>
+</xs:schema>

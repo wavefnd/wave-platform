@@ -1,0 +1,7 @@
+export(c, "wave_policy_engine_abi_version") fun policy_engine_abi_version() -> i32 {
+    return 1;
+}
+
+export(c, "wave_policy_engine_health") fun policy_engine_health() -> i32 {
+    return 1;
+}

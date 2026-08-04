@@ -1,0 +1,50 @@
+:root {
+  --wave-bg-canvas: #f3f4f6;
+  --wave-bg-subtle: #f8f9fb;
+  --wave-surface: #ffffff;
+  --wave-surface-selected: #f1efff;
+  --wave-border: #d8dbe2;
+  --wave-border-strong: #b9bec9;
+  --wave-text: #1f2328;
+  --wave-text-secondary: #5f6672;
+  --wave-text-muted: #6f7682;
+  --wave-accent: #6654f1;
+  --wave-accent-hover: #5140d5;
+  --wave-accent-soft: #eeebff;
+  --wave-success: #1f883d;
+  --wave-warning: #9a6700;
+  --wave-danger: #cf222e;
+  --wave-radius-xs: 2px;
+  --wave-radius-sm: 4px;
+  --wave-radius-md: 6px;
+  --wave-radius-lg: 8px;
+  --wave-shadow-overlay: 0 8px 24px rgba(31, 35, 40, 0.14);
+  --wave-space-1: 4px;
+  --wave-space-2: 8px;
+  --wave-space-3: 12px;
+  --wave-space-4: 16px;
+  --wave-space-5: 24px;
+  --wave-space-6: 32px;
+  --wave-space-7: 48px;
+  --service-accent: var(--wave-accent);
+
+  /* Compatibility aliases for existing small UI components. */
+  --ui-radius-xs: var(--wave-radius-xs);
+  --ui-radius-sm: var(--wave-radius-sm);
+  --ui-radius-md: var(--wave-radius-md);
+  --ui-radius-lg: var(--wave-radius-lg);
+  --ui-border: var(--wave-border);
+  --ui-surface: var(--wave-surface);
+  --ui-subtle: var(--wave-bg-subtle);
+  --synth-wave: var(--wave-accent);
+  --synth-wave-dark: var(--wave-accent-hover);
+}
+
+[data-service="portal"] { --service-accent: #6654f1; }
+[data-service="mail"] { --service-accent: #376fd3; }
+[data-service="community"] { --service-accent: #5946d9; }
+[data-service="personal"] { --service-accent: #6654f1; }
+[data-service="docs"] { --service-accent: #5143c7; }
+[data-service="questions"] { --service-accent: #b95f0d; }
+[data-service="source"] { --service-accent: #30313a; }
+[data-service="admin"] { --service-accent: #6654f1; }

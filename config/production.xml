@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<platform xmlns="https://wave-lang.dev/ns/platform/config/v1" version="1">
+    <server>
+        <address>0.0.0.0:8080</address>
+        <environment>production</environment>
+    </server>
+
+    <storage>
+        <root>/app/data</root>
+    </storage>
+
+    <frontend>
+        <distribution>/app/web/dist</distribution>
+    </frontend>
+
+    <wave>
+        <executable>wavec</executable>
+        <modules>/app/wave</modules>
+        <enabled>true</enabled>
+    </wave>
+
+    <identity>
+        <mail-domain>wave-lang.dev</mail-domain>
+        <registration-open>true</registration-open>
+        <session-hours>720</session-hours>
+        <secure-cookies>false</secure-cookies>
+    </identity>
+
+    <mail>
+        <hostname>mail.wave-lang.dev</hostname>
+        <smtp-address>0.0.0.0:2525</smtp-address>
+        <max-message-bytes>26214400</max-message-bytes>
+        <direct-delivery>true</direct-delivery>
+    </mail>
+
+    <modules>
+        <account enabled="true"/>
+        <auth enabled="true"/>
+        <session enabled="true"/>
+        <permission enabled="true"/>
+        <document enabled="true"/>
+        <mail enabled="true"/>
+        <mailbox enabled="true"/>
+        <mailingList enabled="true"/>
+        <community enabled="true"/>
+        <question enabled="true"/>
+        <gitMirror enabled="true"/>
+        <search enabled="true"/>
+        <audit enabled="true"/>
+    </modules>
+</platform>

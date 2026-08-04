@@ -1,0 +1,114 @@
+services:
+  wave-platform:
+    container_name: wave-platform
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: wave-platform:development
+    restart: unless-stopped
+    user: "${WAVE_PLATFORM_RUNTIME_UID:-1000}:${WAVE_PLATFORM_RUNTIME_GID:-1000}"
+    ports:
+      - "${WAVE_SMTP_HOST_PORT:-2525}:2525"
+    expose:
+      - "8080"
+    environment:
+      WAVE_PLATFORM_ADDRESS: "0.0.0.0:8080"
+      WAVE_PLATFORM_DATA_ROOT: "/app/data"
+      WAVE_PLATFORM_CONFIG: "/app/config/production.xml"
+      WAVE_PLATFORM_WEB_ROOT: "/app/web/dist"
+      WAVE_PLATFORM_WAVE_MODULE_PATH: "/app/wave"
+      WAVE_MAIL_DOMAIN: "${WAVE_DOMAIN:-wave-lang.dev}"
+      WAVE_REGISTRATION_OPEN: "${WAVE_REGISTRATION_OPEN:-true}"
+      WAVE_SESSION_HOURS: "${WAVE_SESSION_HOURS:-720}"
+      WAVE_SECURE_COOKIES: "${WAVE_SECURE_COOKIES:-false}"
+      WAVE_ADMIN_DISPLAY_NAME: "${WAVE_ADMIN_DISPLAY_NAME:-}"
+      WAVE_ADMIN_USERNAME: "${WAVE_ADMIN_USERNAME:-}"
+      WAVE_ADMIN_RECOVERY_EMAIL: "${WAVE_ADMIN_RECOVERY_EMAIL:-}"
+      WAVE_ADMIN_TOTP_SECRET: "${WAVE_ADMIN_TOTP_SECRET:-}"
+      WAVE_AUTH_ENCRYPTION_KEY: "${WAVE_AUTH_ENCRYPTION_KEY:-}"
+      WAVE_TOTP_ISSUER: "${WAVE_TOTP_ISSUER:-Wave Platform}"
+      WAVE_PUBLIC_URL: "${WAVE_PUBLIC_URL:-http://localhost:8080}"
+      WAVE_TURNSTILE_SITE_KEY: "${WAVE_TURNSTILE_SITE_KEY:-}"
+      WAVE_TURNSTILE_SECRET_KEY: "${WAVE_TURNSTILE_SECRET_KEY:-}"
+      WAVE_SMTP_HOSTNAME: "${WAVE_SMTP_HOSTNAME:-mail.wave-lang.dev}"
+      WAVE_SMTP_ADDRESS: "0.0.0.0:2525"
+      WAVE_SMTP_MAX_MESSAGE_BYTES: "${WAVE_SMTP_MAX_MESSAGE_BYTES:-26214400}"
+      WAVE_SMTP_TLS_CERTIFICATE: "${WAVE_SMTP_TLS_CERTIFICATE:-}"
+      WAVE_SMTP_TLS_KEY: "${WAVE_SMTP_TLS_KEY:-}"
+      WAVE_SMTP_RELAY_ADDRESS: "${WAVE_SMTP_RELAY_ADDRESS:-}"
+      WAVE_SMTP_RELAY_USERNAME: "${WAVE_SMTP_RELAY_USERNAME:-}"
+      WAVE_SMTP_RELAY_PASSWORD: "${WAVE_SMTP_RELAY_PASSWORD:-}"
+      WAVE_SMTP_RELAY_IMPLICIT_TLS: "${WAVE_SMTP_RELAY_IMPLICIT_TLS:-false}"
+      WAVE_SMTP_DIRECT_DELIVERY: "${WAVE_SMTP_DIRECT_DELIVERY:-true}"
+      WAVE_DKIM_DOMAIN: "${WAVE_DKIM_DOMAIN:-}"
+      WAVE_DKIM_SELECTOR: "${WAVE_DKIM_SELECTOR:-}"
+      WAVE_DKIM_PRIVATE_KEY: "${WAVE_DKIM_PRIVATE_KEY:-}"
+      TZ: "Asia/Seoul"
+    depends_on:
+      wave-platform-data-init:
+        condition: service_completed_successfully
+    volumes:
+      - type: bind
+        source: ./data
+        target: /app/data
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8080/health/ready"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+    init: true
+    stop_grace_period: 30s
+
+  caddy:
+    image: caddy:2.10-alpine
+    restart: unless-stopped
+    depends_on:
+      wave-platform:
+        condition: service_healthy
+    environment:
+      WAVE_SITE_ADDRESS: "${WAVE_SITE_ADDRESS:-http://localhost}"
+    ports:
+      - "${WAVE_HTTP_PORT:-8080}:80"
+      - "${WAVE_HTTPS_PORT:-8443}:443"
+      - "${WAVE_HTTPS_PORT:-8443}:443/udp"
+    volumes:
+      - type: bind
+        source: ./Caddyfile
+        target: /etc/caddy/Caddyfile
+        read_only: true
+      - caddy-data:/data
+      - caddy-config:/config
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost/health/ready"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+
+  wave-platform-data-init:
+    image: alpine:3.22
+    restart: "no"
+    environment:
+      RUNTIME_UID: "${WAVE_PLATFORM_RUNTIME_UID:-1000}"
+      RUNTIME_GID: "${WAVE_PLATFORM_RUNTIME_GID:-1000}"
+    command:
+      - sh
+      - -c
+      - >-
+        mkdir -p /app/data/badger /app/data/blobs /app/data/git/mirrors
+        /app/data/git/temporary /app/data/mail /app/data/mail/tls /app/data/search
+        /app/data/temporary /app/data/backups &&
+        chown -R "$${RUNTIME_UID}:$${RUNTIME_GID}" /app/data &&
+        chmod 750 /app/data /app/data/badger /app/data/blobs /app/data/git
+        /app/data/git/temporary /app/data/mail /app/data/mail/tls /app/data/search
+        /app/data/temporary /app/data/backups &&
+        chmod 755 /app/data/git/mirrors
+    volumes:
+      - type: bind
+        source: ./data
+        target: /app/data
+
+volumes:
+  caddy-data:
+  caddy-config:
