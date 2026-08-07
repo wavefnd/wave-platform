@@ -85,7 +85,19 @@ Write-Step "[1/3] Downloading Wave $Version..."
 $fileSuffix = "x86_64-pc-windows-gnu"
 $fileName = "wave-$Version-$fileSuffix.zip"
 $url = "https://github.com/$Repo/releases/download/$Version/$fileName"
-$tempRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("wave-install-" + [System.Guid]::NewGuid().ToString("N"))
+
+if ($env:WAVE_INSTALL_DIR) {
+    $installDir = [System.IO.Path]::GetFullPath($env:WAVE_INSTALL_DIR)
+} else {
+    $installDir = Join-Path $env:LOCALAPPDATA "Wave\bin"
+}
+
+$installParent = Split-Path -Parent $installDir
+New-Item -ItemType Directory -Force -Path $installParent | Out-Null
+
+$tempRoot = Join-Path $installParent (".wave-install-" + [System.Guid]::NewGuid().ToString("N"))
+$stageDir = "$installDir.new.$PID"
+$backupDir = "$installDir.old.$PID"
 $downloadPath = Join-Path $tempRoot $fileName
 
 New-Item -ItemType Directory -Force -Path $tempRoot | Out-Null
@@ -116,20 +128,25 @@ try {
         Fail "Package does not contain bundled llvm/."
     }
 
-    if ($env:WAVE_INSTALL_DIR) {
-        $installDir = $env:WAVE_INSTALL_DIR
-    } else {
-        $installDir = Join-Path $env:LOCALAPPDATA "Wave\bin"
+    Remove-Item -Recurse -Force $stageDir -ErrorAction SilentlyContinue
+    Remove-Item -Recurse -Force $backupDir -ErrorAction SilentlyContinue
+    New-Item -ItemType Directory -Force -Path $stageDir | Out-Null
+
+    Copy-Item -Force -Path (Join-Path $packageDir "*") -Destination $stageDir -Recurse
+
+    if (Test-Path $installDir) {
+        Move-Item -Path $installDir -Destination $backupDir
     }
 
-    New-Item -ItemType Directory -Force -Path $installDir | Out-Null
-
-    $installedLlvm = Join-Path $installDir "llvm"
-    if (Test-Path $installedLlvm) {
-        Remove-Item -Recurse -Force $installedLlvm
+    try {
+        Move-Item -Path $stageDir -Destination $installDir
+    } catch {
+        if ((Test-Path $backupDir) -and -not (Test-Path $installDir)) {
+            Move-Item -Path $backupDir -Destination $installDir
+        }
+        throw
     }
 
-    Copy-Item -Force -Path (Join-Path $packageDir "*") -Destination $installDir -Recurse
     Add-UserPath $installDir
     $env:Path = "$installDir;$env:Path"
 
@@ -137,12 +154,30 @@ try {
 
     $installedWavec = Join-Path $installDir "wavec.exe"
     if (-not (Test-Path $installedWavec)) {
+        if (Test-Path $backupDir) {
+            Remove-Item -Recurse -Force $installDir -ErrorAction SilentlyContinue
+            Move-Item -Path $backupDir -Destination $installDir
+        }
         Fail "Installation failed. wavec.exe was not found in $installDir."
     }
 
-    & $installedWavec --version
+    try {
+        & $installedWavec --version
+        if ($LASTEXITCODE -ne 0) {
+            throw "wavec --version exited with code $LASTEXITCODE"
+        }
+    } catch {
+        if (Test-Path $backupDir) {
+            Remove-Item -Recurse -Force $installDir -ErrorAction SilentlyContinue
+            Move-Item -Path $backupDir -Destination $installDir
+        }
+        throw
+    }
+
+    Remove-Item -Recurse -Force $backupDir -ErrorAction SilentlyContinue
     Write-Host "Installation completed successfully."
     Write-Host "Restart PowerShell if 'wavec' is not available from PATH."
 } finally {
     Remove-Item -Recurse -Force $tempRoot -ErrorAction SilentlyContinue
+    Remove-Item -Recurse -Force $stageDir -ErrorAction SilentlyContinue
 }
