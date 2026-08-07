@@ -1,6 +1,13 @@
 package identity
 
 import (
+	"bytes"
+	"io"
+	"mime"
+	"mime/multipart"
+	"mime/quotedprintable"
+	stdmail "net/mail"
+	"strings"
 	"testing"
 	"time"
 
@@ -209,6 +216,65 @@ func TestSendMailUsesOneMessageForSenderAndRecipient(t *testing.T) {
 	archived, err := service.MailboxItems(recipient.ID, "Archive")
 	if err != nil || len(archived) != 1 {
 		t.Fatalf("archived=%d err=%v", len(archived), err)
+	}
+}
+
+func TestSystemMailIncludesPlainTextAndLinkedHTMLAlternatives(t *testing.T) {
+	content := systemMailContent{
+		Subject:     "Confirm your Wave recovery email",
+		Heading:     "Confirm your recovery email",
+		Intro:       "Use the button below to confirm this email address for your Wave account.",
+		ActionLabel: "Confirm recovery email",
+		ActionURL:   "https://wave-lang.dev/account/verify-recovery?token=abc&source=email",
+		Expiry:      "This link expires in 24 hours.",
+		Ignore:      "If you did not create or modify a Wave account, you can safely ignore this email.",
+	}
+	plainBody, htmlBody, err := renderSystemMail(content, "https://wave-lang.dev")
+	if err != nil {
+		t.Fatal(err)
+	}
+	message := maildomain.Message{
+		ID: "message-test", MessageID: "<message-test@wave-lang.dev>", From: "Wave Security <security@wave-lang.dev>",
+		To: []string{"user@example.net"}, Subject: content.Subject, CreatedAt: time.Date(2026, 8, 7, 12, 0, 0, 0, time.UTC),
+	}
+	raw, err := encodeSystemMail(message, plainBody, htmlBody)
+	if err != nil {
+		t.Fatal(err)
+	}
+	parsed, err := stdmail.ReadMessage(bytes.NewReader(raw))
+	if err != nil {
+		t.Fatal(err)
+	}
+	mediaType, parameters, err := mime.ParseMediaType(parsed.Header.Get("Content-Type"))
+	if err != nil || mediaType != "multipart/alternative" {
+		t.Fatalf("content type=%q parameters=%#v err=%v", mediaType, parameters, err)
+	}
+	if parsed.Header.Get("Auto-Submitted") != "auto-generated" {
+		t.Fatalf("Auto-Submitted=%q", parsed.Header.Get("Auto-Submitted"))
+	}
+	reader := multipart.NewReader(parsed.Body, parameters["boundary"])
+	parts := map[string]string{}
+	for {
+		part, partErr := reader.NextRawPart()
+		if partErr == io.EOF {
+			break
+		}
+		if partErr != nil {
+			t.Fatal(partErr)
+		}
+		partType, _, _ := mime.ParseMediaType(part.Header.Get("Content-Type"))
+		data, readErr := io.ReadAll(quotedprintable.NewReader(part))
+		if readErr != nil {
+			t.Fatal(readErr)
+		}
+		parts[partType] = string(data)
+	}
+	if !strings.Contains(parts["text/plain"], content.ActionURL) {
+		t.Fatalf("plain text does not contain action URL: %q", parts["text/plain"])
+	}
+	if !strings.Contains(parts["text/html"], `href="https://wave-lang.dev/account/verify-recovery?token=abc&amp;source=email"`) ||
+		!strings.Contains(parts["text/html"], ">Confirm recovery email</a>") {
+		t.Fatalf("HTML action link is missing: %q", parts["text/html"])
 	}
 }
 

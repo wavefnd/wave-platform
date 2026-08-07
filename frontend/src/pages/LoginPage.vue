@@ -63,6 +63,7 @@ async function recover() {
         <TurnstileWidget :site-key="siteKey" action="recovery" @token="challenge = $event" />
         <button class="portal-button primary" type="submit" :disabled="recoverySent">{{ t('auth.sendRecovery') }}</button>
         <p v-if="recoverySent" class="form-notice" role="status">{{ t('auth.recoverySent') }}</p>
+		<p v-if="recoverySent" class="mail-delivery-hint">{{ t('auth.checkSpam') }}</p>
         <p v-if="error" class="form-notice error" role="alert">{{ error }}</p>
         <button class="auth-text-action" type="button" @click="recoveryMode = false; challenge = ''">{{ t('auth.backToSignIn') }}</button>
       </form>

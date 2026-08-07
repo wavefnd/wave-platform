@@ -355,6 +355,7 @@ a:hover { color: #35279a; }
 .auth-alternate { margin: 4px 0 0; font-size: 13px; text-align: center; }
 .auth-panel-wide { max-width: 480px; }
 .auth-help { margin: 0 0 4px; color: var(--wave-text-secondary); font-size: 13px; line-height: 1.55; }
+.mail-delivery-hint { margin: 2px 0 0; color: var(--wave-text-muted); font-size: 12px; line-height: 1.5; }
 .auth-text-action { margin: 2px 0 0 !important; padding: 4px; border: 0; background: transparent; color: var(--wave-accent); font-size: 13px; cursor: pointer; }
 .auth-text-action:hover { text-decoration: underline; }
 .turnstile-slot { min-height: 2px; margin-top: 8px; }

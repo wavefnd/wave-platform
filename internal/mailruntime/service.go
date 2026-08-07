@@ -410,7 +410,7 @@ func (sender *smtpSender) sign(raw []byte) ([]byte, error) {
 		Domain: sender.config.DKIMDomain, Selector: sender.config.DKIMSelector, Signer: sender.signer,
 		HeaderCanonicalization: dkim.CanonicalizationRelaxed,
 		BodyCanonicalization:   dkim.CanonicalizationRelaxed,
-		HeaderKeys:             []string{"From", "To", "Cc", "Subject", "Date", "Message-ID", "MIME-Version", "Content-Type", "Content-Transfer-Encoding"},
+		HeaderKeys:             []string{"From", "To", "Cc", "Subject", "Date", "Message-ID", "MIME-Version", "Auto-Submitted", "X-Auto-Response-Suppress", "Content-Type", "Content-Transfer-Encoding"},
 	}); err != nil {
 		return nil, fmt.Errorf("sign message with DKIM: %w", err)
 	}

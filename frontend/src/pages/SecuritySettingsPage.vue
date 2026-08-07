@@ -70,7 +70,9 @@ async function updateRecovery() {
         <button class="portal-button" type="submit">{{ t('auth.sendVerification') }}</button>
       </form>
     </section>
-    <p v-if="notice" class="form-notice" role="status">{{ notice }}</p><p v-if="error" class="form-notice error" role="alert">{{ error }}</p>
+    <p v-if="notice" class="form-notice" role="status">{{ notice }}</p>
+    <p v-if="notice" class="mail-delivery-hint">{{ t('auth.checkSpam') }}</p>
+    <p v-if="error" class="form-notice error" role="alert">{{ error }}</p>
     <AuthenticatorEnrollmentDialog
       v-if="enrollment"
       v-model:code="newCode"

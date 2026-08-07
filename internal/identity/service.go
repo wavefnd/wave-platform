@@ -4,9 +4,13 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"html"
 	"mime"
+	"mime/multipart"
+	"mime/quotedprintable"
 	stdmail "net/mail"
 	"net/textproto"
+	"net/url"
 	"strings"
 	"time"
 
@@ -54,6 +58,16 @@ type OutgoingMail struct {
 	To      string
 	Subject string
 	Body    string
+}
+
+type systemMailContent struct {
+	Subject     string
+	Heading     string
+	Intro       string
+	ActionLabel string
+	ActionURL   string
+	Expiry      string
+	Ignore      string
 }
 
 type Service struct {
@@ -331,9 +345,15 @@ func (service *Service) RequestTOTPRecovery(identifier string) error {
 		return nil
 	}
 	link := service.baseURL() + "/account/recover?token=" + result.Token
-	body := "A request was made to reset the authenticator for your Wave account.\n\n" + link +
-		"\n\nThis link expires in 30 minutes. If you did not request this, ignore this message."
-	_, err = service.SendSystemMail(email, "Reset your Wave authenticator", body)
+	_, err = service.sendSystemMail(email, systemMailContent{
+		Subject:     "Reset your Wave authenticator",
+		Heading:     "Reset your authenticator",
+		Intro:       "Use the button below to connect a new authenticator app to your Wave account.",
+		ActionLabel: "Reset authenticator",
+		ActionURL:   link,
+		Expiry:      "This link expires in 30 minutes.",
+		Ignore:      "If you did not request this change, you can safely ignore this email.",
+	})
 	return err
 }
 
@@ -372,9 +392,15 @@ func (service *Service) sendRecoveryVerification(accountID, email string) error 
 		return err
 	}
 	link := service.baseURL() + "/account/verify-recovery?token=" + token
-	body := "Confirm this address as the recovery email for your Wave account.\n\n" + link +
-		"\n\nThis link expires in 24 hours. If you did not request this, ignore this message."
-	_, err = service.SendSystemMail(email, "Confirm your Wave recovery email", body)
+	_, err = service.sendSystemMail(email, systemMailContent{
+		Subject:     "Confirm your Wave recovery email",
+		Heading:     "Confirm your recovery email",
+		Intro:       "Use the button below to confirm this email address for your Wave account.",
+		ActionLabel: "Confirm recovery email",
+		ActionURL:   link,
+		Expiry:      "This link expires in 24 hours.",
+		Ignore:      "If you did not create or modify a Wave account, you can safely ignore this email.",
+	})
 	return err
 }
 
@@ -551,15 +577,18 @@ func (service *Service) SendMail(actor account.Account, outgoing OutgoingMail) (
 		DeliveryStatus: service.deliveryStatus(message.ID)}, nil
 }
 
-func (service *Service) SendSystemMail(to, subject, body string) (MailboxItem, error) {
+func (service *Service) sendSystemMail(to string, content systemMailContent) (MailboxItem, error) {
 	recipients, err := normalizeRecipients(to)
 	if err != nil {
 		return MailboxItem{}, fmt.Errorf("%w: %v", ErrInvalidMail, err)
 	}
-	subject = strings.TrimSpace(subject)
-	body = strings.TrimSpace(strings.ReplaceAll(body, "\r\n", "\n"))
-	if subject == "" || body == "" || strings.ContainsAny(subject, "\r\n") {
+	content.Subject = strings.TrimSpace(content.Subject)
+	if content.Subject == "" || strings.ContainsAny(content.Subject, "\r\n") {
 		return MailboxItem{}, ErrInvalidMail
+	}
+	plainBody, htmlBody, err := renderSystemMail(content, service.baseURL())
+	if err != nil {
+		return MailboxItem{}, fmt.Errorf("%w: %v", ErrInvalidMail, err)
 	}
 	messageID, err := identifier.New("message")
 	if err != nil {
@@ -569,19 +598,22 @@ func (service *Service) SendSystemMail(to, subject, body string) (MailboxItem, e
 	from := "security@" + service.mailDomain
 	message := maildomain.Message{ID: messageID, MessageID: "<" + messageID + "@" + service.mailDomain + ">",
 		ThreadID: messageID, AuthorAccountID: "system/security", From: (&stdmail.Address{Name: "Wave Security", Address: from}).String(),
-		To: recipients, Subject: subject, ReceivedAt: now, CreatedAt: now}
-	if err := service.mail.UpsertMessage(message, encodeRawMail(message, body)); err != nil {
+		To: recipients, Subject: content.Subject, ReceivedAt: now, CreatedAt: now}
+	raw, err := encodeSystemMail(message, plainBody, htmlBody)
+	if err != nil {
+		return MailboxItem{}, err
+	}
+	if err := service.mail.UpsertMessage(message, raw); err != nil {
 		return MailboxItem{}, err
 	}
 	if err := service.routeMessage(from, message, recipients, true); err != nil {
 		return MailboxItem{}, err
 	}
-	return MailboxItem{Message: message, Body: body, DeliveryStatus: service.deliveryStatus(message.ID)}, nil
+	return MailboxItem{Message: message, Body: plainBody, DeliveryStatus: service.deliveryStatus(message.ID)}, nil
 }
 
-// AcceptSMTP stores an RFC 5322/MIME message received through SMTP. A nil
-// actor means Internet ingress and is therefore restricted to local mailbox
-// recipients. A non-nil actor represents authenticated message submission.
+// AcceptSMTP stores an RFC 5322/MIME message received through server-to-server
+// SMTP. Internet ingress is restricted to local Wave mailbox recipients.
 func (service *Service) AcceptSMTP(actor *account.Account, envelopeFrom string, recipients []string, raw []byte) (MailboxItem, error) {
 	if len(raw) == 0 {
 		return MailboxItem{}, fmt.Errorf("%w: message data is empty", ErrInvalidMail)
@@ -831,6 +863,103 @@ func encodeRawMail(message maildomain.Message, body string) []byte {
 	raw.WriteString("\r\n")
 	raw.WriteString(strings.ReplaceAll(body, "\n", "\r\n"))
 	return []byte(raw.String())
+}
+
+func renderSystemMail(content systemMailContent, platformURL string) (string, string, error) {
+	for _, value := range []string{content.Heading, content.Intro, content.ActionLabel, content.ActionURL, content.Expiry, content.Ignore} {
+		if strings.TrimSpace(value) == "" {
+			return "", "", errors.New("system mail content is incomplete")
+		}
+	}
+	actionURL, err := url.Parse(content.ActionURL)
+	if err != nil || (actionURL.Scheme != "http" && actionURL.Scheme != "https") || actionURL.Host == "" {
+		return "", "", errors.New("system mail action URL is invalid")
+	}
+	platformURL = strings.TrimRight(platformURL, "/")
+	plain := strings.Join([]string{
+		"Wave",
+		"",
+		content.Heading,
+		"",
+		content.Intro,
+		"",
+		content.ActionLabel + ":",
+		content.ActionURL,
+		"",
+		content.Expiry,
+		"",
+		content.Ignore,
+		"",
+		"Wave Platform",
+		platformURL,
+	}, "\n")
+	escape := html.EscapeString
+	htmlBody := `<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>` + escape(content.Subject) + `</title></head>
+<body style="margin:0;padding:0;background:#f3f4f6;color:#1f2328;font-family:Arial,sans-serif">
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f3f4f6;padding:32px 16px"><tr><td align="center">
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:560px;background:#ffffff;border:1px solid #d8dbe2"><tr><td style="padding:32px">
+<div style="margin-bottom:28px;color:#6654f1;font-size:22px;font-weight:700">Wave</div>
+<h1 style="margin:0 0 16px;color:#1f2328;font-size:24px;line-height:1.3">` + escape(content.Heading) + `</h1>
+<p style="margin:0 0 24px;color:#5f6672;font-size:15px;line-height:1.6">` + escape(content.Intro) + `</p>
+<table role="presentation" cellspacing="0" cellpadding="0"><tr><td style="background:#6654f1"><a href="` + escape(content.ActionURL) + `" style="display:inline-block;padding:12px 18px;color:#ffffff;font-size:14px;font-weight:700;text-decoration:none">` + escape(content.ActionLabel) + `</a></td></tr></table>
+<p style="margin:24px 0 0;color:#5f6672;font-size:13px;line-height:1.6">` + escape(content.Expiry) + `</p>
+<p style="margin:8px 0 0;color:#7b828e;font-size:13px;line-height:1.6">` + escape(content.Ignore) + `</p>
+<div style="margin-top:28px;padding-top:20px;border-top:1px solid #d8dbe2;color:#7b828e;font-size:12px;line-height:1.6">Wave Platform<br><a href="` + escape(platformURL) + `" style="color:#5b47e8;text-decoration:none">` + escape(platformURL) + `</a></div>
+</td></tr></table>
+</td></tr></table>
+</body>
+</html>`
+	return plain, htmlBody, nil
+}
+
+func encodeSystemMail(message maildomain.Message, plainBody, htmlBody string) ([]byte, error) {
+	var content bytes.Buffer
+	writer := multipart.NewWriter(&content)
+	for _, part := range []struct {
+		contentType string
+		body        string
+	}{
+		{contentType: "text/plain; charset=utf-8", body: plainBody},
+		{contentType: "text/html; charset=utf-8", body: htmlBody},
+	} {
+		header := textproto.MIMEHeader{}
+		header.Set("Content-Type", part.contentType)
+		header.Set("Content-Transfer-Encoding", "quoted-printable")
+		bodyWriter, err := writer.CreatePart(header)
+		if err != nil {
+			return nil, err
+		}
+		encoded := quotedprintable.NewWriter(bodyWriter)
+		if _, err := encoded.Write([]byte(strings.ReplaceAll(part.body, "\n", "\r\n"))); err != nil {
+			return nil, err
+		}
+		if err := encoded.Close(); err != nil {
+			return nil, err
+		}
+	}
+	if err := writer.Close(); err != nil {
+		return nil, err
+	}
+	headers := textproto.MIMEHeader{}
+	headers.Set("From", message.From)
+	headers.Set("To", strings.Join(message.To, ", "))
+	headers.Set("Subject", mime.QEncoding.Encode("utf-8", message.Subject))
+	headers.Set("Date", message.CreatedAt.Format(time.RFC1123Z))
+	headers.Set("Message-ID", message.MessageID)
+	headers.Set("MIME-Version", "1.0")
+	headers.Set("Auto-Submitted", "auto-generated")
+	headers.Set("X-Auto-Response-Suppress", "All")
+	headers.Set("Content-Type", mime.FormatMediaType("multipart/alternative", map[string]string{"boundary": writer.Boundary()}))
+	order := []string{"From", "To", "Subject", "Date", "Message-ID", "MIME-Version", "Auto-Submitted", "X-Auto-Response-Suppress", "Content-Type"}
+	var raw strings.Builder
+	for _, name := range order {
+		raw.WriteString(name + ": " + headers.Get(name) + "\r\n")
+	}
+	raw.WriteString("\r\n")
+	raw.Write(content.Bytes())
+	return []byte(raw.String()), nil
 }
 
 func withoutFlag(flags []string, target string) []string {
