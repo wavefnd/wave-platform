@@ -6,23 +6,45 @@ group: language
 group_order: 2
 order: 11
 title: Comments
-summary: Line comments, nested block comments, and diagnostic behavior.
+summary: Line comments, nestable block comments, and diagnostics for unterminated comments.
 ---
 
 ## Line comments
 
+Everything after `//` through the end of the line is a comment.
+
 ```wave
-var count: i32 = 10; // ignored through the end of the line
+var count: i32 = 10; // current request count
 ```
 
 ## Block comments
 
+`/*` and `*/` delimit a block comment.
+
+```wave
+/* A comment can span
+   multiple lines. */
+```
+
+The v0.2.0-pre-beta lexer tracks block-comment depth, so **nested block comments are supported**.
+
 ```wave
 /* outer comment
-   /* nested comment */
-   outer comment continues
+   /* inner comment */
+   outer comment again
 */
 ```
 
-Comment markers inside string literals remain string content. An unterminated block comment is a compile-time error whose diagnostic points to the opening delimiter.
+## Comment markers inside strings
 
+String and character literals are tokenized as literals, so `//`, `/*`, and `*/` inside them are not interpreted as comment delimiters.
+
+```wave
+var text: str = "https://wave-lang.dev";
+```
+
+## Unterminated block comments
+
+If the lexer reaches the end of the file before finding the final `*/`, it emits an `UnterminatedComment` diagnostic. v0.2.0-pre-beta uses diagnostic code `E1002` for this case.
+
+When temporarily commenting out a large region, make sure nested comment depth remains balanced.

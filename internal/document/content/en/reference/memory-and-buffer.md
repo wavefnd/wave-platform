@@ -6,29 +6,58 @@ group: reference
 group_order: 3
 order: 5
 title: Memory and buffers
-summary: Manual allocation, copying, alignment, pages, and growable byte buffers.
+summary: Manual allocation, copying, alignment, page helpers in std::mem, and safe usage patterns around std::buffer.
 ---
 
-## Manual allocation
+## Basic manual allocation
 
 ```wave
 import("std::mem::alloc");
 import("std::mem::ops");
 
-var memory: ptr<u8> = mem_alloc(256);
-if (memory != null) {
-    mem_zero(memory, 256);
-    mem_free(memory, 256);
+fun main() {
+    let size: i64 = 256;
+    let mut memory: ptr<u8> = mem_alloc(size);
+
+    if (memory != null) {
+        mem_zero(memory, size);
+        mem_free(memory, size);
+    }
 }
 ```
 
-mem_alloc, mem_alloc_zeroed, mem_realloc, mem_free, page helpers, and aligned allocation expose explicit native memory. The caller retains the allocation size and must release storage with the matching function.
+`mem_alloc(size)` returns `ptr<u8>` and may return `null` on failure. `mem_free` receives both the pointer and the original allocation size.
 
-## Growable buffers
+## Zeroing and reallocation
 
-std::buffer is built on std::mem and separates allocation, read, write, and buffer types. Check null and error results before using returned storage.
+`std::mem::alloc` implements families including:
 
-> **Memory model**
-> 
-> ptr<T> in these APIs is the dedicated Wave Explicit Memory Type Model. It does not imply generic ownership, automatic bounds, or garbage collection.
+- `mem_alloc`
+- `mem_alloc_zeroed`
+- `mem_realloc`
+- `mem_free`
+- Generic item allocation/reallocation/free helpers
+- Page-count and page-alignment helpers
+- Aligned allocation and free helpers
 
+The current `mem_realloc` implementation allocates new storage, copies the necessary range, and frees the old storage. Check its exact failure behavior before building ownership logic around it.
+
+## Size units
+
+Major memory-size parameters use `i64` byte counts. Make units visible in calling code so element counts are not confused with byte counts.
+
+```wave
+let count: i64 = 32;
+let elem_size: i64 = 4;
+let bytes: i64 = count * elem_size;
+```
+
+## Pointer access
+
+A manually allocated `ptr<u8>` does not carry bounds. Before accessing `deref p[index]`, the caller must ensure that the index remains inside the allocation.
+
+## std::buffer
+
+`std::buffer` builds buffer helpers on top of `std::mem`. Its APIs still require callers to respect allocation failure, length/capacity, ownership, and release contracts.
+
+Keeping allocation and release in the same abstraction layer makes leaks and size mismatches easier to prevent and review.

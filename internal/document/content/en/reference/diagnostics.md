@@ -6,18 +6,65 @@ group: reference
 group_order: 3
 order: 2
 title: Diagnostics and troubleshooting
-summary: Interpret compiler failures and reduce a program to a useful report.
+summary: Human and JSON diagnostics, check mode, debug output, and a reproducible bug-report workflow.
 ---
 
-## Diagnostic workflow
+## Check the version first
 
-- Read the first diagnostic and its source span before secondary errors.
-- Confirm that wavec --version matches the documentation version.
-- Reduce the failure to the smallest complete source file.
-- Use --emit=check to separate frontend validation from linking and execution.
-- For FFI failures, verify the symbol, ABI, library path, and target architecture independently.
+Before investigating syntax behavior, verify that your compiler matches the documentation baseline.
 
-## Useful bug reports
+```shell
+wavec --version
+```
 
-Include the exact compiler version, operating system, target, command, minimal source, complete diagnostic text, expected result, and actual result. Remove secrets and private paths.
+This documentation targets v0.2.0-pre-beta.
 
+## Check the front end only
+
+To separate Wave source errors from linking or execution:
+
+```shell
+wavec build main.wave --emit=check
+```
+
+This checks Wave input without producing a normal executable.
+
+## JSON diagnostics
+
+For IDEs, CI, and build tools that need structured diagnostics:
+
+```shell
+wavec --error-format=json build main.wave --emit=check
+```
+
+Keep the default human-readable format for terminal use and JSON for automated consumers.
+
+## Inspect compiler stages
+
+```shell
+wavec --debug-wave=tokens build main.wave --emit=check
+wavec --debug-wave=ast build main.wave --emit=check
+```
+
+`--debug-wave` can expose selected stages such as lexer tokens, AST, or IR. For ordinary source errors, read the first actionable diagnostic and its source location before reaching for internal dumps.
+
+## Separate common failure classes
+
+1. **Parsing/type errors** also fail under `--emit=check`.
+2. **Import errors** require checking `std-path`, `--dep-root`, `--dep`, and the actual filesystem layout.
+3. **Link errors** require checking `--link`, `-L`, the target ABI, and symbol names.
+4. **Runtime errors** occur after a successful build and should be separated by exit status and runtime environment.
+5. **FFI errors** require rechecking widths, string representation, pointer lifetime, and calling convention against the native declaration.
+
+## A useful bug report
+
+Include:
+
+- `wavec --version`
+- Host OS and target triple
+- The complete command you ran
+- A minimal `.wave` source that reproduces the issue
+- Full diagnostic output
+- Expected and actual behavior
+
+Remove unrelated secrets, tokens, and private paths before posting logs publicly.

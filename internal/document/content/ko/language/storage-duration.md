@@ -6,28 +6,47 @@ group: language
 group_order: 2
 order: 12
 title: 저장 수명과 변경 가능성
-summary: 범위와 상태 요구에 따라 var, let, const, static을 선택합니다.
+summary: var, let, let mut, const와 static의 범위와 쓰기 가능성을 구분합니다.
 ---
 
-| 형식 | 범위와 용도 |
-| --- | --- |
-| var | 일반 지역 변수이며 Wave의 기본 변수 문법 |
-| let | 엄격한 OS·보안 코드의 제약된 불변 지역 바인딩 |
-| let mut | 엄격한 OS·보안 코드의 제약된 명시적 가변 지역 바인딩 |
-| const | 최상위 컴파일 시점 상수 |
-| static | 최상위 저장 변수 |
+## 선언별 의미
+
+| 형식 | 허용 위치 | 재대입 | 용도 |
+| --- | --- | --- | --- |
+| `var` | 함수·블록 | 가능 | 일반적인 가변 지역 변수 |
+| `let` | 함수·블록 | 불가 | 불변 지역 바인딩 |
+| `let mut` | 함수·블록 | 가능 | 명시적 가변 `let` 바인딩 |
+| `const` | 최상위 | 불가 | 전역 상수 선언 |
+| `static` | 최상위 | 가능 | 프로그램 수명 동안 존재하는 정적 저장 선언 |
 
 ```wave
 const PAGE_SIZE: i32 = 4096;
 static request_count: i64 = 0;
 
 fun main() {
-    var current: i32 = 1;
+    let limit: i32 = 4;
+    var current: i32 = 0;
+    let mut retries: i32 = 0;
+
     current += 1;
+    retries += 1;
+    println("{} {} {}", limit, current, retries);
 }
 ```
 
-> **범위 규칙**
-> 
-> 함수와 블록 안에서는 var와 let 계열을 사용합니다. 최상위 저장 선언에는 const와 static을 사용합니다.
+## let의 불변성
 
+```wave
+let value: i32 = 1;
+value = 2;
+```
+
+위 재대입은 허용되지 않습니다. 코드 생성 단계는 대상의 mutability가 `Let` 또는 `Const`이면 대입을 거부합니다.
+
+## const와 static의 지역 사용
+
+v0.2.0-pre-beta 함수 파서는 함수 본문 안의 `const`와 `static`을 명시적으로 거부합니다. 같은 제한은 `for` 초기화에도 적용됩니다.
+
+## 수명과 포인터
+
+지역 변수의 주소를 `&`로 얻을 수 있지만, 포인터가 가리키는 저장소의 실제 유효 기간을 `ptr<T>` 타입이 추적하지는 않습니다. 지역 저장소의 주소를 함수 밖으로 넘길 때는 그 주소가 계속 유효한지 프로그램 구조에서 직접 보장해야 합니다.

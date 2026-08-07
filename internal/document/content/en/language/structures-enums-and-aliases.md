@@ -5,11 +5,11 @@ locale: en
 group: language
 group_order: 2
 order: 6
-title: Structures, enums, and aliases
-summary: Define composite data, named alternatives, and reusable type names.
+title: Structs, enums, and type aliases
+summary: Struct fields and methods, proto extensions, enums with explicit representation types, and type aliases.
 ---
 
-## Structures
+## Structs
 
 ```wave
 struct Point {
@@ -17,10 +17,40 @@ struct Point {
     y: f64;
 }
 
-var point: Point = Point { x: 1.0, y: 2.0 };
+fun main() {
+    var point: Point = Point { x: 1.0, y: 2.0 };
+    println("{}", point.x);
+}
+```
+
+Struct fields use `name: type;`. Field access uses `value.field`.
+
+## Methods and proto blocks
+
+The v0.2.0-pre-beta parser accepts `fun` methods directly inside a struct body. `proto` also provides a separate block for attaching methods to an already declared struct.
+
+```wave
+struct Counter {
+    value: i32;
+}
+
+proto Counter {
+    fun current(self: Counter) -> i32 {
+        return self.value;
+    }
+}
+```
+
+Call a method with ordinary method syntax:
+
+```wave
+var counter: Counter = Counter { value: 3 };
+var value: i32 = counter.current();
 ```
 
 ## Enums
+
+This release's enum syntax writes an underlying representation type after `->`.
 
 ```wave
 enum State -> i32 {
@@ -30,23 +60,16 @@ enum State -> i32 {
 }
 ```
 
-Structures group fields under one type. Enums define a closed set of named alternatives. Type aliases give an existing type another domain-specific name.
+A variant can specify an integer value explicitly; omitted values continue from preceding values according to compiler enum processing.
 
-## Protocol implementations
+## Type aliases
 
 ```wave
-proto Point {
-    fun length_squared(self: Point) -> f64 {
-        return self.x * self.x + self.y * self.y;
-    }
-}
-
-var distance: f64 = point.length_squared();
+type FileHandle = i64;
 ```
 
-A proto block attaches typed behavior to a structure. The self parameter states the receiver type explicitly.
+Aliases let the same underlying type be referenced by another name.
 
-> **Layout**
-> 
-> Do not assume a native layout at an FFI or binary-data boundary unless the compiler and the external ABI both guarantee it.
+## ABI and layout
 
+When sharing a Wave struct directly across an external ABI or binary-file boundary, do not infer C-compatible layout from field order alone. Design the representation according to guarantees provided by the target ABI and compiler.

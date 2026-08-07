@@ -6,37 +6,68 @@ group: language
 group_order: 2
 order: 4
 title: 제어 흐름
-summary: 조건, 반복, match와 흐름 제어를 설명합니다.
+summary: 괄호가 필요한 조건문과 반복문, C형 for, match, break와 continue를 설명합니다.
 ---
 
 ## 조건문
 
+v0.2.0-pre-beta의 `if`와 `else if` 조건은 **괄호가 필수**입니다.
+
 ```wave
-if score >= 90 {
+if (score >= 90) {
     println("A");
-} else if score >= 80 {
+} else if (score >= 80) {
     println("B");
 } else {
     println("C");
 }
 ```
 
-## 반복문
+`if score >= 90 { ... }`처럼 괄호를 생략한 형태는 이 릴리스 파서가 받지 않습니다.
+
+## while 반복문
+
+`while` 조건도 괄호로 감쌉니다.
 
 ```wave
 var index: i32 = 0;
-while index < 10 {
+while (index < 10) {
     index += 1;
-}
-
-for (item: i32 = 0; item < 10; item += 1) {
-    println("{}", item);
 }
 ```
 
-break는 가장 가까운 반복문을 종료하고 continue는 다음 반복을 시작합니다.
+## for 반복문
 
-## 패턴 선택
+`for`는 초기화, 조건, 증감식의 세 부분을 가지는 형태를 사용합니다.
+
+```wave
+for (var i: i32 = 0; i < 10; i += 1) {
+    println("{}", i);
+}
+```
+
+초기화에는 `var`, `let`, `let mut`, 타입이 명시된 바인딩 또는 일반 표현식을 사용할 수 있습니다. `const`와 `static`은 지역 for 초기화에 사용할 수 없습니다.
+
+## break와 continue
+
+```wave
+var i: i32 = 0;
+while (i < 20) {
+    i += 1;
+    if (i == 5) {
+        continue;
+    }
+    if (i == 10) {
+        break;
+    }
+}
+```
+
+`break`는 가장 가까운 반복문을 끝내고, `continue`는 다음 반복으로 진행합니다.
+
+## match
+
+`match`의 대상 식도 괄호 안에 둡니다. v0.2.0-pre-beta의 패턴은 정수 리터럴, 식별자 형태의 이름, `_` 와일드카드를 처리합니다.
 
 ```wave
 match (status) {
@@ -46,3 +77,4 @@ match (status) {
 }
 ```
 
+와일드카드 `_`는 한 `match` 안에 중복해서 둘 수 없습니다. 각 arm 본문은 `{ ... }` 블록이어야 합니다.

@@ -6,24 +6,54 @@ group: reference
 group_order: 3
 order: 4
 title: Strings and bytes
-summary: String length, comparison, searching, hashing, ASCII helpers, and endian byte operations.
+summary: String submodules, len/is_empty, comparison, search, trimming, ASCII helpers, and endian-aware byte operations.
 ---
 
-## String modules
+## String module layout
+
+`std/string` in v0.2.0-pre-beta contains these source units:
+
+- `ascii.wave`
+- `cmp.wave`
+- `find.wave`
+- `hash.wave`
+- `len.wave`
+- `trim.wave`
+
+Import the source unit that defines the operations you need.
+
+## Length and emptiness
+
+`std::string::len` defines both `len` and `is_empty`.
 
 ```wave
 import("std::string::len");
+
+fun main() {
+    let size: i32 = len("Wave");
+    let empty: bool = is_empty("");
+    println("{} {}", size, empty);
+}
+```
+
+The current `len` implementation indexes the string until it encounters a zero value and returns an `i32` count. Code using this API should therefore follow the release's `str` representation contract.
+
+## Comparison, searching, and trimming
+
+```wave
 import("std::string::cmp");
 import("std::string::find");
 import("std::string::trim");
-
-var size: i32 = len("Wave");
-var empty: bool = is_empty("");
 ```
 
-The release separates string operations by role: len, cmp, find, hash, trim, and ascii. Import the concrete module that declares the function you use.
+Use the installed standard-library source for exact function names and return contracts. `wavec print std-path` prints the current `std` location.
+
+## ASCII helpers
+
+`std::string::ascii` provides helpers for byte-level ASCII classification and conversion. Do not assume that these APIs provide full Unicode text processing.
 
 ## Byte order
 
-std::bytes::endian provides endian swap, load, and store helpers for binary formats and protocols. Always pair a byte operation with the width and byte order required by the external format.
+`std::bytes` provides modules for reading/writing binary values and handling endianness. When implementing a file format or network protocol, distinguish host byte order from the byte order required by the external format.
 
+Keeping integer widths and offsets explicit makes binary-format code easier to review across targets.

@@ -6,10 +6,10 @@ group: language
 group_order: 2
 order: 5
 title: Functions and generics
-summary: Function declarations, parameters, return values, and generic code.
+summary: Function declarations, default parameters, returns, explicit generic instantiation, and current release limitations.
 ---
 
-## Functions
+## Function declarations
 
 ```wave
 fun add(left: i32, right: i32) -> i32 {
@@ -17,35 +17,65 @@ fun add(left: i32, right: i32) -> i32 {
 }
 
 fun log(message: str) {
-    println(message);
+    println("{}", message);
 }
 ```
 
-Parameter and return types are explicit. return transfers a value to the caller; a function without a result omits the return type.
+Parameters use `name: type`. Functions that return a value use `-> type`; omitting the return type defines a value-less function.
 
-## Generics
+## return
+
+```wave
+fun choose(flag: bool) -> i32 {
+    if (flag) {
+        return 1;
+    }
+    return 0;
+}
+```
+
+A value-less function can use `return;`.
+
+## Generic functions
 
 ```wave
 fun identity<T>(value: T) -> T {
     return value;
 }
+
+fun main() {
+    var integer: i32 = identity<i32>(10);
+    var decimal: f64 = identity<f64>(3.14);
+}
 ```
 
-```wave
-var integer: i32 = identity<i32>(10);
-var decimal: f64 = identity<f64>(3.14);
+Generic calls in v0.2.0-pre-beta **require explicit type arguments**. Calling a generic template as `identity(10)` without type arguments produces an error.
 
+## Generic structs
+
+```wave
 struct Pair<A, B> {
     first: A;
     second: B;
 }
 
-var pair: Pair<i32, f64> = Pair<i32, f64> { first: 1, second: 2.5 };
+fun main() {
+    var pair: Pair<i32, f64> = Pair<i32, f64> {
+        first: 1,
+        second: 2.5
+    };
+}
 ```
 
-Generic parameters allow functions and structures to operate on explicitly supplied concrete types. Calls do not infer omitted type arguments in this release. Keep ABI-facing declarations concrete unless the boundary explicitly defines instantiation.
+Concrete type combinations are monomorphized during compilation.
 
-> **Not a pointer model**
-> 
-> The angle brackets in ptr<T> belong to the Wave Explicit Memory Type Model. ptr<T> is a built-in memory type and is not an instantiation of the general generic system described here.
+## Default parameters
 
+The function parser supports default parameter values represented by integer, floating-point, and string literals. Omitted arguments are filled during the compiler's generic-rewrite stage. Do not assume arbitrary expression defaults are supported in this release.
+
+## Current generic limitations
+
+- Generic function calls require explicit type arguments.
+- Generic methods are not supported in v0.2.0-pre-beta.
+- Functions exposed through `export(...)` cannot be generic.
+- `ptr<T>` and `array<T, N>` are built-in type forms handled specially by the type parser, not user-defined generic templates.

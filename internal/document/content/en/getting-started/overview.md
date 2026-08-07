@@ -6,16 +6,14 @@ group: getting-started
 group_order: 1
 order: 1
 title: Wave language overview
-summary: What Wave is, what this reference covers, and which release it describes.
+summary: A practical overview of Wave 0.2.0-pre-beta, its program structure, and this documentation's release scope.
 ---
 
-## Scope
+## Documentation baseline
 
-Wave is a statically typed systems programming language designed for explicit control, readable low-level code, and interoperability with native libraries. This manual describes Wave 0.2.0-pre-beta as implemented by source revision bd5549b.
+Wave is a statically typed systems programming language designed for native code generation and explicit low-level control. This documentation targets **Wave v0.2.0-pre-beta**, commit `bd5549bd99a6cd8372b6542b4170a2221bac85d0`.
 
-> **Release baseline**
-> 
-> Every syntax example in this manual targets Wave 0.2.0-pre-beta. Later development builds may differ.
+Syntax added or changed on `master` after that release is outside this documentation baseline. If an example behaves differently with your compiler, check `wavec --version` first.
 
 ## First program
 
@@ -25,23 +23,60 @@ fun main() {
 }
 ```
 
-Save the source as main.wave, then compile it with wavec. A Wave program starts in main.
+Save the source as `main.wave` and run it with:
 
-## Console input and output
-
-```wave
-var name: str;
-input("{}", name);
-print("Hello, ");
-println("{}", name);
+```shell
+wavec run main.wave
 ```
 
-print writes without completing a line, println writes a formatted line, and input reads formatted input into a variable.
+To build an executable without running it:
 
-## Recommended reading path
+```shell
+wavec build main.wave -o app
+```
 
-- Install the compiler and verify its version.
-- Learn declarations, types, expressions, and control flow.
-- Continue with functions, structures, enums, modules, and the explicit memory type model.
-- Use the syntax reference when you need a compact reminder.
+Hosted executables normally start at `main`. Freestanding builds can select another entry symbol together with the appropriate linker configuration.
 
+## Basic statement style
+
+Wave uses explicit types for variables and function parameters.
+
+```wave
+fun add(left: i32, right: i32) -> i32 {
+    let result: i32 = left + right;
+    return result;
+}
+
+fun main() {
+    var count: i32 = 1;
+    count += 1;
+    println("count = {}", count);
+}
+```
+
+`var` is a reassignable local variable, `let` is an immutable local binding, and `let mut` is an explicitly mutable `let` binding. In this release, `const` and `static` are top-level declarations.
+
+## Console I/O
+
+In v0.2.0-pre-beta, `print`, `println`, and `input` are parser-recognized I/O statements rather than ordinary standard-library function calls. Their first argument must be a string literal, and the number of `{}` placeholders must match the number of following arguments.
+
+```wave
+fun main() {
+    var value: i32 = 0;
+    input("{}", value);
+    print("value = ");
+    println("{}", value);
+}
+```
+
+## Low-level facilities
+
+Wave provides `ptr<T>`, address-of `&`, explicit `deref`, C ABI boundaries through `extern(c)` and `export(c)`, and inline `asm`. These facilities do not automatically establish ownership, bounds, alignment, or lifetime validity; those properties remain part of the surrounding program and API contract.
+
+## Suggested learning order
+
+1. Install the compiler and check `wavec --version` and `wavec --help`.
+2. Learn declarations, types, expressions, and control flow.
+3. Learn functions, generics, structs, enums, and `proto`.
+4. Move on to pointers, imports, FFI, and the standard library.
+5. Use the toolchain and quick-reference pages as lookup material.

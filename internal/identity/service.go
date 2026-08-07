@@ -632,21 +632,30 @@ func (service *Service) AcceptSMTP(actor *account.Account, envelopeFrom string, 
 		return MailboxItem{}, ErrRelayDenied
 	}
 
-	parsed, err := stdmail.ReadMessage(bytes.NewReader(raw))
-	if err != nil {
-		return MailboxItem{}, fmt.Errorf("%w: malformed RFC 5322 message", ErrInvalidMail)
-	}
-	messageID, err := identifier.New("message")
-	if err != nil {
-		return MailboxItem{}, err
-	}
-	now := service.now().UTC()
-	subject, decodeErr := (&mime.WordDecoder{}).DecodeHeader(parsed.Header.Get("Subject"))
-	if decodeErr != nil {
-		subject = parsed.Header.Get("Subject")
-	}
-	from := strings.TrimSpace(parsed.Header.Get("From"))
-	authorID := ""
+    parsed, err := stdmail.ReadMessage(bytes.NewReader(raw))
+    if err != nil {
+    	return MailboxItem{}, fmt.Errorf("%w: malformed RFC 5322 message", ErrInvalidMail)
+    }
+
+    messageID, err := identifier.New("message")
+    if err != nil {
+    	return MailboxItem{}, err
+    }
+
+    now := service.now().UTC()
+
+    subject := decodeMIMEHeader(parsed.Header.Get("Subject"))
+    from := decodeMIMEHeader(parsed.Header.Get("From"))
+
+    if parsedFrom, err := stdmail.ParseAddress(from); err == nil {
+    	if parsedFrom.Name != "" {
+    		from = fmt.Sprintf("%s <%s>", parsedFrom.Name, parsedFrom.Address)
+    	} else {
+    		from = parsedFrom.Address
+    	}
+    }
+
+    authorID := ""
 	if actor != nil {
 		headerFrom, parseErr := stdmail.ParseAddress(from)
 		if parseErr != nil || !strings.EqualFold(headerFrom.Address, actor.Email) {
@@ -979,4 +988,18 @@ func withFlag(flags []string, target string) []string {
 		}
 	}
 	return append(flags, target)
+}
+
+func decodeMIMEHeader(value string) string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return ""
+	}
+
+	decoded, err := (&mime.WordDecoder{}).DecodeHeader(value)
+	if err != nil {
+		return value
+	}
+
+	return decoded
 }

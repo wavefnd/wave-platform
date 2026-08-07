@@ -6,25 +6,59 @@ group: language
 group_order: 2
 order: 9
 title: Inline assembly
-summary: Use architecture-specific instructions at an explicit low-level boundary.
+summary: Instruction strings, in/out operands, and clobber contracts inside asm blocks.
 ---
 
-## Assembly block
+## asm blocks
 
-asm provides an architecture-specific escape hatch. Inputs, outputs, and clobbered state must describe the instruction sequence accurately.
+`asm` is a low-level escape hatch for inserting target-architecture instructions.
 
 ```wave
-var result: i64;
+fun read_value() -> i64 {
+    var result: i64 = 0;
+    asm {
+        "mov rax, 123"
+        out("rax") result
+    }
+    return result;
+}
+```
+
+String literals in the block become assembly instruction entries.
+
+## Inputs and outputs
+
+```wave
+var result: i64 = 0;
 asm {
-    "mov rax, 123"
-    in("rdi") 1
+    "mov rax, rdi"
+    in("rdi") 123
     out("rax") result
 }
 ```
 
-in binds a Wave value to an input register and out writes an output register to a Wave variable. clobber declarations must name additional state changed by the block when required.
+- `in("reg") expression` associates a Wave value with an input operand.
+- `out("reg") target` stores an output into an assignable Wave target.
+- Register names can be parsed from strings or identifier forms.
 
-> **Portability**
-> 
-> Inline assembly is tied to a target architecture, ABI, and compiler contract. Isolate it behind a typed Wave function and provide a non-assembly implementation where practical.
+Input operands are intentionally limited to forms handled by this release's asm parser, including variables, integer and string literals, `&identifier`, `deref identifier`, and negative numeric literals.
 
+## clobbers
+
+If a block changes registers or memory state beyond explicit outputs, list that state in `clobber(...)`.
+
+```wave
+asm {
+    "nop"
+    clobber("rax", "rcx", "memory")
+}
+```
+
+## What to verify
+
+- Instruction syntax must match the target architecture and LLVM inline-assembly contract.
+- Do not destroy registers that the calling convention requires you to preserve.
+- Declare the required clobbers when the block reads or writes hidden state.
+- Prefer isolating architecture-specific asm behind small typed functions.
+
+Inline assembly's correctness and portability are not guaranteed by Wave's type system alone.

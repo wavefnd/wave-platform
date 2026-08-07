@@ -5,13 +5,25 @@ locale: en
 group: language
 group_order: 2
 order: 10
-title: Program structure and imports
-summary: Organize source files, entry points, declarations, and dependency imports.
+title: Program structure
+summary: Top-level declarations, the main entry point, import organization, and freestanding entry symbols.
 ---
 
-## Source file
+## Top-level source items
 
-A Wave source file can contain imports, top-level const and static declarations, type declarations, structures, enums, protocol blocks, extern or export declarations, and functions.
+A v0.2.0-pre-beta source file can contain top-level items such as:
+
+- `import(...)`
+- `const` and `static`
+- `type`
+- `struct`, `enum`, and `proto`
+- `extern(...)` and `export(...)`
+- `fun`
+- `#[target(...)]` conditions before supported items
+
+Local `var` and `let` declarations belong inside functions or blocks.
+
+## Hosted executable
 
 ```wave
 import("std::string::len");
@@ -19,17 +31,30 @@ import("std::string::len");
 const EXIT_OK: i32 = 0;
 
 fun main() -> i32 {
-    var message: str = "Wave";
+    let message: str = "Wave";
     println("{} {}", message, len(message));
     return EXIT_OK;
 }
 ```
 
-## Import resolution
+A normal hosted executable uses `main` as its program entry function.
 
-import receives a qualified string path. Standard-library paths start with std::. Dependency paths are resolved from the roots supplied to wavec or the package tool.
+## Declaration organization and imports
 
-## Entry point
+Imports are processed by combining the imported file's AST with the program. The compiler tracks already imported units, while standard, external-package, and local paths follow different resolution rules.
 
-Hosted executables normally define main. Freestanding builds can select another entry symbol with the compiler's --entry option and matching linker configuration.
+Keep source files focused and import the modules each file directly depends on; this makes dependency flow easier to read.
 
+## Freestanding programs
+
+Kernels, boot code, or targets without a hosted runtime can use freestanding build controls.
+
+```shell
+wavec build kernel.wave \
+  --freestanding \
+  --entry=_start \
+  --linker-script=linker.ld \
+  --no-start-files
+```
+
+`--freestanding` participates in a build plan without default libraries, while `--entry` configures the linker entry symbol. A bootable result still requires a target-appropriate linker script, object format, and platform startup design.
