@@ -40,6 +40,11 @@
 .portal-module > header a:hover,
 .portal-install-module > a:hover { color: var(--wave-accent); text-decoration: underline; }
 
+.install-platform-tabs { display: inline-flex; align-items: center; gap: 2px; }
+.install-platform-tabs button { min-height: 28px; padding: 3px 8px; border: 1px solid transparent; border-radius: var(--wave-radius-sm); background: transparent; color: var(--wave-text-muted); cursor: pointer; font-size: 11px; }
+.install-platform-tabs button:hover { border-color: var(--wave-border); color: var(--wave-text); }
+.install-platform-tabs button.active { border-color: var(--wave-border-strong); background: var(--wave-surface); color: var(--wave-text); font-weight: 650; }
+
 .portal-data-list {
   margin: 0;
   padding: 0;
@@ -95,6 +100,7 @@
 
 .terminal-command span { color: #998bff; user-select: none; }
 .terminal-command code { overflow-x: auto; white-space: nowrap; scrollbar-width: none; }
+.terminal-command.is-windows code { overflow-wrap: anywhere; white-space: normal; }
 .terminal-command code::-webkit-scrollbar { display: none; }
 .terminal-command button { display: grid; width: 30px; height: 28px; flex: 0 0 auto; place-items: center; border: 1px solid #4b4b4b; border-radius: 3px; background: #292929; color: #d7d7d7; cursor: pointer; }
 .terminal-command button:hover { border-color: #777; color: #fff; }

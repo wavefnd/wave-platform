@@ -9,15 +9,22 @@ title: Installing Wave
 summary: Install Wave with the official script or release archives, verify the toolchain, or build the compiler from source.
 ---
 
-## Official install script
+## Official install scripts
 
-On Unix-like systems, the official installer can install the latest release:
+On Linux and macOS, the official shell installer can install the latest release:
 
 ```shell
 curl -fsSL https://wave-lang.dev/install.sh | bash -s -- latest
 ```
 
-If the installer cannot update the current shell environment, apply the PATH instructions it prints or start a new shell.
+On Windows x86-64, run the PowerShell installer:
+
+```powershell
+irm https://wave-lang.dev/install.ps1 -OutFile install.ps1
+powershell -ExecutionPolicy Bypass -File .\install.ps1 -Latest
+```
+
+If an installer cannot update the current shell environment, apply the PATH instructions it prints or start a new shell. The Windows installer uses `%LOCALAPPDATA%\Wave\bin` by default and adds it to the user PATH.
 
 ## Verify the installation
 
@@ -68,4 +75,4 @@ The resulting executable is normally `target/debug/wavec` or `target/release/wav
 
 > **Reviewing remote scripts**
 >
-> If your environment does not permit piping a remote script directly into a shell, download and review the installer before running it.
+> Download and review `install.sh` or `install.ps1` before running it when required by your environment's security policy.

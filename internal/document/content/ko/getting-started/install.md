@@ -11,13 +11,20 @@ summary: 공식 설치 스크립트, 릴리스 아카이브와 소스 빌드 방
 
 ## 공식 설치 스크립트
 
-Unix 계열 환경에서는 공식 설치 스크립트로 최신 릴리스를 설치할 수 있습니다.
+Linux와 macOS에서는 공식 셸 설치 프로그램으로 최신 릴리스를 설치할 수 있습니다.
 
 ```shell
 curl -fsSL https://wave-lang.dev/install.sh | bash -s -- latest
 ```
 
-설치가 끝난 뒤 현재 셸에 PATH가 반영되지 않았다면 설치 프로그램이 출력한 안내를 적용하거나 새 셸을 여십시오.
+Windows x86-64에서는 PowerShell 설치 프로그램을 실행합니다.
+
+```powershell
+irm https://wave-lang.dev/install.ps1 -OutFile install.ps1
+powershell -ExecutionPolicy Bypass -File .\install.ps1 -Latest
+```
+
+설치가 끝난 뒤 현재 셸에 PATH가 반영되지 않았다면 설치 프로그램이 출력한 안내를 적용하거나 새 셸을 여십시오. Windows 설치 프로그램은 기본적으로 `%LOCALAPPDATA%\Wave\bin`을 사용하고 사용자 PATH에 이 경로를 추가합니다.
 
 ## 설치 확인
 
@@ -68,4 +75,4 @@ cargo build --release
 
 > **스크립트 검토**
 >
-> 보안 정책상 원격 스크립트를 바로 셸에 전달할 수 없는 환경에서는 설치 스크립트를 먼저 내려받아 내용을 검토한 뒤 실행하십시오.
+> 보안 정책에서 요구하는 경우 `install.sh` 또는 `install.ps1`을 먼저 내려받아 내용을 검토한 뒤 실행하십시오.

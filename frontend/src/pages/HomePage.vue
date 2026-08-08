@@ -24,7 +24,10 @@ const unansweredQuestions = ref<QuestionSummary[]>([])
 const repositories = ref<SourceRepository[]>([])
 const sponsors = ref<SponsorsView | null>(null)
 const copied = ref(false)
-const installCommand = 'curl -fsSL https://wave-lang.dev/install.sh | bash -s -- latest'
+const installPlatform = ref<'unix' | 'windows'>('unix')
+const installCommand = computed(() => installPlatform.value === 'windows'
+  ? 'irm https://wave-lang.dev/install.ps1 -OutFile install.ps1; powershell -ExecutionPolicy Bypass -File .\\install.ps1 -Latest'
+  : 'curl -fsSL https://wave-lang.dev/install.sh | bash -s -- latest')
 
 const docs = computed(() => [
   { path: 'getting-started/install', label: t('docs.installation'), detail: t('docs.installation.detail') },
@@ -44,7 +47,7 @@ function formatDate(value: string) {
 }
 
 async function copyInstall() {
-  await navigator.clipboard.writeText(installCommand)
+  await navigator.clipboard.writeText(installCommand.value)
   copied.value = true
   window.setTimeout(() => { copied.value = false }, 1600)
 }
@@ -129,8 +132,14 @@ onMounted(async () => {
       </section>
 
       <section class="portal-module portal-install-module">
-        <header><h2>{{ t('home.installWave') }}</h2></header>
-        <div class="terminal-command"><code><span>$</span> {{ installCommand }}</code><button type="button" :title="t('home.copyInstall')" :aria-label="t('home.copyInstall')" @click="copyInstall"><Check v-if="copied" :size="16" /><Copy v-else :size="16" /></button></div>
+        <header>
+          <h2>{{ t('home.installWave') }}</h2>
+          <div class="install-platform-tabs" role="group" :aria-label="t('home.installPlatform')">
+            <button type="button" :class="{ active: installPlatform === 'unix' }" :aria-pressed="installPlatform === 'unix'" @click="installPlatform = 'unix'">Linux / macOS</button>
+            <button type="button" :class="{ active: installPlatform === 'windows' }" :aria-pressed="installPlatform === 'windows'" @click="installPlatform = 'windows'">Windows</button>
+          </div>
+        </header>
+        <div class="terminal-command" :class="{ 'is-windows': installPlatform === 'windows' }"><code><span>{{ installPlatform === 'windows' ? 'PS>' : '$' }}</span> {{ installCommand }}</code><button type="button" :title="t('home.copyInstall')" :aria-label="t('home.copyInstall')" @click="copyInstall"><Check v-if="copied" :size="16" /><Copy v-else :size="16" /></button></div>
         <RouterLink to="/docs/getting-started/install">{{ t('home.start.docs') }} →</RouterLink>
       </section>
 
