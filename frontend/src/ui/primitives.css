@@ -18,7 +18,7 @@
 .ui-button:hover,
 .portal-button:hover,
 .button:hover {
-  border-color: #989eaa;
+  border-color: var(--wave-border-strong);
   background: var(--wave-bg-subtle);
   color: var(--wave-text);
 }
@@ -28,7 +28,7 @@
 .button.primary {
   border-color: var(--service-accent);
   background: var(--service-accent);
-  color: #fff;
+  color: var(--wave-on-accent);
 }
 
 .ui-button.primary:hover,
@@ -36,7 +36,7 @@
 .button.primary:hover {
   border-color: var(--wave-accent-hover);
   background: var(--wave-accent-hover);
-  color: #fff;
+  color: var(--wave-on-accent);
 }
 
 .ui-surface {
@@ -62,9 +62,9 @@
 }
 
 .ui-badge.is-accent {
-  border-color: #d8d2ff;
+  border-color: var(--wave-accent-soft);
   background: var(--wave-accent-soft);
-  color: #4938ba;
+  color: var(--wave-accent-text);
 }
 
 .ui-tabs {
@@ -116,7 +116,7 @@
   padding: 3px 7px;
   border: 1px solid var(--wave-border-strong);
   border-radius: var(--wave-radius-sm);
-  background: #fff;
+  background: var(--wave-surface-raised);
   color: var(--wave-text);
   cursor: pointer;
 }
@@ -138,7 +138,7 @@
 .ui-skeleton-rows small {
   height: 9px;
   border-radius: 2px;
-  background: #e9ebef;
+  background: var(--wave-border);
   animation: skeleton-pulse 1.4s ease-in-out infinite;
 }
 

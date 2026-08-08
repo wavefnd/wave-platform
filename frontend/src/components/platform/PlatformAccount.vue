@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { useI18n, type Locale } from '../../i18n'
 import { useAuthStore } from '../../stores/auth'
+import ThemeSelector from './ThemeSelector.vue'
 
 const { locale, setLocale, t } = useI18n()
 const auth = useAuthStore()
@@ -16,6 +17,7 @@ async function signOut() {
 
 <template>
   <div class="platform-account">
+    <ThemeSelector />
     <select :value="locale" :aria-label="t('nav.language')" @change="changeLocale">
       <option value="en">English</option>
       <option value="ko">한국어</option>

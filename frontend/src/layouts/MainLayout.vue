@@ -69,6 +69,7 @@ watchEffect(() => updateSEO(route, locale.value, service.value as Parameters<typ
       </div>
       <div :class="['platform-switcher-row', { open: menuOpen }]">
         <ServiceSwitcher :compact="!isPortal" />
+        <PlatformAccount class="mobile-platform-account" />
       </div>
     </header>
 

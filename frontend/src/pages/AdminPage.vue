@@ -18,14 +18,16 @@ import {
   type AdminAccount, type AdminSnapshot, type ModuleStatus, type PlatformStatus,
 } from '../services/http'
 import { useI18n } from '../i18n'
+import type { Locale } from '../i18n'
 import { useAuthStore } from '../stores/auth'
+import ThemeSelector from '../components/platform/ThemeSelector.vue'
 
 type PendingAction = { kind: 'status'; account: AdminAccount; status: 'active' | 'suspended' }
   | { kind: 'role'; account: AdminAccount; administrator: boolean }
 
 const router = useRouter()
 const auth = useAuthStore()
-const { locale, t } = useI18n()
+const { locale, setLocale, t } = useI18n()
 const modules = ref<ModuleStatus[]>([])
 const snapshot = ref<AdminSnapshot | null>(null)
 const platform = ref<PlatformStatus | null>(null)
@@ -128,6 +130,10 @@ async function signOut() {
   await auth.signOut()
   await router.replace('/')
 }
+
+function changeLocale(event: Event) {
+  setLocale((event.target as HTMLSelectElement).value as Locale)
+}
 </script>
 
 <template>
@@ -159,6 +165,8 @@ async function signOut() {
           <CHeaderToggler class="me-3" :aria-label="t('nav.menu')" @click="sidebarVisible = !sidebarVisible"><Menu :size="22" /></CHeaderToggler>
           <strong>Wave Platform</strong>
           <div class="ms-auto d-flex align-items-center gap-3">
+            <ThemeSelector class="form-select form-select-sm admin-preference-select" />
+            <select class="form-select form-select-sm admin-preference-select" :value="locale" :aria-label="t('nav.language')" @change="changeLocale"><option value="en">English</option><option value="ko">한국어</option></select>
             <span class="text-body-secondary small d-none d-sm-inline">{{ auth.account?.displayName }}</span>
             <button class="btn btn-outline-secondary btn-sm" type="button" @click="signOut">{{ t('auth.signOut') }}</button>
           </div>
@@ -260,6 +268,7 @@ body.coreui-admin-active { background-color: var(--cui-tertiary-bg); }
 .coreui-admin-template .sidebar-footer .nav-link { display: flex; align-items: center; color: var(--cui-sidebar-nav-link-color); text-decoration: none; }
 .coreui-admin-template .body { padding-bottom: 2rem; }
 .admin-heading, .admin-card-header { display: flex; align-items: center; justify-content: space-between; gap: 20px; }
+.admin-preference-select { width: auto; max-width: 150px; }
 .admin-heading .btn { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
 .admin-loading { padding: 48px 0; text-align: center; }
 .admin-search { display: flex; width: min(100%, 320px); height: 34px; align-items: center; gap: 7px; padding: 0 9px; border: 1px solid var(--cui-border-color); border-radius: var(--cui-border-radius); background: var(--cui-body-bg); color: var(--cui-secondary-color); }
@@ -276,5 +285,6 @@ body.coreui-admin-active { background-color: var(--cui-tertiary-bg); }
 .admin-definition-list dt { color: var(--cui-secondary-color); font-weight: 500; }
 .admin-definition-list dd { margin: 0; font-weight: 650; }
 @media (max-width: 991.98px) { .coreui-admin-template .wrapper { padding-inline-start: 0; } }
-@media (max-width: 767.98px) { .admin-card-header { align-items: stretch; flex-direction: column; }.admin-search { width: 100%; }.admin-heading { align-items: flex-start; }.coreui-admin-template .container-fluid { padding-right: 16px !important; padding-left: 16px !important; } }
+@media (max-width: 767.98px) { .admin-card-header { align-items: stretch; flex-direction: column; }.admin-search { width: 100%; }.admin-heading { align-items: flex-start; }.coreui-admin-template .container-fluid { padding-right: 16px !important; padding-left: 16px !important; }.admin-preference-select { max-width: 96px; }.coreui-admin-template .header .gap-3 { gap: .4rem !important; } }
+@media (max-width: 480px) { .coreui-admin-template .header strong { display: none; }.admin-preference-select { max-width: 88px; } }
 </style>
