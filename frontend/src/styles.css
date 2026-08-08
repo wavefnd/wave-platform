@@ -208,7 +208,7 @@ a:hover { color: var(--wave-link-hover); }
 .platform-account .account-signout:hover { border-color: var(--wave-border); background: var(--wave-bg-subtle); color: var(--wave-text); }
 
 .platform-account select { cursor: pointer; }
-.platform-account .theme-selector { width: 108px; }
+.platform-account .theme-toggle { display: grid; width: 32px; flex: 0 0 auto; place-items: center; padding: 0; }
 
 .platform-account a:hover {
   border-color: var(--wave-border);
@@ -432,10 +432,14 @@ a:hover { color: var(--wave-link-hover); }
   .platform-switcher-row { display: none; }
   .platform-switcher-row.open { display: block; }
   .service-switcher,
-  .service-switcher.compact { display: grid; grid-template-columns: repeat(2, 1fr); padding: 6px 10px 10px; }
-  .service-switcher a { min-height: 38px; border-radius: 4px; }
+  .service-switcher.compact { display: grid; grid-template-columns: 1fr; padding: 6px 12px; }
+  .service-switcher a { min-height: 42px; padding: 0 12px; border-bottom: 1px solid var(--wave-border); border-left: 3px solid transparent; }
+  .service-switcher a:last-child { border-bottom: 0; }
+  .service-switcher a:hover { background: var(--wave-surface-hover); }
+  .service-switcher a.router-link-exact-active,
+  .service-switcher a.router-link-active:not(:first-child) { border-left-color: var(--service-accent); background: var(--wave-surface-selected); }
   .service-switcher a::after { display: none; }
-  .platform-switcher-row .mobile-platform-account { display: flex; flex-wrap: wrap; justify-content: flex-start; gap: 4px; padding: 8px 12px 12px; border-top: 1px solid var(--wave-border); }
+  .platform-switcher-row .mobile-platform-account { display: flex; flex-wrap: wrap; justify-content: flex-start; gap: 5px; padding: 10px 12px 12px; border-top: 1px solid var(--wave-border); background: var(--wave-bg-subtle); }
   .mobile-platform-account .account-address { max-width: 120px; }
   .mobile-platform-account .account-create { display: inline-flex; }
   .portal-width,

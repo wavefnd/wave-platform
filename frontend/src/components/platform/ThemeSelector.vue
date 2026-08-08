@@ -1,19 +1,20 @@
 <script setup lang="ts">
+import { Moon, Sun } from '@lucide/vue'
+
 import { useI18n } from '../../i18n'
-import { useTheme, type ThemePreference } from '../../theme'
+import { useTheme } from '../../theme'
 
 const { t } = useI18n()
-const { preference, setTheme } = useTheme()
+const { resolved, setTheme } = useTheme()
 
-function changeTheme(event: Event) {
-  setTheme((event.target as HTMLSelectElement).value as ThemePreference)
+function toggleTheme() {
+  setTheme(resolved.value === 'dark' ? 'light' : 'black')
 }
 </script>
 
 <template>
-  <select class="theme-selector" :value="preference" :aria-label="t('theme.label')" :title="t('theme.label')" @change="changeTheme">
-    <option value="system">{{ t('theme.system') }}</option>
-    <option value="light">{{ t('theme.light') }}</option>
-    <option value="black">{{ t('theme.black') }}</option>
-  </select>
+  <button class="theme-toggle" type="button" :aria-label="resolved === 'dark' ? t('theme.switchLight') : t('theme.switchBlack')" :title="resolved === 'dark' ? t('theme.switchLight') : t('theme.switchBlack')" @click="toggleTheme">
+    <Sun v-if="resolved === 'dark'" :size="17" aria-hidden="true" />
+    <Moon v-else :size="17" aria-hidden="true" />
+  </button>
 </template>

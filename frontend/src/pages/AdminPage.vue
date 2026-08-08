@@ -165,7 +165,7 @@ function changeLocale(event: Event) {
           <CHeaderToggler class="me-3" :aria-label="t('nav.menu')" @click="sidebarVisible = !sidebarVisible"><Menu :size="22" /></CHeaderToggler>
           <strong>Wave Platform</strong>
           <div class="ms-auto d-flex align-items-center gap-3">
-            <ThemeSelector class="form-select form-select-sm admin-preference-select" />
+            <ThemeSelector class="admin-theme-toggle" />
             <select class="form-select form-select-sm admin-preference-select" :value="locale" :aria-label="t('nav.language')" @change="changeLocale"><option value="en">English</option><option value="ko">한국어</option></select>
             <span class="text-body-secondary small d-none d-sm-inline">{{ auth.account?.displayName }}</span>
             <button class="btn btn-outline-secondary btn-sm" type="button" @click="signOut">{{ t('auth.signOut') }}</button>
@@ -269,6 +269,8 @@ body.coreui-admin-active { background-color: var(--cui-tertiary-bg); }
 .coreui-admin-template .body { padding-bottom: 2rem; }
 .admin-heading, .admin-card-header { display: flex; align-items: center; justify-content: space-between; gap: 20px; }
 .admin-preference-select { width: auto; max-width: 150px; }
+.admin-theme-toggle { display: grid; width: 32px; height: 31px; flex: 0 0 auto; place-items: center; padding: 0; border: 1px solid var(--cui-border-color); border-radius: var(--cui-border-radius); background: var(--cui-body-bg); color: var(--cui-body-color); }
+.admin-theme-toggle:hover { background: var(--cui-tertiary-bg); }
 .admin-heading .btn { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
 .admin-loading { padding: 48px 0; text-align: center; }
 .admin-search { display: flex; width: min(100%, 320px); height: 34px; align-items: center; gap: 7px; padding: 0 9px; border: 1px solid var(--cui-border-color); border-radius: var(--cui-border-radius); background: var(--cui-body-bg); color: var(--cui-secondary-color); }
