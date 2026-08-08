@@ -20,6 +20,7 @@ import type { SourceRepository } from '../components/source/types'
 const { locale, t } = useI18n()
 const releases = ref<ReleaseSummary[]>([])
 const discussions = ref<CommunityThreadSummary[]>([])
+const personalPosts = ref<CommunityThreadSummary[]>([])
 const unansweredQuestions = ref<QuestionSummary[]>([])
 const repositories = ref<SourceRepository[]>([])
 const sponsors = ref<SponsorsView | null>(null)
@@ -40,6 +41,10 @@ function authorName(author: string) {
   return label.replace(/^"(.*)"$/, '$1') || author
 }
 
+function personalSpaceName(spaceID: string) {
+  return t(spaceID === 'development-log' ? 'community.space.development-log' : 'community.space.founder-notes')
+}
+
 function formatDate(value: string) {
   return new Intl.DateTimeFormat(locale.value === 'ko' ? 'ko-KR' : 'en-US', {
     year: 'numeric', month: 'short', day: 'numeric',
@@ -53,13 +58,18 @@ async function copyInstall() {
 }
 
 onMounted(async () => {
-  const [releaseResult, discussionResult, spaceResult, questionResult, repositoryResult, sponsorResult] = await Promise.allSettled([
+  const [releaseResult, discussionResult, spaceResult, questionResult, repositoryResult, sponsorResult, personalResult] = await Promise.allSettled([
     getReleases(4),
     getCommunityThreads('', { sort: 'active', limit: 5 }),
     getCommunitySpaces(),
     getQuestions({ sort: 'unanswered', limit: 5 }),
     getSourceRepositories(),
 	getSponsors(),
+    Promise.all([
+      getCommunityThreads('founder-notes', { sort: 'latest', limit: 4 }),
+      getCommunityThreads('development-log', { sort: 'latest', limit: 4 }),
+    ]).then(([writing, developmentLog]) => [...writing, ...developmentLog]
+      .sort((left, right) => right.createdAt.localeCompare(left.createdAt)).slice(0, 4)),
   ])
   if (releaseResult.status === 'fulfilled') releases.value = releaseResult.value
   if (discussionResult.status === 'fulfilled' && spaceResult.status === 'fulfilled') {
@@ -74,6 +84,7 @@ onMounted(async () => {
       .slice(0, 4)
   }
 	if (sponsorResult.status === 'fulfilled') sponsors.value = sponsorResult.value
+  if (personalResult.status === 'fulfilled') personalPosts.value = personalResult.value
 })
 </script>
 
@@ -143,18 +154,34 @@ onMounted(async () => {
         <RouterLink to="/docs/getting-started/install">{{ t('home.start.docs') }} →</RouterLink>
       </section>
 
-      <section v-if="repositories.length" class="portal-module portal-source-module">
-        <header>
-          <h2>{{ t('home.recentSource') }}</h2>
-          <RouterLink to="/source">{{ t('common.more') }}</RouterLink>
-        </header>
-        <ul class="portal-data-list portal-discussions">
-          <li v-for="repository in repositories" :key="repository.id">
-            <RouterLink :to="{ name: 'source-repository', params: { repository: repository.id } }">{{ repository.owner }}/{{ repository.name }}</RouterLink>
-            <small>{{ repository.headCommit?.subject }} · {{ formatDate(repository.headCommit?.authoredAt ?? '') }}</small>
-          </li>
-        </ul>
-      </section>
+      <div class="portal-module-pair" :class="{ single: !repositories.length }">
+        <section v-if="repositories.length" class="portal-module portal-source-module">
+          <header>
+            <h2>{{ t('home.recentSource') }}</h2>
+            <RouterLink to="/source">{{ t('common.more') }}</RouterLink>
+          </header>
+          <ul class="portal-data-list portal-discussions">
+            <li v-for="repository in repositories" :key="repository.id">
+              <RouterLink :to="{ name: 'source-repository', params: { repository: repository.id } }">{{ repository.owner }}/{{ repository.name }}</RouterLink>
+              <small>{{ repository.headCommit?.subject }} · {{ formatDate(repository.headCommit?.authoredAt ?? '') }}</small>
+            </li>
+          </ul>
+        </section>
+
+        <section class="portal-module portal-lunastev-module">
+          <header>
+            <h2>LunaStev</h2>
+            <RouterLink to="/lunastev">{{ t('common.more') }}</RouterLink>
+          </header>
+          <ul v-if="personalPosts.length" class="portal-data-list portal-discussions">
+            <li v-for="item in personalPosts" :key="item.id">
+              <RouterLink :to="{ name: 'personal-space-thread', params: { thread: item.id } }">{{ item.title }}</RouterLink>
+              <small>{{ personalSpaceName(item.spaceId) }} · {{ formatDate(item.createdAt) }}</small>
+            </li>
+          </ul>
+          <p v-else class="portal-empty-state">{{ t('home.personalEmpty') }}</p>
+        </section>
+      </div>
 
 	  <section v-if="sponsors" class="portal-module portal-sponsors-module">
 		<header><h2>{{ t('home.sponsors') }}</h2><a :href="sponsors.url" target="_blank" rel="noopener noreferrer">{{ t('home.sponsorProject') }}</a></header>

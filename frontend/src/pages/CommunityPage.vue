@@ -363,6 +363,13 @@ watchEffect(() => {
       </aside>
 
       <section class="community-feed" aria-live="polite">
+        <nav v-if="personalMode && !threadID && !isComposer" class="personal-category-tabs" :aria-label="t('community.personalCategories')">
+          <button type="button" :class="{ active: !selectedSpaceID }" @click="selectSpace('')">{{ t('community.personalAll') }}</button>
+          <button v-for="space in personalSpaces" :key="space.id" type="button"
+            :class="{ active: selectedSpaceID === space.id }" @click="selectSpace(space.id)">
+            {{ spaceName(space) }}
+          </button>
+        </nav>
         <UiSkeletonRows v-if="loading" :rows="6" />
         <UiInlineState v-else-if="failed" :message="t('common.loadError')" :action="t('common.retry')" @action="load" />
 

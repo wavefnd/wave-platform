@@ -72,3 +72,25 @@ func TestParseReleasePostRejectsPatch(t *testing.T) {
 		t.Fatal("expected patch rejection")
 	}
 }
+
+func TestSeedSpacesIncludesPersonalWritingCategories(t *testing.T) {
+	database, err := storage.Open(filepath.Join(t.TempDir(), "data"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = database.Close() })
+	if err := SeedSpaces(database); err != nil {
+		t.Fatal(err)
+	}
+
+	repository := NewRepository(database)
+	for _, id := range []string{"founder-notes", "development-log"} {
+		space, err := repository.Space(id)
+		if err != nil {
+			t.Fatalf("personal space %q: %v", id, err)
+		}
+		if space.PostingPolicy != "owner" || space.Visibility != "public" {
+			t.Fatalf("personal space %q = %#v", id, space)
+		}
+	}
+}
