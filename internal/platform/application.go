@@ -7,8 +7,10 @@ import (
 	"log"
 	"net/http"
 	"path/filepath"
+	"strings"
 	"time"
 
+	admindomain "github.com/wavefnd/wave-platform/internal/admin"
 	"github.com/wavefnd/wave-platform/internal/auth"
 	"github.com/wavefnd/wave-platform/internal/community"
 	"github.com/wavefnd/wave-platform/internal/config"
@@ -117,6 +119,8 @@ func New(configPath string) (*Application, error) {
 		RegistrationOpen: cfg.Identity.RegistrationOpen, SecureCookies: cfg.Identity.SecureCookies,
 		Challenge: auth.TurnstileVerifier{SiteKey: cfg.Identity.TurnstileSiteKey, Secret: cfg.Identity.TurnstileSecret}}
 	mailboxHandler := &handler.MailboxHandler{Auth: *authHandler}
+	adminService := admindomain.NewService(database, gitMirrorService, cfg.Identity.RegistrationOpen,
+		strings.TrimSpace(cfg.Identity.TurnstileSiteKey) != "")
 
 	moduleStatuses := cfg.Modules.Statuses()
 	modules := make([]handler.ModuleStatus, 0, len(moduleStatuses)+1)
@@ -156,6 +160,7 @@ func New(configPath string) (*Application, error) {
 		statsService,
 		authHandler,
 		mailboxHandler,
+		adminService,
 	)
 
 	server := &http.Server{

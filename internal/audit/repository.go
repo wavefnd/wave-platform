@@ -5,6 +5,7 @@ import (
 	"encoding/xml"
 	"errors"
 	"fmt"
+	"sort"
 
 	"github.com/dgraph-io/badger/v4"
 	"github.com/wavefnd/wave-platform/internal/storage"
@@ -47,4 +48,24 @@ func (repository *Repository) Append(event Event) error {
 		}
 		return transaction.Set(storage.Key("audit", "event", fmt.Sprintf("%020d", sequence)), data)
 	})
+}
+
+func (repository *Repository) Events(limit int) ([]Event, error) {
+	items := make([]Event, 0)
+	err := repository.database.Scan(storage.Prefix("audit", "event"), func(_, value []byte) error {
+		var event Event
+		if err := xml.Unmarshal(value, &event); err != nil {
+			return fmt.Errorf("decode audit event: %w", err)
+		}
+		items = append(items, event)
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	sort.Slice(items, func(left, right int) bool { return items[left].Sequence > items[right].Sequence })
+	if limit > 0 && len(items) > limit {
+		items = items[:limit]
+	}
+	return items, nil
 }

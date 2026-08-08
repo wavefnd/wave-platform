@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	admindomain "github.com/wavefnd/wave-platform/internal/admin"
 	communitydomain "github.com/wavefnd/wave-platform/internal/community"
 	documentdomain "github.com/wavefnd/wave-platform/internal/document"
 	"github.com/wavefnd/wave-platform/internal/gitmirror"
@@ -34,6 +35,7 @@ func NewRouter(
 	statsService *platformstats.Service,
 	authHandler *handler.AuthHandler,
 	mailboxHandler *handler.MailboxHandler,
+	adminService *admindomain.Service,
 ) http.Handler {
 	mux := http.NewServeMux()
 
@@ -49,6 +51,7 @@ func NewRouter(
 	questionsHandler := handler.QuestionsHandler{Repository: questionRepository, Service: questionService, Auth: authHandler}
 	sourceHandler := handler.SourceHandler{Service: sourceService}
 	statsHandler := handler.StatsHandler{Service: statsService}
+	adminHandler := handler.AdministrationHandler{Service: adminService, Auth: authHandler}
 	sponsorsHandler := handler.SponsorsHandler{Service: sponsor.NewService()}
 	seoHandler := NewSEOHandler(publicURL, documentRepository, releaseRepository, communityRepository, questionRepository)
 
@@ -80,6 +83,9 @@ func NewRouter(
 	mux.HandleFunc("GET /api/v1/source/repositories/{repository}/commits/{oid}", sourceHandler.CommitDetail)
 	mux.HandleFunc("GET /api/v1/source/repositories/{repository}/refs", sourceHandler.Refs)
 	mux.HandleFunc("GET /api/v1/platform/stats", statsHandler.Get)
+	mux.HandleFunc("GET /api/v1/admin", adminHandler.Snapshot)
+	mux.HandleFunc("POST /api/v1/admin/accounts/{account}/status", adminHandler.AccountStatus)
+	mux.HandleFunc("POST /api/v1/admin/accounts/{account}/role", adminHandler.AccountRole)
 	if authHandler != nil {
 		mux.HandleFunc("GET /api/v1/auth/config", authHandler.Config)
 		mux.HandleFunc("POST /api/v1/auth/register/begin", authHandler.BeginRegistration)

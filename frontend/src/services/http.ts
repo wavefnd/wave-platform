@@ -69,6 +69,61 @@ export interface PlatformStats {
   gitMirrors: number
 }
 
+export interface AdminAccount {
+	id: string
+	username: string
+	displayName: string
+	email: string
+	status: string
+	owner: boolean
+	administrator: boolean
+	totpEnabled: boolean
+	recoveryVerified: boolean
+	createdAt: string
+	updatedAt: string
+}
+
+export interface AdminDelivery {
+	id: string
+	messageId: string
+	recipient: string
+	destination: string
+	status: string
+	attempts: number
+	nextAttemptAt: string
+	lastAttemptAt: string
+	lastError: string
+	createdAt: string
+}
+
+export interface AdminAuditEvent {
+	id: string
+	actorId: string
+	resourceId: string
+	action: string
+	result: string
+	occurredAt: string
+}
+
+export interface AdminSnapshot {
+	accounts: AdminAccount[]
+	security: {
+		activeAccounts: number
+		suspendedAccounts: number
+		totpAccounts: number
+		verifiedRecoveries: number
+		registrationOpen: boolean
+		turnstileEnabled: boolean
+	}
+	storage: { databaseBytes: number; valueLogBytes: number; filesBytes: number; health: string }
+	mail: { queued: number; delivering: number; deferred: number; failed: number; delivered: number }
+	deliveries: AdminDelivery[]
+	gitMirrors: SourceRepository[]
+	gitSyncInterval: string
+	auditLog: AdminAuditEvent[]
+	generatedAt: string
+}
+
 export interface AuthConfig {
 	mailDomain: string
 	registrationOpen: boolean
@@ -538,6 +593,69 @@ export async function getModules(): Promise<ModuleStatus[]> {
     enabled: booleanAttribute(element, 'enabled'),
     status: element.getAttribute('status') ?? 'unknown',
   }))
+}
+
+export async function getAdminSnapshot(): Promise<AdminSnapshot> {
+	const xml = await getXml('/api/v1/admin')
+	const root = xml.documentElement
+	const security = Array.from(root.children).find((element) => element.localName === 'security')
+	const storage = Array.from(root.children).find((element) => element.localName === 'storage')
+	const mailStatus = Array.from(root.children).find((element) => element.localName === 'mail-status')
+	return {
+		accounts: Array.from(root.querySelectorAll('accounts > account')).map((element) => ({
+			id: element.getAttribute('id') ?? '', username: childText(element, 'username'),
+			displayName: childText(element, 'display-name'), email: childText(element, 'email'),
+			status: childText(element, 'status'), owner: childText(element, 'owner') === 'true',
+			administrator: childText(element, 'administrator') === 'true',
+			totpEnabled: childText(element, 'totp-enabled') === 'true',
+			recoveryVerified: childText(element, 'recovery-verified') === 'true',
+			createdAt: childText(element, 'created-at'), updatedAt: childText(element, 'updated-at'),
+		})),
+		security: {
+			activeAccounts: Number(security ? childText(security, 'active-accounts') : 0),
+			suspendedAccounts: Number(security ? childText(security, 'suspended-accounts') : 0),
+			totpAccounts: Number(security ? childText(security, 'totp-accounts') : 0),
+			verifiedRecoveries: Number(security ? childText(security, 'verified-recoveries') : 0),
+			registrationOpen: security ? childText(security, 'registration-open') === 'true' : false,
+			turnstileEnabled: security ? childText(security, 'turnstile-enabled') === 'true' : false,
+		},
+		storage: {
+			databaseBytes: Number(storage ? childText(storage, 'database-bytes') : 0),
+			valueLogBytes: Number(storage ? childText(storage, 'value-log-bytes') : 0),
+			filesBytes: Number(storage ? childText(storage, 'files-bytes') : 0),
+			health: storage ? childText(storage, 'health') : 'unknown',
+		},
+		mail: {
+			queued: Number(mailStatus ? childText(mailStatus, 'queued') : 0),
+			delivering: Number(mailStatus ? childText(mailStatus, 'delivering') : 0),
+			deferred: Number(mailStatus ? childText(mailStatus, 'deferred') : 0),
+			failed: Number(mailStatus ? childText(mailStatus, 'failed') : 0),
+			delivered: Number(mailStatus ? childText(mailStatus, 'delivered') : 0),
+		},
+		deliveries: Array.from(root.querySelectorAll('deliveries > delivery')).map((element) => ({
+			id: element.getAttribute('id') ?? '', messageId: childText(element, 'message-id'),
+			recipient: childText(element, 'recipient'), destination: childText(element, 'destination'),
+			status: childText(element, 'status'), attempts: Number(childText(element, 'attempts')),
+			nextAttemptAt: childText(element, 'next-attempt-at'), lastAttemptAt: childText(element, 'last-attempt-at'),
+			lastError: childText(element, 'last-error'), createdAt: childText(element, 'created-at'),
+		})),
+		gitMirrors: Array.from(root.querySelectorAll('git-mirrors > repository')).map(parseRepository),
+		gitSyncInterval: childText(root, 'git-sync-interval'),
+		auditLog: Array.from(root.querySelectorAll('audit-log > event')).map((element) => ({
+			id: element.getAttribute('id') ?? '', actorId: childText(element, 'actor-id'),
+			resourceId: childText(element, 'resource-id'), action: childText(element, 'action'),
+			result: childText(element, 'result'), occurredAt: childText(element, 'occurred-at'),
+		})),
+		generatedAt: childText(root, 'generated-at'),
+	}
+}
+
+export async function updateAdminAccountStatus(accountId: string, status: 'active' | 'suspended'): Promise<void> {
+	await requestXml(`/api/v1/admin/accounts/${encodeURIComponent(accountId)}/status`, 'POST', authDocument('account-status', { status }))
+}
+
+export async function updateAdminAccountRole(accountId: string, administrator: boolean): Promise<void> {
+	await requestXml(`/api/v1/admin/accounts/${encodeURIComponent(accountId)}/role`, 'POST', authDocument('account-role', { administrator: String(administrator) }))
 }
 
 export async function getReleases(limit = 0): Promise<ReleaseSummary[]> {

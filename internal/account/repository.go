@@ -4,6 +4,7 @@ import (
 	"encoding/xml"
 	"errors"
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/dgraph-io/badger/v4"
@@ -58,6 +59,39 @@ func (repository *Repository) Create(item Account) error {
 
 func (repository *Repository) Account(id string) (Account, error) {
 	return repository.read(storage.Key("account", "object", id))
+}
+
+func (repository *Repository) Accounts() ([]Account, error) {
+	items := make([]Account, 0)
+	err := repository.database.Scan(storage.Prefix("account", "object"), func(_, value []byte) error {
+		var item Account
+		if err := xml.Unmarshal(value, &item); err != nil {
+			return fmt.Errorf("decode account: %w", err)
+		}
+		items = append(items, item)
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	sort.Slice(items, func(left, right int) bool {
+		return items[left].CreatedAt.After(items[right].CreatedAt)
+	})
+	return items, nil
+}
+
+func (repository *Repository) Update(item Account) error {
+	if item.ID == "" || item.Username == "" || item.Email == "" {
+		return errors.New("account id, username, and email are required")
+	}
+	if _, err := repository.Account(item.ID); err != nil {
+		return err
+	}
+	data, err := xml.Marshal(item)
+	if err != nil {
+		return fmt.Errorf("encode account: %w", err)
+	}
+	return repository.database.Set(storage.Key("account", "object", item.ID), data)
 }
 
 func (repository *Repository) ByUsername(username string) (Account, error) {

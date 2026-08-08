@@ -36,6 +36,7 @@ func TestRouterServesAPIAndSPA(t *testing.T) {
 		nil,
 		nil,
 		nil,
+		nil,
 	)
 
 	for _, test := range []struct {
@@ -88,7 +89,7 @@ func TestRouterServesAPIAndSPA(t *testing.T) {
 func TestRouterReportsUnavailableDatabase(t *testing.T) {
 	router := NewRouter("test", t.TempDir(), "https://wave.example", "0.1.0", nil, func() error {
 		return errors.New("database unavailable")
-	}, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil)
+	}, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil)
 	request := httptest.NewRequest(http.MethodGet, "/health/ready", nil)
 	response := httptest.NewRecorder()
 	router.ServeHTTP(response, request)

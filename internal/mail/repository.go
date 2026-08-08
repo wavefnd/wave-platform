@@ -50,6 +50,20 @@ func (repository *Repository) DeliveriesByMessage(messageID string) ([]Delivery,
 	return repository.deliveries(func(delivery Delivery) bool { return delivery.MessageID == messageID })
 }
 
+func (repository *Repository) Deliveries(limit int) ([]Delivery, error) {
+	items, err := repository.deliveries(func(Delivery) bool { return true })
+	if err != nil {
+		return nil, err
+	}
+	sort.Slice(items, func(left, right int) bool {
+		return items[left].CreatedAt.After(items[right].CreatedAt)
+	})
+	if limit > 0 && len(items) > limit {
+		items = items[:limit]
+	}
+	return items, nil
+}
+
 func (repository *Repository) PendingDeliveries(now time.Time, limit int) ([]Delivery, error) {
 	items, err := repository.deliveries(func(delivery Delivery) bool {
 		return (delivery.Status == "queued" || delivery.Status == "deferred") &&
