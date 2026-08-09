@@ -218,7 +218,9 @@
 .community-editor-toolbar { display: flex; min-height: 36px; align-items: center; gap: 2px; padding: 3px 5px; border: 1px solid var(--wave-border-strong); border-bottom: 0; background: var(--wave-bg-subtle); }
 .community-editor-toolbar button { display: grid; min-width: 30px; height: 28px; place-items: center; border: 0; background: transparent; color: var(--wave-text-secondary); cursor: pointer; }
 .community-editor-toolbar button:hover { background: var(--wave-surface-hover); color: var(--wave-text); }
+.community-editor-toolbar button:disabled { cursor: wait; opacity: .55; }
 .community-editor-toolbar .preview-toggle { display: block; width: auto; margin-left: auto; padding: 0 7px; font-size: 12px; }
+.community-image-help { margin-top: -8px; padding: 7px 9px; border: 1px solid var(--wave-border-strong); border-top: 0; color: var(--wave-text-muted); font-size: 11px; }
 .community-editor-preview { min-height: 150px; padding: 14px; border: 1px solid var(--wave-border-strong); }
 .community-composer { display: grid; gap: 8px; padding: 20px; }
 .community-composer > header { margin-bottom: 8px; padding-bottom: 14px; border-bottom: 1px solid var(--wave-border); }

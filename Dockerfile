@@ -68,9 +68,16 @@ RUN mkdir -p build/wave \
     && wavec build wave/policy-engine/main.wave \
         --emit=obj \
         -o build/wave/policy-engine.o \
+    && wavec build wave/media-policy/main.wave \
+        --emit=obj \
+        -o build/wave/media-policy.o \
     && wavec build wave/source-analyzer/main.wave \
         --emit=obj \
         -o build/wave/source-analyzer.o \
+    && cc -shared \
+        -Wl,-soname,libwave-media-policy.so \
+        -o build/wave/libwave-media-policy.so \
+        build/wave/media-policy.o \
     && cc -shared \
         -Wl,-soname,libwave-source-analyzer.so \
         -o build/wave/libwave-source-analyzer.so \
@@ -81,7 +88,14 @@ RUN mkdir -p build/wave \
         -o build/wave/source-analyzer-smoke \
     && build/wave/source-analyzer-smoke \
     && rm -f build/wave/source-analyzer-smoke \
+    && cc -Inative/include \
+        native/tests/media_policy_smoke.c \
+        build/wave/media-policy.o \
+        -o build/wave/media-policy-smoke \
+    && build/wave/media-policy-smoke \
+    && rm -f build/wave/media-policy-smoke \
     && cp wave/policy-engine/module.xml build/wave/policy-engine.xml \
+    && cp wave/media-policy/module.xml build/wave/media-policy.xml \
     && cp wave/source-analyzer/module.xml build/wave/source-analyzer.xml
 
 RUN CGO_ENABLED=1 \

@@ -3,11 +3,13 @@ module github.com/wavefnd/wave-platform
 go 1.25.8
 
 require (
+	github.com/deepteams/webp v1.2.6
 	github.com/dgraph-io/badger/v4 v4.9.5
 	github.com/emersion/go-msgauth v0.7.0
 	github.com/emersion/go-sasl v0.0.0-20241020182733-b788ff22d5a6
 	github.com/emersion/go-smtp v0.24.0
 	github.com/pquerna/otp v1.5.0
+	golang.org/x/image v0.32.0
 	golang.org/x/text v0.34.0
 )
 

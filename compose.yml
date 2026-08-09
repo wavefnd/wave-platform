@@ -96,11 +96,12 @@ services:
       - sh
       - -c
       - >-
-        mkdir -p /app/data/badger /app/data/blobs /app/data/git/mirrors
+        mkdir -p /app/data/badger /app/data/blobs/lunastev/images /app/data/git/mirrors
         /app/data/git/temporary /app/data/mail /app/data/mail/tls /app/data/search
         /app/data/temporary /app/data/backups &&
         chown -R "$${RUNTIME_UID}:$${RUNTIME_GID}" /app/data &&
-        chmod 750 /app/data /app/data/badger /app/data/blobs /app/data/git
+        chmod 750 /app/data /app/data/badger /app/data/blobs /app/data/blobs/lunastev
+        /app/data/blobs/lunastev/images /app/data/git
         /app/data/git/temporary /app/data/mail /app/data/mail/tls /app/data/search
         /app/data/temporary /app/data/backups &&
         chmod 755 /app/data/git/mirrors

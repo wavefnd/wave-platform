@@ -260,6 +260,14 @@ export interface CommunityThread {
 	subscribed: boolean
 }
 
+export interface MediaUpload {
+	id: string
+	url: string
+	width: number
+	height: number
+	bytes: number
+}
+
 export interface QuestionSummary {
 	id: string
 	title: string
@@ -809,6 +817,32 @@ export async function createCommunityPost(input: { spaceId: string; title: strin
 	const xml = await requestXml('/api/v1/community/threads', 'POST', document)
 	if (!xml) throw new Error('The server returned an empty post response.')
 	return parseCommunityThread(xml)
+}
+
+export async function uploadLunaStevImage(file: File): Promise<MediaUpload> {
+	const form = new FormData()
+	form.append('image', file, file.name)
+	const response = await fetch('/api/v1/media/lunastev/images', {
+		method: 'POST', credentials: 'same-origin', headers: { Accept: 'application/xml' }, body: form,
+	})
+	const body = await response.text()
+	if (!response.ok) {
+		if (body) {
+			try {
+				const xml = parseXml(body)
+				throw new Error(textOf(xml, 'message') || `Request failed (${response.status})`)
+			} catch (error) {
+				if (error instanceof Error && !error.message.includes('올바르지 않은 XML')) throw error
+			}
+		}
+		throw new Error(`Request failed (${response.status})`)
+	}
+	const xml = parseXml(body)
+	return {
+		id: textOf(xml, 'id'), url: textOf(xml, 'url'),
+		width: Number(textOf(xml, 'width')) || 0, height: Number(textOf(xml, 'height')) || 0,
+		bytes: Number(textOf(xml, 'bytes')) || 0,
+	}
 }
 
 export async function createCommunityReply(threadId: string, body: string, parentMessageId = ''): Promise<CommunityThread> {

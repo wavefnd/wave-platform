@@ -1,0 +1,42 @@
+export(c, "wave_media_policy_abi_version") fun media_policy_abi_version() -> i32 {
+    return 1;
+}
+
+export(c, "wave_media_policy_plan") fun media_policy_plan(
+    width: i64,
+    height: i64,
+    input_bytes: i64,
+    format: i32,
+    out_width: ptr<i64>,
+    out_height: ptr<i64>
+) -> i32 {
+    if (width < 1 || height < 1 || width > 12000 || height > 12000) {
+        return -1;
+    }
+    if (input_bytes < 1 || input_bytes > 12582912) {
+        return -2;
+    }
+    if (format < 1 || format > 3) {
+        return -3;
+    }
+    if (width * height > 40000000) {
+        return -4;
+    }
+
+    let mut planned_width: i64 = width;
+    let mut planned_height: i64 = height;
+    if (planned_width > 1920) {
+        planned_height = (planned_height * 1920) / planned_width;
+        planned_width = 1920;
+    }
+    if (planned_height > 1920) {
+        planned_width = (planned_width * 1920) / planned_height;
+        planned_height = 1920;
+    }
+    if (planned_width < 1) { planned_width = 1; }
+    if (planned_height < 1) { planned_height = 1; }
+
+    deref out_width = planned_width;
+    deref out_height = planned_height;
+    return 0;
+}

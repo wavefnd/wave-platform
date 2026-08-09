@@ -11,6 +11,7 @@ import (
 	communitydomain "github.com/wavefnd/wave-platform/internal/community"
 	documentdomain "github.com/wavefnd/wave-platform/internal/document"
 	"github.com/wavefnd/wave-platform/internal/gitmirror"
+	mediadomain "github.com/wavefnd/wave-platform/internal/media"
 	"github.com/wavefnd/wave-platform/internal/platformstats"
 	questiondomain "github.com/wavefnd/wave-platform/internal/question"
 	releasedomain "github.com/wavefnd/wave-platform/internal/release"
@@ -36,6 +37,7 @@ func NewRouter(
 	authHandler *handler.AuthHandler,
 	mailboxHandler *handler.MailboxHandler,
 	adminService *admindomain.Service,
+	mediaService *mediadomain.Service,
 ) http.Handler {
 	mux := http.NewServeMux()
 
@@ -53,6 +55,7 @@ func NewRouter(
 	statsHandler := handler.StatsHandler{Service: statsService}
 	adminHandler := handler.AdministrationHandler{Service: adminService, Auth: authHandler}
 	sponsorsHandler := handler.SponsorsHandler{Service: sponsor.NewService()}
+	mediaHandler := handler.MediaHandler{Service: mediaService, Auth: authHandler}
 	seoHandler := NewSEOHandler(publicURL, documentRepository, releaseRepository, communityRepository, questionRepository)
 
 	mux.HandleFunc("GET /api/v1/platform", platformHandler.Status)
@@ -86,6 +89,8 @@ func NewRouter(
 	mux.HandleFunc("GET /api/v1/admin", adminHandler.Snapshot)
 	mux.HandleFunc("POST /api/v1/admin/accounts/{account}/status", adminHandler.AccountStatus)
 	mux.HandleFunc("POST /api/v1/admin/accounts/{account}/role", adminHandler.AccountRole)
+	mux.HandleFunc("POST /api/v1/media/lunastev/images", mediaHandler.UploadLunaStevImage)
+	mux.HandleFunc("GET /media/lunastev/{image}", mediaHandler.LunaStevImage)
 	if authHandler != nil {
 		mux.HandleFunc("GET /api/v1/auth/config", authHandler.Config)
 		mux.HandleFunc("POST /api/v1/auth/register/begin", authHandler.BeginRegistration)

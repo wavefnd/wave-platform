@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<module xmlns="https://wave-lang.dev/ns/platform/runtime/v1"
+        id="media-policy"
+        version="0.1.0"
+        abi="1">
+    <capability name="media.image.plan" contractVersion="1"/>
+</module>

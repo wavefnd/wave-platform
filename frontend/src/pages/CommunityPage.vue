@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import {
-  ArrowBigDown, ArrowBigUp, Bell, BellOff, Code2, Eye, Link, MessageSquare, Quote, Search,
+  ArrowBigDown, ArrowBigUp, Bell, BellOff, Code2, Eye, ImagePlus, Link, MessageSquare, Quote, Search,
 } from '@lucide/vue'
 import { computed, nextTick, ref, watch, watchEffect } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
@@ -10,7 +10,7 @@ import CommunityReplyEditor from '../components/community/CommunityReplyEditor.v
 import { useI18n } from '../i18n'
 import {
   createCommunityPost, createCommunityReply, getCommunitySpaces, getCommunityThread,
-  getCommunityThreads, subscribeCommunity, voteCommunity,
+  getCommunityThreads, subscribeCommunity, uploadLunaStevImage, voteCommunity,
   type CommunityMessage, type CommunitySpace, type CommunityThread, type CommunityThreadSummary,
 } from '../services/http'
 import { useAuthStore } from '../stores/auth'
@@ -40,6 +40,8 @@ const postBody = ref('')
 const postTags = ref('')
 const postPreview = ref(false)
 const postBodyInput = ref<HTMLTextAreaElement | null>(null)
+const postImageInput = ref<HTMLInputElement | null>(null)
+const uploadingImage = ref(false)
 
 const replyBody = ref('')
 const replyTo = ref('')
@@ -305,6 +307,32 @@ async function insertMarkup(prefix: string, suffix = '') {
   element.focus(); element.setSelectionRange(start + prefix.length, end + prefix.length)
 }
 
+async function uploadPostImage(event: Event) {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  input.value = ''
+  if (!file || !personalMode.value || !auth.account?.owner) return
+  uploadingImage.value = true
+  actionError.value = ''
+  try {
+    const uploaded = await uploadLunaStevImage(file)
+    postPreview.value = false
+    await nextTick()
+    const element = postBodyInput.value
+    const offset = element?.selectionStart ?? postBody.value.length
+    const alternate = file.name.replace(/\.[^.]+$/, '').replace(/[\[\]]/g, '').trim() || 'Image'
+    const markdown = `\n![${alternate}](${uploaded.url})\n`
+    postBody.value = postBody.value.slice(0, offset) + markdown + postBody.value.slice(offset)
+    await nextTick()
+    element?.focus()
+    element?.setSelectionRange(offset + markdown.length, offset + markdown.length)
+  } catch (reason) {
+    actionError.value = reason instanceof Error ? reason.message : t('community.imageUploadFailed')
+  } finally {
+    uploadingImage.value = false
+  }
+}
+
 watch(() => route.fullPath, load, { immediate: true })
 watchEffect(() => {
   if (!thread.value) return
@@ -389,8 +417,15 @@ watchEffect(() => {
             <button type="button" :title="t('community.code')" @click="insertMarkup('\n```wave\n', '\n```\n')"><Code2 :size="16" /></button>
             <button type="button" :title="t('community.link')" @click="insertMarkup('[', '](https://)')"><Link :size="16" /></button>
             <button type="button" :title="t('community.quote')" @click="insertMarkup('> ')"><Quote :size="16" /></button>
+            <button v-if="personalMode && auth.account?.owner" type="button" :title="t('community.imageUpload')"
+              :aria-label="t('community.imageUpload')" :disabled="uploadingImage" @click="postImageInput?.click()">
+              <ImagePlus :size="16" />
+            </button>
+            <input v-if="personalMode && auth.account?.owner" ref="postImageInput" hidden type="file"
+              accept="image/jpeg,image/png,image/webp" @change="uploadPostImage" />
             <button type="button" class="preview-toggle" @click="postPreview = !postPreview">{{ postPreview ? t('community.edit') : t('community.preview') }}</button>
           </div>
+          <small v-if="personalMode && auth.account?.owner" class="community-image-help">{{ uploadingImage ? t('community.imageUploading') : t('community.imageHelp') }}</small>
           <MarkdownContent v-if="postPreview" class="community-editor-preview" :source="postBody" />
           <textarea v-else id="post-body" ref="postBodyInput" v-model="postBody" required maxlength="20000" rows="12" />
           <label for="post-tags">{{ t('community.tags') }}</label>

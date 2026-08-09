@@ -11,6 +11,7 @@ import (
 	"time"
 
 	admindomain "github.com/wavefnd/wave-platform/internal/admin"
+	"github.com/wavefnd/wave-platform/internal/audit"
 	"github.com/wavefnd/wave-platform/internal/auth"
 	"github.com/wavefnd/wave-platform/internal/community"
 	"github.com/wavefnd/wave-platform/internal/config"
@@ -18,6 +19,8 @@ import (
 	"github.com/wavefnd/wave-platform/internal/gitmirror"
 	"github.com/wavefnd/wave-platform/internal/identity"
 	"github.com/wavefnd/wave-platform/internal/mailruntime"
+	mediadomain "github.com/wavefnd/wave-platform/internal/media"
+	"github.com/wavefnd/wave-platform/internal/mediapolicy"
 	"github.com/wavefnd/wave-platform/internal/platformstats"
 	questiondomain "github.com/wavefnd/wave-platform/internal/question"
 	releasedomain "github.com/wavefnd/wave-platform/internal/release"
@@ -36,6 +39,7 @@ type Application struct {
 	Server         *http.Server
 	GitMirror      *gitmirror.Service
 	SourceAnalyzer sourceanalysis.Analyzer
+	MediaPolicy    *waveruntime.NativeMediaPolicy
 	Identity       *identity.Service
 	MailRuntime    *mailruntime.Service
 }
@@ -94,6 +98,8 @@ func New(configPath string) (*Application, error) {
 	questionRepository := questiondomain.NewRepository(database)
 	questionService := questiondomain.NewService(database, cfg.Identity.MailDomain)
 	var sourceAnalyzer sourceanalysis.Analyzer
+	var mediaPlanner mediapolicy.Planner
+	var nativeMediaPolicy *waveruntime.NativeMediaPolicy
 	if cfg.Wave.Enabled {
 		modulePath := filepath.Join(cfg.Wave.Modules, "libwave-source-analyzer.so")
 		loadedAnalyzer, loadErr := waveruntime.OpenSourceAnalyzer(modulePath)
@@ -103,6 +109,20 @@ func New(configPath string) (*Application, error) {
 			sourceAnalyzer = loadedAnalyzer
 			log.Printf("Wave source analyzer ready: %s", modulePath)
 		}
+		mediaPolicyPath := filepath.Join(cfg.Wave.Modules, "libwave-media-policy.so")
+		loadedMediaPolicy, policyErr := waveruntime.OpenMediaPolicy(mediaPolicyPath)
+		if policyErr != nil {
+			log.Printf("Wave media policy unavailable: %v", policyErr)
+		} else {
+			nativeMediaPolicy = loadedMediaPolicy
+			mediaPlanner = loadedMediaPolicy
+			log.Printf("Wave media policy ready: %s", mediaPolicyPath)
+		}
+	}
+	mediaService, err := mediadomain.NewService(filepath.Join(cfg.Storage.Root, "blobs", "lunastev", "images"), mediaPlanner, audit.NewRepository(database))
+	if err != nil {
+		_ = database.Close()
+		return nil, fmt.Errorf("initialize LunaStev media: %w", err)
 	}
 	gitMirrorService, err := gitmirror.NewService(database, sourceAnalyzer)
 	if err != nil {
@@ -161,6 +181,7 @@ func New(configPath string) (*Application, error) {
 		authHandler,
 		mailboxHandler,
 		adminService,
+		mediaService,
 	)
 
 	server := &http.Server{
@@ -178,6 +199,7 @@ func New(configPath string) (*Application, error) {
 		Server:         server,
 		GitMirror:      gitMirrorService,
 		SourceAnalyzer: sourceAnalyzer,
+		MediaPolicy:    nativeMediaPolicy,
 		Identity:       identityService,
 		MailRuntime:    mailRuntime,
 	}, nil
@@ -241,6 +263,9 @@ func (application *Application) Close() error {
 	var closeErrors []error
 	if application.SourceAnalyzer != nil {
 		closeErrors = append(closeErrors, application.SourceAnalyzer.Close())
+	}
+	if application.MediaPolicy != nil {
+		closeErrors = append(closeErrors, application.MediaPolicy.Close())
 	}
 	if application.Database != nil {
 		closeErrors = append(closeErrors, application.Database.Close())
