@@ -318,7 +318,7 @@ func (service *Service) RegistrationAddress(displayName string) (string, bool, e
 		return "", false, fmt.Errorf("%w: %v", ErrInvalidRegistration, err)
 	}
 	if account.IsReservedLocalPart(generated) {
-		return generated, true, nil
+		return "", false, fmt.Errorf("%w: this display name is reserved", ErrInvalidRegistration)
 	}
 	_, err = service.accounts.ByUsername(generated)
 	if err == nil {
@@ -540,7 +540,7 @@ func (service *Service) ChangeWaveAddress(accountID, currentCode, localPart stri
 func (service *Service) AddressChoiceAllowed(item account.Account) bool {
 	generated, err := account.LocalPart(item.DisplayName)
 	if err != nil || account.IsReservedLocalPart(generated) {
-		return true
+		return false
 	}
 	existing, err := service.accounts.ByUsername(generated)
 	return err == nil && existing.ID != item.ID

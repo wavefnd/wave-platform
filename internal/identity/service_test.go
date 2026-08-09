@@ -141,6 +141,9 @@ func TestRegistrationAddressChoiceIsLimitedToDuplicateNames(t *testing.T) {
 	if _, err := service.BeginTOTPRegistration("First Person", "custom-address", "first@example.net"); !errors.Is(err, ErrInvalidRegistration) {
 		t.Fatalf("non-duplicate custom address error = %v", err)
 	}
+	if _, _, err := service.RegistrationAddress("Admin"); !errors.Is(err, ErrInvalidRegistration) {
+		t.Fatalf("reserved display name error = %v", err)
+	}
 	first, err := service.Register(testRegistration("Same Name"))
 	if err != nil {
 		t.Fatal(err)
