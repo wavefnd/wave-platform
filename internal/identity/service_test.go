@@ -2,6 +2,7 @@ package identity
 
 import (
 	"bytes"
+	"errors"
 	"io"
 	"mime"
 	"mime/multipart"
@@ -122,6 +123,107 @@ func TestDuplicateDisplayNameGetsUniqueAddress(t *testing.T) {
 	}
 	if first.Email != "john-mark@wave-lang.dev" || second.Email != "john-mark-2@wave-lang.dev" {
 		t.Fatalf("addresses = %q, %q", first.Email, second.Email)
+	}
+}
+
+func TestRegistrationAddressChoiceIsLimitedToDuplicateNames(t *testing.T) {
+	database, err := storage.Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer database.Close()
+	service := newTestIdentity(t, database)
+
+	local, required, err := service.RegistrationAddress("Same Name")
+	if err != nil || local != "same-name" || required {
+		t.Fatalf("initial suggestion local=%q required=%v err=%v", local, required, err)
+	}
+	if _, err := service.BeginTOTPRegistration("First Person", "custom-address", "first@example.net"); !errors.Is(err, ErrInvalidRegistration) {
+		t.Fatalf("non-duplicate custom address error = %v", err)
+	}
+	first, err := service.Register(testRegistration("Same Name"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	local, required, err = service.RegistrationAddress("Same Name")
+	if err != nil || local != first.Username || !required {
+		t.Fatalf("duplicate suggestion local=%q required=%v err=%v", local, required, err)
+	}
+	if _, err := service.BeginTOTPRegistration("Same Name", "", "second@example.net"); !errors.Is(err, ErrAddressChoiceRequired) {
+		t.Fatalf("missing duplicate address error = %v", err)
+	}
+	if _, err := service.BeginTOTPRegistration("Same Name", "same-name-two", "second@example.net"); err != nil {
+		t.Fatalf("duplicate custom address: %v", err)
+	}
+}
+
+func TestDuplicateAccountCanChangeUniqueAddressAndPreservesProfileAlias(t *testing.T) {
+	database, err := storage.Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer database.Close()
+	service := newTestIdentity(t, database)
+	if _, err := service.Register(testRegistration("Same Name")); err != nil {
+		t.Fatal(err)
+	}
+	registration := testRegistration("Same Name")
+	registration.Username = "same-name-two"
+	second, err := service.Register(registration)
+	if err != nil {
+		t.Fatal(err)
+	}
+	code, err := totp.GenerateCode(testTOTPSecret, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	updated, err := service.ChangeWaveAddress(second.ID, code, "same-name-alt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if updated.Email != "same-name-alt@wave-lang.dev" || updated.Username != "same-name-alt" {
+		t.Fatalf("updated account = %#v", updated)
+	}
+	box, err := service.Mailbox(second.ID)
+	if err != nil || box.Address != updated.Email || !service.HasLocalRecipient(updated.Email) {
+		t.Fatalf("mailbox=%#v err=%v", box, err)
+	}
+	aliased, err := service.PublicAccount("same-name-two")
+	if err != nil || aliased.ID != second.ID {
+		t.Fatalf("profile alias=%#v err=%v", aliased, err)
+	}
+}
+
+func TestManagementAddressesShareOneMailbox(t *testing.T) {
+	database, err := storage.Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer database.Close()
+	service := newTestIdentity(t, database)
+	box, err := service.EnsureManagementMailbox()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, address := range service.ManagementAddresses() {
+		if !service.HasLocalRecipient(address) {
+			t.Fatalf("management recipient %q is unavailable", address)
+		}
+		resolved, err := service.mailboxes.MailboxByAddress(address)
+		if err != nil || resolved.ID != box.ID {
+			t.Fatalf("address %q mailbox=%#v err=%v", address, resolved, err)
+		}
+	}
+	sender, err := service.Register(testRegistration("Mailbox Sender"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := service.SendMail(sender, OutgoingMail{To: "help@wave-lang.dev", Subject: "Need help", Body: "A management request."}); err != nil {
+		t.Fatal(err)
+	}
+	items, err := service.ManagementMailboxItems("Inbox")
+	if err != nil || len(items) != 1 || items[0].Message.Subject != "Need help" {
+		t.Fatalf("management items=%#v err=%v", items, err)
 	}
 }
 

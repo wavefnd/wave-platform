@@ -69,6 +69,10 @@ func New(configPath string) (*Application, error) {
 	if created {
 		log.Printf("Wave administrator created: %s", adminAccount.Email)
 	}
+	if _, err := identityService.EnsureManagementMailbox(); err != nil {
+		_ = database.Close()
+		return nil, fmt.Errorf("initialize management mailbox: %w", err)
+	}
 	if _, err := community.SeedLanguageReleases(database); err != nil {
 		_ = database.Close()
 		return nil, fmt.Errorf("seed language releases: %w", err)

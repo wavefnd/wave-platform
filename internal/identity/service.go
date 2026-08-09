@@ -11,6 +11,7 @@ import (
 	stdmail "net/mail"
 	"net/textproto"
 	"net/url"
+	"sort"
 	"strings"
 	"time"
 
@@ -26,18 +27,19 @@ import (
 )
 
 var (
-	ErrRegistrationClosed  = errors.New("registration is closed")
-	ErrInvalidCredentials  = errors.New("invalid credentials")
-	ErrAccountInactive     = errors.New("account is not active")
-	ErrInvalidRegistration = errors.New("invalid registration")
-	ErrInvalidMail         = errors.New("invalid mail message")
-	ErrRelayDenied         = errors.New("mail relay denied")
+	ErrRegistrationClosed    = errors.New("registration is closed")
+	ErrInvalidCredentials    = errors.New("invalid credentials")
+	ErrAccountInactive       = errors.New("account is not active")
+	ErrInvalidRegistration   = errors.New("invalid registration")
+	ErrInvalidMail           = errors.New("invalid mail message")
+	ErrRelayDenied           = errors.New("mail relay denied")
+	ErrInvalidProfile        = errors.New("invalid profile")
+	ErrAddressChoiceRequired = errors.New("a different Wave mail address is required for this duplicate display name")
 )
 
-var reservedUsernames = map[string]bool{
-	"abuse": true, "admin": true, "administrator": true, "hostmaster": true,
-	"mailer-daemon": true, "postmaster": true, "root": true, "security": true,
-}
+const ManagementMailboxAccountID = "role/platform-management"
+
+var managementLocalParts = []string{"admin", "help", "info", "support"}
 
 type Registration struct {
 	DisplayName   string
@@ -107,7 +109,8 @@ func (service *Service) Register(registration Registration) (account.Account, er
 	if displayName == "" || len([]rune(displayName)) > 80 {
 		return account.Account{}, fmt.Errorf("%w: display name must contain between 1 and 80 characters", ErrInvalidRegistration)
 	}
-	username := strings.TrimSpace(strings.ToLower(registration.Username))
+	requestedUsername := strings.TrimSpace(strings.ToLower(registration.Username))
+	username := requestedUsername
 	if username == "" {
 		var err error
 		username, err = account.LocalPart(displayName)
@@ -120,16 +123,25 @@ func (service *Service) Register(registration Registration) (account.Account, er
 		return account.Account{}, fmt.Errorf("%w: %v", ErrInvalidRegistration, err)
 	}
 	username = base
-	if !registration.Admin && reservedUsernames[username] {
-		username = "user-" + username
-		base = username
-	}
 	if registration.Admin {
 		if _, err := service.accounts.ByUsername(username); err == nil {
 			return account.Account{}, account.ErrConflict
 		}
-	} else {
+	} else if requestedUsername == "" {
+		if account.IsReservedLocalPart(base) {
+			base = "user-" + base
+		}
 		username = service.availableUsername(base)
+	} else {
+		username, err = account.MailLocalPart(requestedUsername)
+		if err != nil {
+			return account.Account{}, fmt.Errorf("%w: %v", ErrInvalidRegistration, err)
+		}
+		if _, lookupErr := service.accounts.ByUsername(username); lookupErr == nil {
+			return account.Account{}, account.ErrConflict
+		} else if !errors.Is(lookupErr, storage.ErrNotFound) {
+			return account.Account{}, lookupErr
+		}
 	}
 	address, err := account.Address(username, service.mailDomain)
 	if err != nil {
@@ -140,7 +152,7 @@ func (service *Service) Register(registration Registration) (account.Account, er
 		return account.Account{}, err
 	}
 	now := service.now().UTC()
-	item := account.Account{ID: id, Username: username, DisplayName: displayName, Email: address,
+	item := account.Account{ID: id, Username: username, DisplayName: displayName, Email: address, TimeZone: "UTC",
 		Status: "active", CreatedAt: now, UpdatedAt: now}
 	if err := service.accounts.Create(item); err != nil {
 		return account.Account{}, err
@@ -251,7 +263,7 @@ func (service *Service) BootstrapTOTPAdmin(displayName, username, recoveryEmail,
 
 func (service *Service) TOTPConfigured() bool { return service.totp.Configured() }
 
-func (service *Service) BeginTOTPRegistration(displayName, recoveryEmail string) (auth.EnrollmentResult, error) {
+func (service *Service) BeginTOTPRegistration(displayName, username, recoveryEmail string) (auth.EnrollmentResult, error) {
 	if !service.registrationOpen {
 		return auth.EnrollmentResult{}, ErrRegistrationClosed
 	}
@@ -259,15 +271,70 @@ func (service *Service) BeginTOTPRegistration(displayName, recoveryEmail string)
 	if displayName == "" || len([]rune(displayName)) > 80 {
 		return auth.EnrollmentResult{}, fmt.Errorf("%w: display name must contain between 1 and 80 characters", ErrInvalidRegistration)
 	}
-	username, err := account.LocalPart(displayName)
+	generated, choiceRequired, err := service.RegistrationAddress(displayName)
 	if err != nil {
-		return auth.EnrollmentResult{}, fmt.Errorf("%w: %v", ErrInvalidRegistration, err)
+		return auth.EnrollmentResult{}, err
+	}
+	username = strings.TrimSpace(username)
+	if !choiceRequired {
+		if username != "" && !strings.EqualFold(username, generated) {
+			return auth.EnrollmentResult{}, fmt.Errorf("%w: a custom mail address is available only when the generated address is already in use", ErrInvalidRegistration)
+		}
+		username = generated
+	} else {
+		if username == "" {
+			return auth.EnrollmentResult{}, ErrAddressChoiceRequired
+		}
+		var err error
+		username, err = account.MailLocalPart(username)
+		if err != nil {
+			return auth.EnrollmentResult{}, fmt.Errorf("%w: %v", ErrInvalidRegistration, err)
+		}
+		if _, lookupErr := service.accounts.ByUsername(username); lookupErr == nil {
+			return auth.EnrollmentResult{}, account.ErrConflict
+		} else if !errors.Is(lookupErr, storage.ErrNotFound) {
+			return auth.EnrollmentResult{}, lookupErr
+		}
+		if _, lookupErr := service.accounts.ByProfileAlias(username); lookupErr == nil {
+			return auth.EnrollmentResult{}, account.ErrConflict
+		} else if !errors.Is(lookupErr, storage.ErrNotFound) {
+			return auth.EnrollmentResult{}, lookupErr
+		}
 	}
 	address, err := account.Address(username, service.mailDomain)
 	if err != nil {
 		return auth.EnrollmentResult{}, err
 	}
-	return service.totp.BeginEnrollment("registration", "", displayName, "", recoveryEmail, address)
+	return service.totp.BeginEnrollment("registration", "", displayName, username, recoveryEmail, address)
+}
+
+func (service *Service) RegistrationAddress(displayName string) (string, bool, error) {
+	displayName = strings.TrimSpace(displayName)
+	if displayName == "" || len([]rune(displayName)) > 80 {
+		return "", false, fmt.Errorf("%w: display name must contain between 1 and 80 characters", ErrInvalidRegistration)
+	}
+	generated, err := account.LocalPart(displayName)
+	if err != nil {
+		return "", false, fmt.Errorf("%w: %v", ErrInvalidRegistration, err)
+	}
+	if account.IsReservedLocalPart(generated) {
+		return generated, true, nil
+	}
+	_, err = service.accounts.ByUsername(generated)
+	if err == nil {
+		return generated, true, nil
+	}
+	if !errors.Is(err, storage.ErrNotFound) {
+		return "", false, err
+	}
+	_, err = service.accounts.ByProfileAlias(generated)
+	if err == nil {
+		return generated, true, nil
+	}
+	if !errors.Is(err, storage.ErrNotFound) {
+		return "", false, err
+	}
+	return generated, false, nil
 }
 
 func (service *Service) CompleteTOTPRegistration(token, code, userAgent string) (account.Account, string, session.Session, error) {
@@ -275,7 +342,7 @@ func (service *Service) CompleteTOTPRegistration(token, code, userAgent string) 
 	if err != nil || enrollment.Kind != "registration" {
 		return account.Account{}, "", session.Session{}, ErrInvalidCredentials
 	}
-	item, err := service.Register(Registration{DisplayName: enrollment.DisplayName, TOTPSecret: secret,
+	item, err := service.Register(Registration{DisplayName: enrollment.DisplayName, Username: enrollment.Username, TOTPSecret: secret,
 		RecoveryEmail: enrollment.RecoveryEmail})
 	if err != nil {
 		return account.Account{}, "", session.Session{}, err
@@ -381,6 +448,104 @@ func (service *Service) ChangeRecoveryEmail(accountID, currentCode, email string
 	return service.sendRecoveryVerification(accountID, email)
 }
 
+func (service *Service) UpdateProfile(accountID, displayName, bio, timeZone string) (account.Account, error) {
+	displayName = strings.TrimSpace(displayName)
+	bio = strings.TrimSpace(strings.ReplaceAll(bio, "\r\n", "\n"))
+	if len([]rune(displayName)) < 1 || len([]rune(displayName)) > 80 {
+		return account.Account{}, fmt.Errorf("%w: display name must contain between 1 and 80 characters", ErrInvalidProfile)
+	}
+	if len([]rune(bio)) > 500 {
+		return account.Account{}, fmt.Errorf("%w: profile introduction must be 500 characters or shorter", ErrInvalidProfile)
+	}
+	timeZone = strings.TrimSpace(timeZone)
+	if timeZone == "" {
+		timeZone = "UTC"
+	}
+	if len(timeZone) > 64 {
+		return account.Account{}, fmt.Errorf("%w: time zone is invalid", ErrInvalidProfile)
+	}
+	if _, err := time.LoadLocation(timeZone); err != nil {
+		return account.Account{}, fmt.Errorf("%w: time zone is invalid", ErrInvalidProfile)
+	}
+	item, err := service.accounts.Account(accountID)
+	if err != nil {
+		return account.Account{}, err
+	}
+	item.DisplayName = displayName
+	item.Bio = bio
+	item.TimeZone = timeZone
+	item.UpdatedAt = service.now().UTC()
+	if err := service.accounts.Update(item); err != nil {
+		return account.Account{}, err
+	}
+	_ = service.appendAudit(accountID, "account/"+accountID+"/profile", "account.profile.update")
+	return item, nil
+}
+
+func (service *Service) ChangeWaveAddress(accountID, currentCode, localPart string) (account.Account, error) {
+	if err := service.totp.Verify(accountID, strings.TrimSpace(currentCode)); err != nil {
+		return account.Account{}, ErrInvalidCredentials
+	}
+	localPart, err := account.MailLocalPart(localPart)
+	if err != nil {
+		return account.Account{}, fmt.Errorf("%w: %v", ErrInvalidProfile, err)
+	}
+	address, err := account.Address(localPart, service.mailDomain)
+	if err != nil {
+		return account.Account{}, fmt.Errorf("%w: invalid Wave address", ErrInvalidProfile)
+	}
+	item, err := service.accounts.Account(accountID)
+	if err != nil {
+		return account.Account{}, err
+	}
+	if strings.EqualFold(item.Email, address) {
+		return item, nil
+	}
+	if !service.AddressChoiceAllowed(item) {
+		return account.Account{}, fmt.Errorf("%w: a custom mail address is available only for duplicate display names", ErrInvalidProfile)
+	}
+	if _, lookupErr := service.accounts.ByEmail(address); lookupErr == nil {
+		return account.Account{}, account.ErrConflict
+	} else if !errors.Is(lookupErr, storage.ErrNotFound) {
+		return account.Account{}, lookupErr
+	}
+	if _, lookupErr := service.accounts.ByUsername(localPart); lookupErr == nil {
+		return account.Account{}, account.ErrConflict
+	} else if !errors.Is(lookupErr, storage.ErrNotFound) {
+		return account.Account{}, lookupErr
+	}
+	box, err := service.mailboxes.MailboxByAccount(accountID)
+	if err != nil {
+		return account.Account{}, err
+	}
+	previous := item
+	previousLocalPart := item.Username
+	previousAddress := box.Address
+	item.Username = localPart
+	item.Email = address
+	item.UpdatedAt = service.now().UTC()
+	if err := service.accounts.Update(item); err != nil {
+		return account.Account{}, err
+	}
+	box.Address = address
+	if err := service.mailboxes.UpdateAddress(box, previousAddress); err != nil {
+		_ = service.accounts.Update(previous)
+		return account.Account{}, err
+	}
+	_ = service.accounts.AddProfileAlias(previousLocalPart, item.ID)
+	_ = service.appendAudit(accountID, "account/"+accountID+"/address", "account.address.update")
+	return item, nil
+}
+
+func (service *Service) AddressChoiceAllowed(item account.Account) bool {
+	generated, err := account.LocalPart(item.DisplayName)
+	if err != nil || account.IsReservedLocalPart(generated) {
+		return true
+	}
+	existing, err := service.accounts.ByUsername(generated)
+	return err == nil && existing.ID != item.ID
+}
+
 func (service *Service) VerifyRecoveryEmail(token string) error {
 	_, err := service.totp.CompleteEmailVerification(token)
 	return err
@@ -412,6 +577,39 @@ func (service *Service) accountByIdentifier(identifier string) (account.Account,
 	return service.accounts.ByUsername(identifier)
 }
 
+func (service *Service) PublicAccount(localPart string) (account.Account, error) {
+	localPart = strings.ToLower(strings.TrimSpace(localPart))
+	item, err := service.accounts.ByEmail(localPart + "@" + service.mailDomain)
+	if errors.Is(err, storage.ErrNotFound) {
+		item, err = service.accounts.ByUsername(localPart)
+	}
+	if errors.Is(err, storage.ErrNotFound) {
+		return service.accounts.ByProfileAlias(localPart)
+	}
+	return item, err
+}
+
+func (service *Service) PublicAccountByID(accountID string) (account.Account, error) {
+	return service.accounts.Account(strings.TrimSpace(accountID))
+}
+
+func (service *Service) PublicAccounts() ([]account.Account, error) {
+	items, err := service.accounts.Accounts()
+	if err != nil {
+		return nil, err
+	}
+	active := make([]account.Account, 0, len(items))
+	for _, item := range items {
+		if item.Status == "active" {
+			active = append(active, item)
+		}
+	}
+	sort.SliceStable(active, func(left, right int) bool {
+		return strings.ToLower(active[left].Email) < strings.ToLower(active[right].Email)
+	})
+	return active, nil
+}
+
 func (service *Service) baseURL() string {
 	if service.publicURL != "" {
 		return service.publicURL
@@ -426,7 +624,9 @@ func (service *Service) availableUsername(base string) string {
 			candidate = fmt.Sprintf("%s-%d", base, suffix)
 		}
 		if _, err := service.accounts.ByUsername(candidate); errors.Is(err, storage.ErrNotFound) {
-			return candidate
+			if _, aliasErr := service.accounts.ByProfileAlias(candidate); errors.Is(aliasErr, storage.ErrNotFound) {
+				return candidate
+			}
 		}
 	}
 	return base + "-" + fmt.Sprint(service.now().UTC().Unix())
@@ -478,6 +678,71 @@ func (service *Service) Mailbox(accountID string) (mailbox.Mailbox, error) {
 	return service.mailboxes.MailboxByAccount(accountID)
 }
 
+func (service *Service) EnsureManagementMailbox() (mailbox.Mailbox, error) {
+	addresses := service.ManagementAddresses()
+	if len(addresses) == 0 {
+		return mailbox.Mailbox{}, errors.New("management mailbox has no addresses")
+	}
+	box, err := service.mailboxes.MailboxByAccount(ManagementMailboxAccountID)
+	if errors.Is(err, storage.ErrNotFound) {
+		id, idErr := identifier.New("mailbox")
+		if idErr != nil {
+			return mailbox.Mailbox{}, idErr
+		}
+		box = mailbox.Mailbox{ID: id, AccountID: ManagementMailboxAccountID, Address: addresses[0], CreatedAt: service.now().UTC()}
+		if err := service.mailboxes.UpsertMailbox(box); err != nil {
+			return mailbox.Mailbox{}, err
+		}
+	} else if err != nil {
+		return mailbox.Mailbox{}, err
+	}
+	for _, address := range addresses {
+		if err := service.mailboxes.AddAddress(box.ID, address); err != nil {
+			return mailbox.Mailbox{}, err
+		}
+	}
+	return box, nil
+}
+
+func (service *Service) ManagementAddresses() []string {
+	addresses := make([]string, 0, len(managementLocalParts))
+	for _, local := range managementLocalParts {
+		addresses = append(addresses, local+"@"+service.mailDomain)
+	}
+	return addresses
+}
+
+func (service *Service) ManagementMailboxItems(folder string) ([]MailboxItem, error) {
+	box, err := service.EnsureManagementMailbox()
+	if err != nil {
+		return nil, err
+	}
+	return service.mailboxItems(box, folder)
+}
+
+func (service *Service) ManagementMailboxItem(entryID string) (MailboxItem, error) {
+	box, err := service.EnsureManagementMailbox()
+	if err != nil {
+		return MailboxItem{}, err
+	}
+	return service.mailboxItem(box, entryID)
+}
+
+func (service *Service) UpdateManagementMailboxEntry(actorID, entryID, action string) (MailboxItem, error) {
+	if !service.IsAdministrator(actorID) {
+		return MailboxItem{}, ErrRelayDenied
+	}
+	item, err := service.ManagementMailboxItem(entryID)
+	if err != nil {
+		return MailboxItem{}, err
+	}
+	if err := service.applyMailboxAction(&item, action); err != nil {
+		return MailboxItem{}, err
+	}
+	_ = service.appendAudit(actorID, "mailbox/management/entry/"+entryID, "admin.mailbox."+action)
+	return item, nil
+}
+
 func (service *Service) MailboxEntries(accountID, folder string) ([]mailbox.Entry, error) {
 	box, err := service.Mailbox(accountID)
 	if err != nil {
@@ -491,6 +756,10 @@ func (service *Service) MailboxItems(accountID, folder string) ([]MailboxItem, e
 	if err != nil {
 		return nil, err
 	}
+	return service.mailboxItems(box, folder)
+}
+
+func (service *Service) mailboxItems(box mailbox.Mailbox, folder string) ([]MailboxItem, error) {
 	entries, err := service.mailboxes.Entries(box.ID, folder)
 	if err != nil {
 		return nil, err
@@ -516,6 +785,10 @@ func (service *Service) MailboxItem(accountID, entryID string) (MailboxItem, err
 	if err != nil {
 		return MailboxItem{}, err
 	}
+	return service.mailboxItem(box, entryID)
+}
+
+func (service *Service) mailboxItem(box mailbox.Mailbox, entryID string) (MailboxItem, error) {
 	entry, err := service.mailboxes.Entry(box.ID, entryID)
 	if err != nil {
 		return MailboxItem{}, err
@@ -632,30 +905,30 @@ func (service *Service) AcceptSMTP(actor *account.Account, envelopeFrom string, 
 		return MailboxItem{}, ErrRelayDenied
 	}
 
-    parsed, err := stdmail.ReadMessage(bytes.NewReader(raw))
-    if err != nil {
-    	return MailboxItem{}, fmt.Errorf("%w: malformed RFC 5322 message", ErrInvalidMail)
-    }
+	parsed, err := stdmail.ReadMessage(bytes.NewReader(raw))
+	if err != nil {
+		return MailboxItem{}, fmt.Errorf("%w: malformed RFC 5322 message", ErrInvalidMail)
+	}
 
-    messageID, err := identifier.New("message")
-    if err != nil {
-    	return MailboxItem{}, err
-    }
+	messageID, err := identifier.New("message")
+	if err != nil {
+		return MailboxItem{}, err
+	}
 
-    now := service.now().UTC()
+	now := service.now().UTC()
 
-    subject := decodeMIMEHeader(parsed.Header.Get("Subject"))
-    from := decodeMIMEHeader(parsed.Header.Get("From"))
+	subject := decodeMIMEHeader(parsed.Header.Get("Subject"))
+	from := decodeMIMEHeader(parsed.Header.Get("From"))
 
-    if parsedFrom, err := stdmail.ParseAddress(from); err == nil {
-    	if parsedFrom.Name != "" {
-    		from = fmt.Sprintf("%s <%s>", parsedFrom.Name, parsedFrom.Address)
-    	} else {
-    		from = parsedFrom.Address
-    	}
-    }
+	if parsedFrom, err := stdmail.ParseAddress(from); err == nil {
+		if parsedFrom.Name != "" {
+			from = fmt.Sprintf("%s <%s>", parsedFrom.Name, parsedFrom.Address)
+		} else {
+			from = parsedFrom.Address
+		}
+	}
 
-    authorID := ""
+	authorID := ""
 	if actor != nil {
 		headerFrom, parseErr := stdmail.ParseAddress(from)
 		if parseErr != nil || !strings.EqualFold(headerFrom.Address, actor.Email) {
@@ -817,6 +1090,13 @@ func (service *Service) UpdateMailboxEntry(accountID, entryID, action string) (M
 	if err != nil {
 		return MailboxItem{}, err
 	}
+	if err := service.applyMailboxAction(&item, action); err != nil {
+		return MailboxItem{}, err
+	}
+	return item, nil
+}
+
+func (service *Service) applyMailboxAction(item *MailboxItem, action string) error {
 	switch action {
 	case "archive":
 		item.Entry.Folder = "Archive"
@@ -827,12 +1107,12 @@ func (service *Service) UpdateMailboxEntry(accountID, entryID, action string) (M
 	case "unread":
 		item.Entry.Flags = withFlag(item.Entry.Flags, "unread")
 	default:
-		return MailboxItem{}, fmt.Errorf("%w: unsupported mailbox action", ErrInvalidMail)
+		return fmt.Errorf("%w: unsupported mailbox action", ErrInvalidMail)
 	}
 	if err := service.mailboxes.UpdateEntry(item.Entry); err != nil {
-		return MailboxItem{}, err
+		return err
 	}
-	return item, nil
+	return nil
 }
 
 func (service *Service) addMailboxEntry(mailboxID, messageID, folder string, flags []string) (mailbox.Entry, error) {

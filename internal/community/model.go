@@ -33,20 +33,21 @@ type Thread struct {
 }
 
 type ThreadSummary struct {
-	ID             string   `xml:"id"`
-	SpaceID        string   `xml:"space-id"`
-	Title          string   `xml:"title"`
-	Author         string   `xml:"author"`
-	Excerpt        string   `xml:"excerpt"`
-	CreatedAt      string   `xml:"created-at"`
-	ReplyCount     int      `xml:"reply-count"`
-	ViewCount      uint64   `xml:"view-count"`
-	Score          int64    `xml:"score"`
-	ViewerVote     int      `xml:"viewer-vote"`
-	LastActivityAt string   `xml:"last-activity-at"`
-	Tags           []string `xml:"tags>tag,omitempty"`
-	Pinned         bool     `xml:"pinned"`
-	Locked         bool     `xml:"locked"`
+	ID              string   `xml:"id"`
+	SpaceID         string   `xml:"space-id"`
+	Title           string   `xml:"title"`
+	Author          string   `xml:"author"`
+	AuthorAccountID string   `xml:"author-account-id,omitempty"`
+	Excerpt         string   `xml:"excerpt"`
+	CreatedAt       string   `xml:"created-at"`
+	ReplyCount      int      `xml:"reply-count"`
+	ViewCount       uint64   `xml:"view-count"`
+	Score           int64    `xml:"score"`
+	ViewerVote      int      `xml:"viewer-vote"`
+	LastActivityAt  string   `xml:"last-activity-at"`
+	Tags            []string `xml:"tags>tag,omitempty"`
+	Pinned          bool     `xml:"pinned"`
+	Locked          bool     `xml:"locked"`
 }
 
 type MessageView struct {

@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/wavefnd/wave-platform/internal/account"
 	"github.com/wavefnd/wave-platform/internal/identity"
 	"github.com/wavefnd/wave-platform/internal/storage"
 	"github.com/wavefnd/wave-platform/internal/xmlcodec"
@@ -15,10 +16,107 @@ import (
 type MailboxHandler struct{ Auth AuthHandler }
 
 type MailboxResponse struct {
-	XMLName xml.Name          `xml:"https://wave-lang.dev/ns/platform/api/v1 mailbox"`
-	Address string            `xml:"address"`
-	Folder  string            `xml:"folder"`
-	Items   []MailboxItemView `xml:"items>item"`
+	XMLName   xml.Name          `xml:"https://wave-lang.dev/ns/platform/api/v1 mailbox"`
+	Address   string            `xml:"address"`
+	Addresses []string          `xml:"addresses>address,omitempty"`
+	Folder    string            `xml:"folder"`
+	Items     []MailboxItemView `xml:"items>item"`
+}
+
+func (handler MailboxHandler) ManagementList(writer http.ResponseWriter, request *http.Request) {
+	setPrivateResponseHeaders(writer)
+	actor, ok := handler.managementActor(writer, request, false)
+	if !ok {
+		return
+	}
+	_ = actor
+	folder := strings.TrimSpace(request.URL.Query().Get("folder"))
+	query := strings.ToLower(strings.TrimSpace(request.URL.Query().Get("q")))
+	if len([]rune(query)) > 200 {
+		writeAPIError(writer, http.StatusBadRequest, "invalid-query", "The mailbox search is too long.")
+		return
+	}
+	if folder == "" {
+		folder = "Inbox"
+	}
+	items, err := handler.Auth.Service.ManagementMailboxItems(folder)
+	if err != nil {
+		writeAPIError(writer, http.StatusInternalServerError, "mailbox-unavailable", "The management mailbox could not be loaded.")
+		return
+	}
+	views := make([]MailboxItemView, 0, len(items))
+	for _, item := range items {
+		if query != "" {
+			haystack := strings.ToLower(item.Message.From + " " + strings.Join(item.Message.To, " ") + " " + item.Message.Subject + " " + item.Body)
+			if !strings.Contains(haystack, query) {
+				continue
+			}
+		}
+		views = append(views, mailboxView(item))
+	}
+	addresses := handler.Auth.Service.ManagementAddresses()
+	_ = xmlcodec.Write(writer, http.StatusOK, MailboxResponse{Address: addresses[0], Addresses: addresses, Folder: folder, Items: views})
+}
+
+func (handler MailboxHandler) ManagementMessage(writer http.ResponseWriter, request *http.Request) {
+	setPrivateResponseHeaders(writer)
+	if _, ok := handler.managementActor(writer, request, false); !ok {
+		return
+	}
+	item, err := handler.Auth.Service.ManagementMailboxItem(request.PathValue("entry"))
+	if errors.Is(err, storage.ErrNotFound) {
+		writeAPIError(writer, http.StatusNotFound, "message-not-found", "The management mailbox message was not found.")
+		return
+	}
+	if err != nil {
+		writeAPIError(writer, http.StatusInternalServerError, "mailbox-unavailable", "The management mailbox message could not be loaded.")
+		return
+	}
+	_ = xmlcodec.Write(writer, http.StatusOK, mailMessageView(item))
+}
+
+func (handler MailboxHandler) ManagementAction(writer http.ResponseWriter, request *http.Request) {
+	setPrivateResponseHeaders(writer)
+	actor, ok := handler.managementActor(writer, request, true)
+	if !ok {
+		return
+	}
+	var input MailboxActionRequest
+	if xmlcodec.Decode(request.Body, &input) != nil {
+		writeAPIError(writer, http.StatusBadRequest, "invalid-xml", "The mailbox action is not valid XML.")
+		return
+	}
+	item, err := handler.Auth.Service.UpdateManagementMailboxEntry(actor.ID, request.PathValue("entry"), strings.TrimSpace(input.Action))
+	if errors.Is(err, storage.ErrNotFound) {
+		writeAPIError(writer, http.StatusNotFound, "message-not-found", "The management mailbox message was not found.")
+		return
+	}
+	if errors.Is(err, identity.ErrInvalidMail) {
+		writeAPIError(writer, http.StatusUnprocessableEntity, "invalid-action", strings.TrimPrefix(err.Error(), identity.ErrInvalidMail.Error()+": "))
+		return
+	}
+	if err != nil {
+		writeAPIError(writer, http.StatusInternalServerError, "mailbox-action-failed", "The management mailbox action could not be completed.")
+		return
+	}
+	_ = xmlcodec.Write(writer, http.StatusOK, mailMessageView(item))
+}
+
+func (handler MailboxHandler) managementActor(writer http.ResponseWriter, request *http.Request, mutation bool) (current account.Account, ok bool) {
+	actor, authenticated := AuthenticatedAccount(handler.Auth, request)
+	if !authenticated {
+		writeAPIError(writer, http.StatusUnauthorized, "not-authenticated", "Authentication is required.")
+		return current, false
+	}
+	if !handler.Auth.Service.IsAdministrator(actor.ID) {
+		writeAPIError(writer, http.StatusForbidden, "administrator-required", "Administrator access is required.")
+		return current, false
+	}
+	if mutation && !sameOrigin(request) {
+		writeAPIError(writer, http.StatusForbidden, "invalid-origin", "The request origin is not allowed.")
+		return current, false
+	}
+	return actor, true
 }
 
 type MailboxItemView struct {

@@ -111,3 +111,28 @@ func TestOnlyOwnerCanChangeAdministratorRole(t *testing.T) {
 		t.Fatalf("owner changed own role: %v", err)
 	}
 }
+
+func TestLunaStevTimeZoneDefaultsToSeoulAndIsAudited(t *testing.T) {
+	database, err := storage.Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = database.Close() })
+	service := NewService(database, nil, true, false)
+	if value := service.LunaStevTimeZone(); value != "Asia/Seoul" {
+		t.Fatalf("default time zone = %q", value)
+	}
+	if err := service.UpdateLunaStevTimeZone("owner", "America/New_York"); err != nil {
+		t.Fatal(err)
+	}
+	if value := service.LunaStevTimeZone(); value != "America/New_York" {
+		t.Fatalf("updated time zone = %q", value)
+	}
+	if err := service.UpdateLunaStevTimeZone("owner", "not/a-zone"); err == nil {
+		t.Fatal("invalid time zone was accepted")
+	}
+	events, err := audit.NewRepository(database).Events(10)
+	if err != nil || len(events) != 1 || events[0].Action != "admin.setting.update" {
+		t.Fatalf("events=%#v err=%v", events, err)
+	}
+}

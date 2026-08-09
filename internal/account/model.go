@@ -11,6 +11,8 @@ type Account struct {
 	Username    string    `xml:"username"`
 	DisplayName string    `xml:"display-name"`
 	Email       string    `xml:"email"`
+	Bio         string    `xml:"bio,omitempty"`
+	TimeZone    string    `xml:"time-zone,omitempty"`
 	Status      string    `xml:"status"`
 	CreatedAt   time.Time `xml:"created-at"`
 	UpdatedAt   time.Time `xml:"updated-at"`

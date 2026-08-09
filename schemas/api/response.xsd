@@ -3,6 +3,7 @@
     xmlns:xs="http://www.w3.org/2001/XMLSchema"
     targetNamespace="https://wave-lang.dev/ns/platform/api/v1"
     xmlns="https://wave-lang.dev/ns/platform/api/v1"
+	xmlns:tns="https://wave-lang.dev/ns/platform/api/v1"
     elementFormDefault="qualified">
     <xs:element name="platform">
         <xs:complexType><xs:sequence>
@@ -47,6 +48,7 @@
 	<xs:element name="register">
 		<xs:complexType><xs:sequence>
 			<xs:element name="display-name" type="xs:string"/>
+			<xs:element name="username" type="xs:string" minOccurs="0"/>
 			<xs:element name="recovery-email" type="xs:string"/>
 		</xs:sequence></xs:complexType>
 	</xs:element>
@@ -62,13 +64,16 @@
 			<xs:element name="username" type="xs:string"/>
 			<xs:element name="display-name" type="xs:string"/>
 			<xs:element name="email" type="xs:string"/>
+			<xs:element name="time-zone" type="xs:string"/>
 			<xs:element name="administrator" type="xs:boolean"/>
+			<xs:element name="owner" type="xs:boolean"/>
 			<xs:element name="expires-at" type="xs:dateTime"/>
 		</xs:sequence></xs:complexType>
 	</xs:element>
 	<xs:element name="mailbox">
 		<xs:complexType><xs:sequence>
 			<xs:element name="address" type="xs:string"/>
+			<xs:element name="addresses" minOccurs="0"><xs:complexType><xs:sequence><xs:element name="address" type="xs:string" minOccurs="0" maxOccurs="unbounded"/></xs:sequence></xs:complexType></xs:element>
 			<xs:element name="folder" type="xs:string"/>
 			<xs:element name="items">
 				<xs:complexType><xs:sequence>
@@ -149,6 +154,23 @@
 			<xs:element name="subscribed" type="xs:boolean"/>
 		</xs:sequence></xs:complexType>
 	</xs:element>
+	<xs:element name="registration-address">
+		<xs:complexType><xs:sequence><xs:element name="local-part" type="xs:string"/><xs:element name="choice-required" type="xs:boolean"/></xs:sequence></xs:complexType>
+	</xs:element>
+	<xs:element name="platform-preferences">
+		<xs:complexType><xs:sequence><xs:element name="lunastev-time-zone" type="xs:string"/></xs:sequence></xs:complexType>
+	</xs:element>
+	<xs:complexType name="userProfile">
+		<xs:sequence>
+			<xs:element name="username" type="xs:string"/><xs:element name="display-name" type="xs:string"/>
+			<xs:element name="email" type="xs:string"/><xs:element name="bio" type="xs:string" minOccurs="0"/>
+			<xs:element name="time-zone" type="xs:string"/><xs:element name="joined-at" type="xs:dateTime"/>
+			<xs:element name="activities" minOccurs="0"><xs:complexType><xs:sequence><xs:element name="activity" minOccurs="0" maxOccurs="unbounded"><xs:complexType><xs:sequence><xs:element name="kind" type="xs:string"/><xs:element name="title" type="xs:string"/><xs:element name="excerpt" type="xs:string"/><xs:element name="url" type="xs:string"/><xs:element name="created-at" type="xs:dateTime"/></xs:sequence></xs:complexType></xs:element></xs:sequence></xs:complexType></xs:element>
+			<xs:element name="address-choice-allowed" type="xs:boolean"/>
+		</xs:sequence>
+	</xs:complexType>
+	<xs:element name="user-profile" type="tns:userProfile"/>
+	<xs:element name="users"><xs:complexType><xs:sequence><xs:element name="user" type="tns:userProfile" minOccurs="0" maxOccurs="unbounded"/></xs:sequence></xs:complexType></xs:element>
 	<xs:element name="error">
 		<xs:complexType><xs:sequence>
 			<xs:element name="code" type="xs:string"/>

@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"encoding/xml"
 	"errors"
 	"net/http"
 	"strings"
@@ -9,6 +10,11 @@ import (
 	"github.com/wavefnd/wave-platform/internal/storage"
 	"github.com/wavefnd/wave-platform/internal/xmlcodec"
 )
+
+type PlatformPreferencesResponse struct {
+	XMLName          xml.Name `xml:"https://wave-lang.dev/ns/platform/api/v1 platform-preferences"`
+	LunaStevTimeZone string   `xml:"lunastev-time-zone"`
+}
 
 type AdministrationHandler struct {
 	Service *admindomain.Service
@@ -67,6 +73,31 @@ func (handler AdministrationHandler) AccountRole(writer http.ResponseWriter, req
 	err := handler.Service.UpdateAdministrator(actor.ID, request.PathValue("account"), input.Administrator)
 	if err != nil {
 		handler.writeManagementError(writer, err)
+		return
+	}
+	writer.WriteHeader(http.StatusNoContent)
+}
+
+func (handler AdministrationHandler) PlatformPreferences(writer http.ResponseWriter, _ *http.Request) {
+	if handler.Service == nil {
+		writeAPIError(writer, http.StatusServiceUnavailable, "preferences-unavailable", "Platform preferences are unavailable.")
+		return
+	}
+	_ = xmlcodec.Write(writer, http.StatusOK, PlatformPreferencesResponse{LunaStevTimeZone: handler.Service.LunaStevTimeZone()})
+}
+
+func (handler AdministrationHandler) LunaStevTimeZone(writer http.ResponseWriter, request *http.Request) {
+	actor, ok := handler.authorize(writer, request, true)
+	if !ok {
+		return
+	}
+	var input admindomain.TimeZoneInput
+	if xmlcodec.Decode(request.Body, &input) != nil {
+		writeAPIError(writer, http.StatusBadRequest, "invalid-xml", "The time zone request is not valid XML.")
+		return
+	}
+	if err := handler.Service.UpdateLunaStevTimeZone(actor.ID, input.TimeZone); err != nil {
+		writeAPIError(writer, http.StatusUnprocessableEntity, "invalid-time-zone", "Choose a valid IANA time zone.")
 		return
 	}
 	writer.WriteHeader(http.StatusNoContent)

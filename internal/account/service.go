@@ -12,6 +12,13 @@ import (
 
 const maxLocalPartBytes = 60
 
+var reservedLocalParts = map[string]bool{
+	"abuse": true, "admin": true, "administrator": true, "contact": true,
+	"help": true, "hostmaster": true, "info": true, "mailer-daemon": true,
+	"no-reply": true, "noreply": true, "postmaster": true, "root": true,
+	"security": true, "support": true, "webmaster": true,
+}
+
 func LocalPart(displayName string) (string, error) {
 	var builder strings.Builder
 	separator := false
@@ -49,4 +56,23 @@ func Address(username, domain string) (string, error) {
 		return "", fmt.Errorf("invalid username or mail domain")
 	}
 	return username + "@" + domain, nil
+}
+
+// MailLocalPart validates a user-selected Wave address. It intentionally uses
+// the same canonical form as generated account names so an address is also a
+// safe public profile path segment.
+func MailLocalPart(value string) (string, error) {
+	trimmed := strings.TrimSpace(strings.ToLower(norm.NFKC.String(value)))
+	local, err := LocalPart(trimmed)
+	if err != nil || local != trimmed {
+		return "", errors.New("mail address may contain letters, numbers, and single hyphens")
+	}
+	if reservedLocalParts[local] {
+		return "", errors.New("mail address is reserved for platform operations")
+	}
+	return local, nil
+}
+
+func IsReservedLocalPart(value string) bool {
+	return reservedLocalParts[strings.ToLower(strings.TrimSpace(value))]
 }

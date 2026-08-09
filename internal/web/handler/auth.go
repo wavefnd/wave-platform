@@ -33,8 +33,15 @@ type AuthConfigResponse struct {
 	TurnstileSiteKey string   `xml:"turnstile-site-key,omitempty"`
 }
 
+type RegistrationAddressResponse struct {
+	XMLName        xml.Name `xml:"https://wave-lang.dev/ns/platform/api/v1 registration-address"`
+	LocalPart      string   `xml:"local-part"`
+	ChoiceRequired bool     `xml:"choice-required"`
+}
+
 type BeginRegistrationRequest struct {
 	DisplayName   string `xml:"display-name"`
+	Username      string `xml:"username"`
 	RecoveryEmail string `xml:"recovery-email"`
 	Challenge     string `xml:"challenge-token"`
 }
@@ -90,6 +97,7 @@ type AccountResponse struct {
 	Username      string    `xml:"username"`
 	DisplayName   string    `xml:"display-name"`
 	Email         string    `xml:"email"`
+	TimeZone      string    `xml:"time-zone"`
 	Administrator bool      `xml:"administrator"`
 	Owner         bool      `xml:"owner"`
 	ExpiresAt     time.Time `xml:"expires-at"`
@@ -108,6 +116,16 @@ func (handler AuthHandler) Config(writer http.ResponseWriter, _ *http.Request) {
 		TurnstileSiteKey: handler.Challenge.SiteKey})
 }
 
+func (handler AuthHandler) RegistrationAddress(writer http.ResponseWriter, request *http.Request) {
+	setPrivateResponseHeaders(writer)
+	localPart, required, err := handler.Service.RegistrationAddress(request.URL.Query().Get("display-name"))
+	if err != nil {
+		handler.writeAuthError(writer, err)
+		return
+	}
+	_ = xmlcodec.Write(writer, http.StatusOK, RegistrationAddressResponse{LocalPart: localPart, ChoiceRequired: required})
+}
+
 func (handler AuthHandler) BeginRegistration(writer http.ResponseWriter, request *http.Request) {
 	setPrivateResponseHeaders(writer)
 	if !handler.allowMutation(writer, request, "register") {
@@ -122,7 +140,7 @@ func (handler AuthHandler) BeginRegistration(writer http.ResponseWriter, request
 		writeAPIError(writer, http.StatusForbidden, "challenge-failed", "Human verification failed.")
 		return
 	}
-	result, err := handler.Service.BeginTOTPRegistration(input.DisplayName, input.RecoveryEmail)
+	result, err := handler.Service.BeginTOTPRegistration(input.DisplayName, input.Username, input.RecoveryEmail)
 	if err != nil {
 		handler.writeAuthError(writer, err)
 		return
@@ -348,6 +366,8 @@ func (handler AuthHandler) writeAuthError(writer http.ResponseWriter, err error)
 		writeAPIError(writer, http.StatusConflict, "account-conflict", "That Wave address is already in use.")
 	case errors.Is(err, auth.ErrTOTPNotConfigured):
 		writeAPIError(writer, http.StatusServiceUnavailable, "totp-not-configured", "TOTP authentication is not configured on this server.")
+	case errors.Is(err, identity.ErrAddressChoiceRequired):
+		writeAPIError(writer, http.StatusConflict, "address-choice-required", err.Error())
 	case errors.Is(err, identity.ErrInvalidRegistration):
 		writeAPIError(writer, http.StatusUnprocessableEntity, "invalid-account", strings.TrimPrefix(err.Error(), identity.ErrInvalidRegistration.Error()+": "))
 	default:
@@ -365,8 +385,15 @@ func (handler AuthHandler) allowMutation(writer http.ResponseWriter, request *ht
 
 func (handler AuthHandler) writeAccount(writer http.ResponseWriter, status int, item account.Account, currentSession session.Session) {
 	_ = xmlcodec.Write(writer, status, AccountResponse{ID: item.ID, Username: item.Username, DisplayName: item.DisplayName,
-		Email: item.Email, Administrator: handler.Service.IsAdministrator(item.ID), Owner: handler.Service.IsOwner(item.ID),
+		Email: item.Email, TimeZone: normalizedTimeZone(item.TimeZone), Administrator: handler.Service.IsAdministrator(item.ID), Owner: handler.Service.IsOwner(item.ID),
 		ExpiresAt: currentSession.ExpiresAt})
+}
+
+func normalizedTimeZone(value string) string {
+	if strings.TrimSpace(value) == "" {
+		return "UTC"
+	}
+	return value
 }
 
 func (handler AuthHandler) setCookie(writer http.ResponseWriter, token string, currentSession session.Session) {

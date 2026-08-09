@@ -36,6 +36,7 @@ func (repository *Repository) Create(item Account) error {
 			storage.Key("account", "object", item.ID),
 			storage.Key("account", "name", username),
 			storage.Key("account", "email", email),
+			storage.Key("account", "profile-alias", username),
 		} {
 			if _, getErr := transaction.Get(key); getErr == nil {
 				return ErrConflict
@@ -84,14 +85,80 @@ func (repository *Repository) Update(item Account) error {
 	if item.ID == "" || item.Username == "" || item.Email == "" {
 		return errors.New("account id, username, and email are required")
 	}
-	if _, err := repository.Account(item.ID); err != nil {
+	previous, err := repository.Account(item.ID)
+	if err != nil {
 		return err
 	}
 	data, err := xml.Marshal(item)
 	if err != nil {
 		return fmt.Errorf("encode account: %w", err)
 	}
-	return repository.database.Set(storage.Key("account", "object", item.ID), data)
+	username := strings.ToLower(item.Username)
+	email := strings.ToLower(item.Email)
+	previousUsername := strings.ToLower(previous.Username)
+	previousEmail := strings.ToLower(previous.Email)
+	err = repository.database.DB.Update(func(transaction *badger.Txn) error {
+		for _, indexed := range []struct {
+			key      []byte
+			previous string
+			current  string
+		}{
+			{storage.Key("account", "name", username), previousUsername, username},
+			{storage.Key("account", "email", email), previousEmail, email},
+		} {
+			if indexed.previous == indexed.current {
+				continue
+			}
+			if existing, getErr := transaction.Get(indexed.key); getErr == nil {
+				value, copyErr := existing.ValueCopy(nil)
+				if copyErr != nil {
+					return copyErr
+				}
+				if string(value) != item.ID {
+					return ErrConflict
+				}
+			} else if !errors.Is(getErr, badger.ErrKeyNotFound) {
+				return getErr
+			}
+		}
+		if previousUsername != username {
+			if existing, getErr := transaction.Get(storage.Key("account", "profile-alias", username)); getErr == nil {
+				value, copyErr := existing.ValueCopy(nil)
+				if copyErr != nil {
+					return copyErr
+				}
+				if string(value) != item.ID {
+					return ErrConflict
+				}
+			} else if !errors.Is(getErr, badger.ErrKeyNotFound) {
+				return getErr
+			}
+		}
+		if err := transaction.Set(storage.Key("account", "object", item.ID), data); err != nil {
+			return err
+		}
+		if previousUsername != username {
+			if err := transaction.Delete(storage.Key("account", "name", previousUsername)); err != nil {
+				return err
+			}
+			if err := transaction.Set(storage.Key("account", "name", username), []byte(item.ID)); err != nil {
+				return err
+			}
+		}
+		if previousEmail != email {
+			if err := transaction.Delete(storage.Key("account", "email", previousEmail)); err != nil {
+				return err
+			}
+			if err := transaction.Set(storage.Key("account", "email", email), []byte(item.ID)); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("update account: %w", err)
+	}
+	return nil
 }
 
 func (repository *Repository) ByUsername(username string) (Account, error) {
@@ -100,6 +167,17 @@ func (repository *Repository) ByUsername(username string) (Account, error) {
 
 func (repository *Repository) ByEmail(email string) (Account, error) {
 	return repository.byIndex(storage.Key("account", "email", strings.ToLower(strings.TrimSpace(email))))
+}
+
+func (repository *Repository) AddProfileAlias(localPart, accountID string) error {
+	if strings.TrimSpace(localPart) == "" || accountID == "" {
+		return errors.New("profile alias and account id are required")
+	}
+	return repository.database.Set(storage.Key("account", "profile-alias", strings.ToLower(strings.TrimSpace(localPart))), []byte(accountID))
+}
+
+func (repository *Repository) ByProfileAlias(localPart string) (Account, error) {
+	return repository.byIndex(storage.Key("account", "profile-alias", strings.ToLower(strings.TrimSpace(localPart))))
 }
 
 func (repository *Repository) byIndex(key []byte) (Account, error) {

@@ -250,7 +250,8 @@ func (repository *Repository) summary(thread Thread) (ThreadSummary, error) {
 	}
 	return ThreadSummary{
 		ID: thread.ID, SpaceID: thread.SpaceID, Title: root.Subject, Author: root.From,
-		Excerpt: excerpt(body, 220), CreatedAt: root.CreatedAt.Format(time.RFC3339),
+		AuthorAccountID: root.AuthorAccountID,
+		Excerpt:         excerpt(body, 220), CreatedAt: root.CreatedAt.Format(time.RFC3339),
 		ReplyCount: replyCount, ViewCount: viewCount, Score: score, LastActivityAt: lastActivity.Format(time.RFC3339),
 		Tags: thread.Tags, Pinned: thread.Pinned, Locked: thread.Locked,
 	}, nil

@@ -58,7 +58,7 @@ func (service *Service) Snapshot(ctx context.Context, query string) (Snapshot, e
 	if err != nil {
 		return Snapshot{}, err
 	}
-	result := Snapshot{GeneratedAt: service.now().UTC(), SyncInterval: GitSyncInterval.String()}
+	result := Snapshot{GeneratedAt: service.now().UTC(), SyncInterval: GitSyncInterval.String(), LunaStevTimeZone: service.LunaStevTimeZone()}
 	query = strings.ToLower(strings.TrimSpace(query))
 	for _, item := range items {
 		factor, hasFactor := factors[item.ID]
@@ -125,6 +125,28 @@ func (service *Service) Snapshot(ctx context.Context, query string) (Snapshot, e
 	}
 	result.Storage = service.storageStatus()
 	return result, nil
+}
+
+func (service *Service) LunaStevTimeZone() string {
+	data, err := service.database.Get(storage.Key("setting", "lunastev", "time-zone"))
+	if err != nil || strings.TrimSpace(string(data)) == "" {
+		return "Asia/Seoul"
+	}
+	return string(data)
+}
+
+func (service *Service) UpdateLunaStevTimeZone(actorID, value string) error {
+	value = strings.TrimSpace(value)
+	if len(value) > 64 {
+		return errors.New("invalid time zone")
+	}
+	if _, err := time.LoadLocation(value); err != nil {
+		return errors.New("invalid time zone")
+	}
+	if err := service.database.Set(storage.Key("setting", "lunastev", "time-zone"), []byte(value)); err != nil {
+		return err
+	}
+	return service.appendAudit(actorID, "setting/lunastev/time-zone", "admin.setting.update")
 }
 
 func (service *Service) UpdateAccountStatus(actorID, accountID, status string) error {

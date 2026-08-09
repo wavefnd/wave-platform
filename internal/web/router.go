@@ -56,6 +56,7 @@ func NewRouter(
 	adminHandler := handler.AdministrationHandler{Service: adminService, Auth: authHandler}
 	sponsorsHandler := handler.SponsorsHandler{Service: sponsor.NewService()}
 	mediaHandler := handler.MediaHandler{Service: mediaService, Auth: authHandler}
+	usersHandler := handler.UsersHandler{Community: communityRepository, Questions: questionRepository, Auth: authHandler}
 	seoHandler := NewSEOHandler(publicURL, documentRepository, releaseRepository, communityRepository, questionRepository)
 
 	mux.HandleFunc("GET /api/v1/platform", platformHandler.Status)
@@ -86,13 +87,21 @@ func NewRouter(
 	mux.HandleFunc("GET /api/v1/source/repositories/{repository}/commits/{oid}", sourceHandler.CommitDetail)
 	mux.HandleFunc("GET /api/v1/source/repositories/{repository}/refs", sourceHandler.Refs)
 	mux.HandleFunc("GET /api/v1/platform/stats", statsHandler.Get)
+	mux.HandleFunc("GET /api/v1/platform/preferences", adminHandler.PlatformPreferences)
+	mux.HandleFunc("GET /api/v1/users", usersHandler.Directory)
+	mux.HandleFunc("GET /api/v1/users/by-id/{account}", usersHandler.ProfileByID)
+	mux.HandleFunc("GET /api/v1/users/{user}", usersHandler.Profile)
+	mux.HandleFunc("POST /api/v1/users/me/profile", usersHandler.UpdateProfile)
+	mux.HandleFunc("POST /api/v1/users/me/address", usersHandler.UpdateAddress)
 	mux.HandleFunc("GET /api/v1/admin", adminHandler.Snapshot)
 	mux.HandleFunc("POST /api/v1/admin/accounts/{account}/status", adminHandler.AccountStatus)
 	mux.HandleFunc("POST /api/v1/admin/accounts/{account}/role", adminHandler.AccountRole)
+	mux.HandleFunc("POST /api/v1/admin/settings/lunastev-time-zone", adminHandler.LunaStevTimeZone)
 	mux.HandleFunc("POST /api/v1/media/lunastev/images", mediaHandler.UploadLunaStevImage)
 	mux.HandleFunc("GET /media/lunastev/{image}", mediaHandler.LunaStevImage)
 	if authHandler != nil {
 		mux.HandleFunc("GET /api/v1/auth/config", authHandler.Config)
+		mux.HandleFunc("GET /api/v1/auth/registration-address", authHandler.RegistrationAddress)
 		mux.HandleFunc("POST /api/v1/auth/register/begin", authHandler.BeginRegistration)
 		mux.HandleFunc("POST /api/v1/auth/register/finish", authHandler.FinishRegistration)
 		mux.HandleFunc("POST /api/v1/auth/login", authHandler.Login)
@@ -112,6 +121,9 @@ func NewRouter(
 		mux.HandleFunc("POST /api/v1/mailbox/messages", mailboxHandler.Send)
 		mux.HandleFunc("GET /api/v1/mailbox/messages/{entry}", mailboxHandler.Message)
 		mux.HandleFunc("POST /api/v1/mailbox/messages/{entry}/action", mailboxHandler.Action)
+		mux.HandleFunc("GET /api/v1/admin/mailbox", mailboxHandler.ManagementList)
+		mux.HandleFunc("GET /api/v1/admin/mailbox/messages/{entry}", mailboxHandler.ManagementMessage)
+		mux.HandleFunc("POST /api/v1/admin/mailbox/messages/{entry}/action", mailboxHandler.ManagementAction)
 	}
 	mux.HandleFunc("GET /health", healthHandler.Ready)
 	mux.HandleFunc("GET /health/live", healthHandler.Live)

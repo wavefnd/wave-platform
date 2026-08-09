@@ -86,3 +86,56 @@ func TestMailboxSendReadSearchAndArchive(t *testing.T) {
 		t.Fatalf("archived=%d err=%v", len(archived), err)
 	}
 }
+
+func TestManagementMailboxRequiresAdministrator(t *testing.T) {
+	database, err := storage.Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer database.Close()
+	service, err := testsupport.NewIdentity(database)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := service.EnsureManagementMailbox(); err != nil {
+		t.Fatal(err)
+	}
+	owner, _, err := service.BootstrapTOTPAdmin("Wave Owner", "wave-owner", "owner@example.net", testsupport.TOTPSecret)
+	if err != nil {
+		t.Fatal(err)
+	}
+	member, err := testsupport.Register(service, "Mailbox Member")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, ownerToken, _, err := testsupport.Authenticate(service, owner.Email)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, memberToken, _, err := testsupport.Authenticate(service, member.Email)
+	if err != nil {
+		t.Fatal(err)
+	}
+	handler := MailboxHandler{Auth: AuthHandler{Service: service}}
+	for _, test := range []struct {
+		name   string
+		token  string
+		status int
+	}{
+		{name: "anonymous", status: http.StatusUnauthorized},
+		{name: "member", token: memberToken, status: http.StatusForbidden},
+		{name: "owner", token: ownerToken, status: http.StatusOK},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			request := httptest.NewRequest(http.MethodGet, "http://wave.test/api/v1/admin/mailbox", nil)
+			if test.token != "" {
+				request.AddCookie(&http.Cookie{Name: SessionCookieName, Value: test.token})
+			}
+			response := httptest.NewRecorder()
+			handler.ManagementList(response, request)
+			if response.Code != test.status {
+				t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+			}
+		})
+	}
+}

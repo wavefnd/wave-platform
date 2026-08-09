@@ -48,16 +48,17 @@ type MailStatus struct {
 }
 
 type Snapshot struct {
-	XMLName      xml.Name               `xml:"https://wave-lang.dev/ns/platform/api/v1 administration"`
-	Accounts     []AccountView          `xml:"accounts>account"`
-	Security     SecurityStatus         `xml:"security"`
-	Storage      StorageStatus          `xml:"storage"`
-	Mail         MailStatus             `xml:"mail-status"`
-	Deliveries   []maildomain.Delivery  `xml:"deliveries>delivery"`
-	Repositories []gitmirror.Repository `xml:"git-mirrors>repository"`
-	SyncInterval string                 `xml:"git-sync-interval"`
-	AuditEvents  []audit.Event          `xml:"audit-log>event"`
-	GeneratedAt  time.Time              `xml:"generated-at"`
+	XMLName          xml.Name               `xml:"https://wave-lang.dev/ns/platform/api/v1 administration"`
+	Accounts         []AccountView          `xml:"accounts>account"`
+	Security         SecurityStatus         `xml:"security"`
+	Storage          StorageStatus          `xml:"storage"`
+	Mail             MailStatus             `xml:"mail-status"`
+	Deliveries       []maildomain.Delivery  `xml:"deliveries>delivery"`
+	Repositories     []gitmirror.Repository `xml:"git-mirrors>repository"`
+	SyncInterval     string                 `xml:"git-sync-interval"`
+	AuditEvents      []audit.Event          `xml:"audit-log>event"`
+	GeneratedAt      time.Time              `xml:"generated-at"`
+	LunaStevTimeZone string                 `xml:"lunastev-time-zone"`
 }
 
 type AccountStatusInput struct {
@@ -66,4 +67,8 @@ type AccountStatusInput struct {
 
 type AccountRoleInput struct {
 	Administrator bool `xml:"administrator"`
+}
+
+type TimeZoneInput struct {
+	TimeZone string `xml:"time-zone"`
 }
