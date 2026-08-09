@@ -355,6 +355,10 @@ a:hover { color: var(--wave-link-hover); }
 .form-notice { margin: 8px 0 0; padding: 9px; border-left: 3px solid var(--wave-warning); background: var(--wave-warning-soft); color: var(--wave-warning-text); font-size: 12px; }
 .form-notice.error { border-left-color: var(--wave-danger); background: var(--wave-danger-soft); color: var(--wave-danger-text); }
 .address-preview { margin: -2px 0 4px; color: var(--wave-accent); font: 12px ui-monospace, SFMono-Regular, Consolas, monospace; }
+.address-field { display: flex; align-items: stretch; border: 1px solid var(--wave-border-strong); border-radius: 4px; background: var(--wave-surface); }
+.address-field:focus-within { border-color: var(--wave-focus); outline: 2px solid var(--wave-focus-ring); outline-offset: 1px; }
+.address-field input { min-width: 0; flex: 1; border: 0 !important; outline: 0 !important; box-shadow: none !important; }
+.address-field span { display: flex; align-items: center; padding: 0 10px; border-left: 1px solid var(--wave-border); color: var(--wave-text-secondary); font: 12px ui-monospace, SFMono-Regular, Consolas, monospace; }
 .auth-alternate { margin: 4px 0 0; font-size: 13px; text-align: center; }
 .auth-panel-wide { max-width: 480px; }
 .auth-help { margin: 0 0 4px; color: var(--wave-text-secondary); font-size: 13px; line-height: 1.55; }

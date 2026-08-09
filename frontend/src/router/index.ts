@@ -38,12 +38,16 @@ const router = createRouter({
         { path: 'source', name: 'source', component: SourcePage },
         { path: 'source/:repository', name: 'source-repository', component: SourcePage },
         { path: 'search', name: 'search', component: SearchPage },
+		{ path: 'user', name: 'user-directory', component: () => import('../pages/UserPage.vue') },
+		{ path: 'user/id/:account', name: 'user-id-profile', component: () => import('../pages/UserPage.vue') },
+		{ path: 'user/:user', name: 'user-profile', component: () => import('../pages/UserPage.vue') },
 		{ path: 'login', name: 'login', component: () => import('../pages/LoginPage.vue') },
 		{ path: 'register', name: 'register', component: () => import('../pages/RegisterPage.vue') },
 		{ path: 'account/recover', name: 'account-recover', component: () => import('../pages/RecoveryPage.vue') },
 		{ path: 'account/verify-recovery', name: 'verify-recovery', component: () => import('../pages/VerifyRecoveryEmailPage.vue') },
 		{ path: 'account/security', name: 'account-security', component: () => import('../pages/SecuritySettingsPage.vue'), meta: { requiresAuth: true } },
-        { path: 'admin', name: 'admin', component: () => import('../pages/AdminPage.vue') },
+        { path: 'admin', name: 'admin', component: () => import('../pages/AdminPage.vue'), meta: { adminSection: 'overview' } },
+		{ path: 'admin/:section(accounts|mailbox|mail-queue|git-mirrors|audit-log|security|modules|system)', name: 'admin-section', component: () => import('../pages/AdminPage.vue') },
         { path: ':pathMatch(.*)*', name: 'not-found', component: NotFoundPage },
       ],
     },
@@ -51,11 +55,11 @@ const router = createRouter({
 })
 
 router.beforeEach(async (to) => {
-  if (to.name !== 'admin' && !to.meta.requiresAuth) return true
+  if (!String(to.name ?? '').startsWith('admin') && !to.meta.requiresAuth) return true
   const auth = useAuthStore()
   await auth.initialize()
 	if (to.meta.requiresAuth && auth.account) return true
-	if (to.name === 'admin' && (auth.account?.owner || auth.account?.administrator)) return true
+	if (String(to.name ?? '').startsWith('admin') && (auth.account?.owner || auth.account?.administrator)) return true
   return { name: 'login', query: { redirect: to.fullPath } }
 })
 

@@ -6,16 +6,17 @@ import {
   CSidebar, CSidebarBrand, CSidebarFooter, CSidebarHeader, CSidebarNav, CTable, CTableBody,
   CTableDataCell, CTableHead, CTableHeaderCell, CTableRow,
 } from '@coreui/vue'
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import {
   ArrowLeft, Boxes, Database, FileClock, Gauge, GitBranch, MailWarning, Menu, RefreshCw,
   Search, ShieldCheck, Users,
 } from '@lucide/vue'
 
 import {
-  getAdminSnapshot, getModules, getPlatformStatus, updateAdminAccountRole, updateAdminAccountStatus,
-  type AdminAccount, type AdminSnapshot, type ModuleStatus, type PlatformStatus,
+  getAdminSnapshot, getManagementMailbox, getManagementMailMessage, getModules, getPlatformStatus,
+  updateAdminAccountRole, updateAdminAccountStatus, updateLunaStevTimeZone,
+  type AdminAccount, type AdminSnapshot, type MailboxView, type MailMessageView, type ModuleStatus, type PlatformStatus,
 } from '../services/http'
 import { useI18n } from '../i18n'
 import type { Locale } from '../i18n'
@@ -26,6 +27,7 @@ type PendingAction = { kind: 'status'; account: AdminAccount; status: 'active' |
   | { kind: 'role'; account: AdminAccount; administrator: boolean }
 
 const router = useRouter()
+const route = useRoute()
 const auth = useAuthStore()
 const { locale, setLocale, t } = useI18n()
 const modules = ref<ModuleStatus[]>([])
@@ -38,6 +40,10 @@ const actionLoading = ref(false)
 const sidebarVisible = ref(window.innerWidth >= 992)
 const accountQuery = ref('')
 const pendingAction = ref<PendingAction | null>(null)
+const managementMailbox = ref<MailboxView | null>(null)
+const managementMessage = ref<MailMessageView | null>(null)
+const lunaStevTimeZone = ref('Asia/Seoul')
+const timeZones = ['Asia/Seoul', 'UTC', 'Asia/Tokyo', 'Asia/Singapore', 'Europe/London', 'Europe/Paris', 'America/New_York', 'America/Los_Angeles']
 let stylesheet: HTMLLinkElement | null = null
 
 const accounts = computed(() => {
@@ -48,6 +54,10 @@ const accounts = computed(() => {
 })
 const mailAttention = computed(() => (snapshot.value?.mail.queued ?? 0) + (snapshot.value?.mail.delivering ?? 0)
   + (snapshot.value?.mail.deferred ?? 0) + (snapshot.value?.mail.failed ?? 0))
+const section = computed(() => String(route.params.section ?? route.meta.adminSection ?? 'overview'))
+const sectionTitle = computed(() => t(({ overview: 'admin.overview', accounts: 'admin.accounts', mailbox: 'admin.managementMailbox',
+  'mail-queue': 'admin.mailQueue', 'git-mirrors': 'admin.gitMirrors', 'audit-log': 'admin.auditLog', security: 'admin.security',
+  modules: 'admin.modules', system: 'admin.system' } as Record<string, string>)[section.value] ?? 'admin.overview'))
 
 onMounted(async () => {
   stylesheet = document.createElement('link')
@@ -58,6 +68,7 @@ onMounted(async () => {
   document.body.classList.add('coreui-admin-active')
   await load()
 })
+watch(() => route.fullPath, load)
 
 onBeforeUnmount(() => {
   stylesheet?.remove()
@@ -73,12 +84,26 @@ async function load() {
     ])
     modules.value = moduleResult
     snapshot.value = snapshotResult
+	lunaStevTimeZone.value = snapshotResult.lunaStevTimeZone
     platform.value = platformResult
+	if (section.value === 'mailbox') managementMailbox.value = await getManagementMailbox()
   } catch (reason) {
     error.value = reason instanceof Error ? reason.message : t('common.loadError')
   } finally {
     loading.value = false
   }
+}
+
+async function saveLunaStevTimeZone() {
+  actionError.value = ''
+  try { await updateLunaStevTimeZone(lunaStevTimeZone.value); await load() }
+  catch (reason) { actionError.value = reason instanceof Error ? reason.message : t('admin.actionFailed') }
+}
+
+async function openManagementMessage(entryID: string) {
+  actionError.value = ''
+  try { managementMessage.value = await getManagementMailMessage(entryID) }
+  catch (reason) { actionError.value = reason instanceof Error ? reason.message : t('common.loadError') }
 }
 
 function formatDate(value: string) {
@@ -143,16 +168,17 @@ function changeLocale(event: Event) {
         <CSidebarBrand as="div" class="admin-brand">Wave <span>{{ t('admin.title') }}</span></CSidebarBrand>
       </CSidebarHeader>
       <CSidebarNav>
-        <CNavItem><a class="nav-link active" href="#overview"><Gauge class="nav-icon" :size="20" />{{ t('admin.overview') }}</a></CNavItem>
+        <CNavItem><RouterLink class="nav-link" :class="{ active: section === 'overview' }" to="/admin"><Gauge class="nav-icon" :size="20" />{{ t('admin.overview') }}</RouterLink></CNavItem>
         <CNavTitle>{{ t('admin.management') }}</CNavTitle>
-        <CNavItem><a class="nav-link" href="#accounts"><Users class="nav-icon" :size="20" />{{ t('admin.accounts') }}</a></CNavItem>
-        <CNavItem><a class="nav-link" href="#mail-queue"><MailWarning class="nav-icon" :size="20" />{{ t('admin.mailQueue') }}</a></CNavItem>
-        <CNavItem><a class="nav-link" href="#git-mirrors"><GitBranch class="nav-icon" :size="20" />{{ t('admin.gitMirrors') }}</a></CNavItem>
-        <CNavItem><a class="nav-link" href="#audit-log"><FileClock class="nav-icon" :size="20" />{{ t('admin.auditLog') }}</a></CNavItem>
+        <CNavItem><RouterLink class="nav-link" :class="{ active: section === 'accounts' }" to="/admin/accounts"><Users class="nav-icon" :size="20" />{{ t('admin.accounts') }}</RouterLink></CNavItem>
+        <CNavItem><RouterLink class="nav-link" :class="{ active: section === 'mailbox' }" to="/admin/mailbox"><MailWarning class="nav-icon" :size="20" />{{ t('admin.managementMailbox') }}</RouterLink></CNavItem>
+        <CNavItem><RouterLink class="nav-link" :class="{ active: section === 'mail-queue' }" to="/admin/mail-queue"><MailWarning class="nav-icon" :size="20" />{{ t('admin.mailQueue') }}</RouterLink></CNavItem>
+        <CNavItem><RouterLink class="nav-link" :class="{ active: section === 'git-mirrors' }" to="/admin/git-mirrors"><GitBranch class="nav-icon" :size="20" />{{ t('admin.gitMirrors') }}</RouterLink></CNavItem>
+        <CNavItem><RouterLink class="nav-link" :class="{ active: section === 'audit-log' }" to="/admin/audit-log"><FileClock class="nav-icon" :size="20" />{{ t('admin.auditLog') }}</RouterLink></CNavItem>
         <CNavTitle>{{ t('admin.platform') }}</CNavTitle>
-        <CNavItem><a class="nav-link" href="#security"><ShieldCheck class="nav-icon" :size="20" />{{ t('admin.security') }}</a></CNavItem>
-        <CNavItem><a class="nav-link" href="#modules"><Boxes class="nav-icon" :size="20" />{{ t('admin.modules') }}</a></CNavItem>
-        <CNavItem><a class="nav-link" href="#system"><Database class="nav-icon" :size="20" />{{ t('admin.system') }}</a></CNavItem>
+        <CNavItem><RouterLink class="nav-link" :class="{ active: section === 'security' }" to="/admin/security"><ShieldCheck class="nav-icon" :size="20" />{{ t('admin.security') }}</RouterLink></CNavItem>
+        <CNavItem><RouterLink class="nav-link" :class="{ active: section === 'modules' }" to="/admin/modules"><Boxes class="nav-icon" :size="20" />{{ t('admin.modules') }}</RouterLink></CNavItem>
+        <CNavItem><RouterLink class="nav-link" :class="{ active: section === 'system' }" to="/admin/system"><Database class="nav-icon" :size="20" />{{ t('admin.system') }}</RouterLink></CNavItem>
       </CSidebarNav>
       <CSidebarFooter class="border-top">
         <RouterLink class="nav-link" to="/"><ArrowLeft class="nav-icon" :size="20" />{{ t('admin.backToPlatform') }}</RouterLink>
@@ -177,9 +203,9 @@ function changeLocale(event: Event) {
         <CContainer class="px-4" fluid>
           <div id="overview" class="admin-heading mb-4">
             <div>
-              <div class="text-body-secondary small mb-1">{{ t('admin.title') }} / {{ t('admin.overview') }}</div>
-              <h1 class="h3 mb-1">{{ t('admin.platformOverview') }}</h1>
-              <p class="text-body-secondary mb-0">{{ t('admin.lead') }}</p>
+              <div class="text-body-secondary small mb-1">{{ t('admin.title') }} / {{ sectionTitle }}</div>
+              <h1 class="h3 mb-1">{{ sectionTitle }}</h1>
+              <p v-if="section === 'overview'" class="text-body-secondary mb-0">{{ t('admin.overviewLead') }}</p>
             </div>
             <CButton color="secondary" variant="outline" size="sm" :disabled="loading" @click="load"><RefreshCw :size="15" /> {{ t('admin.refresh') }}</CButton>
           </div>
@@ -188,14 +214,14 @@ function changeLocale(event: Event) {
           <div v-if="loading && !snapshot" class="admin-loading text-body-secondary">{{ t('common.loading') }}</div>
 
           <template v-if="snapshot">
-            <CRow :xs="{ cols: 1, gutter: 3 }" :sm="{ cols: 2 }" :xl="{ cols: 4 }" class="mb-4">
+            <CRow v-if="section === 'overview'" :xs="{ cols: 1, gutter: 3 }" :sm="{ cols: 2 }" :xl="{ cols: 4 }" class="mb-4">
               <CCol><CCard class="h-100"><CCardBody><div class="text-body-secondary small">{{ t('admin.accounts') }}</div><div class="fs-3 fw-semibold">{{ snapshot.security.activeAccounts + snapshot.security.suspendedAccounts }}</div><small class="text-body-secondary">{{ snapshot.security.suspendedAccounts }} {{ t('admin.suspended').toLowerCase() }}</small></CCardBody></CCard></CCol>
               <CCol><CCard class="h-100"><CCardBody><div class="text-body-secondary small">{{ t('admin.mailAttention') }}</div><div class="fs-3 fw-semibold">{{ mailAttention }}</div><small class="text-body-secondary">{{ snapshot.mail.failed }} {{ t('admin.failed').toLowerCase() }}</small></CCardBody></CCard></CCol>
               <CCol><CCard class="h-100"><CCardBody><div class="text-body-secondary small">{{ t('admin.gitMirrors') }}</div><div class="fs-3 fw-semibold">{{ snapshot.gitMirrors.filter((item) => item.status === 'ready').length }} / {{ snapshot.gitMirrors.length }}</div><small class="text-body-secondary">{{ t('admin.ready') }}</small></CCardBody></CCard></CCol>
               <CCol><CCard class="h-100"><CCardBody><div class="text-body-secondary small">{{ t('admin.storageUsed') }}</div><div class="fs-3 fw-semibold">{{ formatBytes(snapshot.storage.filesBytes) }}</div><small class="text-body-secondary">{{ snapshot.storage.health }}</small></CCardBody></CCard></CCol>
             </CRow>
 
-            <CCard id="accounts" class="mb-4">
+            <CCard v-if="section === 'accounts'" class="mb-4">
               <CCardHeader class="admin-card-header">
                 <div><strong>{{ t('admin.accountManagement') }}</strong><div class="text-body-secondary small">{{ t('admin.accountManagementHelp') }}</div></div>
                 <label class="admin-search"><Search :size="16" /><span class="visually-hidden">{{ t('admin.searchAccounts') }}</span><input v-model="accountQuery" type="search" :placeholder="t('admin.searchAccounts')"></label>
@@ -220,7 +246,15 @@ function changeLocale(event: Event) {
               </CCardBody>
             </CCard>
 
-            <CCard id="mail-queue" class="mb-4">
+            <CCard v-if="section === 'mailbox'" class="mb-4">
+              <CCardHeader class="admin-card-header"><div><strong>{{ t('admin.managementMailbox') }}</strong><div class="text-body-secondary small">{{ managementMailbox?.addresses?.join(' · ') }}</div></div></CCardHeader>
+              <CCardBody class="p-0"><CTable align="middle" class="mb-0 admin-table" hover responsive>
+                <CTableHead><CTableRow><CTableHeaderCell class="ps-4">{{ t('mail.from') }}</CTableHeaderCell><CTableHeaderCell>{{ t('mail.subject') }}</CTableHeaderCell><CTableHeaderCell>{{ t('admin.recipient') }}</CTableHeaderCell><CTableHeaderCell>{{ t('admin.updated') }}</CTableHeaderCell></CTableRow></CTableHead>
+                <CTableBody><CTableRow v-for="item in managementMailbox?.items ?? []" :key="item.id" role="button" tabindex="0" @click="openManagementMessage(item.id)" @keydown.enter="openManagementMessage(item.id)"><CTableDataCell class="ps-4">{{ item.from }}</CTableDataCell><CTableDataCell><strong>{{ item.subject }}</strong><div class="text-body-secondary small">{{ item.preview }}</div></CTableDataCell><CTableDataCell>{{ item.to.join(', ') }}</CTableDataCell><CTableDataCell>{{ formatDate(item.receivedAt) }}</CTableDataCell></CTableRow><CTableRow v-if="managementMailbox?.items.length === 0"><CTableDataCell colspan="4" class="py-4 text-center text-body-secondary">{{ t('admin.managementMailboxEmpty') }}</CTableDataCell></CTableRow></CTableBody>
+              </CTable></CCardBody>
+            </CCard>
+
+            <CCard v-if="section === 'mail-queue'" class="mb-4">
               <CCardHeader><strong>{{ t('admin.mailQueue') }}</strong><span class="ms-2 text-body-secondary small">{{ t('admin.recentDeliveries') }}</span></CCardHeader>
               <CCardBody class="p-0">
                 <div class="admin-status-strip"><span>{{ t('admin.queued') }} <strong>{{ snapshot.mail.queued }}</strong></span><span>{{ t('admin.delivering') }} <strong>{{ snapshot.mail.delivering }}</strong></span><span>{{ t('admin.deferred') }} <strong>{{ snapshot.mail.deferred }}</strong></span><span>{{ t('admin.failed') }} <strong>{{ snapshot.mail.failed }}</strong></span><span>{{ t('admin.delivered') }} <strong>{{ snapshot.mail.delivered }}</strong></span></div>
@@ -231,19 +265,19 @@ function changeLocale(event: Event) {
               </CCardBody>
             </CCard>
 
-            <CCard id="git-mirrors" class="mb-4">
+            <CCard v-if="section === 'git-mirrors'" class="mb-4">
               <CCardHeader><strong>{{ t('admin.gitMirrors') }}</strong><span class="ms-2 text-body-secondary small">{{ t('admin.syncEvery') }} {{ snapshot.gitSyncInterval }}</span></CCardHeader>
               <CCardBody class="p-0"><CTable align="middle" class="mb-0 admin-table" responsive><CTableHead><CTableRow><CTableHeaderCell class="ps-4">{{ t('admin.repository') }}</CTableHeaderCell><CTableHeaderCell>{{ t('admin.branch') }}</CTableHeaderCell><CTableHeaderCell>{{ t('admin.head') }}</CTableHeaderCell><CTableHeaderCell>{{ t('admin.lastFetched') }}</CTableHeaderCell><CTableHeaderCell>{{ t('admin.status') }}</CTableHeaderCell></CTableRow></CTableHead><CTableBody><CTableRow v-for="repository in snapshot.gitMirrors" :key="repository.id"><CTableDataCell class="ps-4"><strong>{{ repository.owner }}/{{ repository.name }}</strong></CTableDataCell><CTableDataCell>{{ repository.defaultBranch }}</CTableDataCell><CTableDataCell><code>{{ repository.headOid ? repository.headOid.slice(0, 10) : '—' }}</code></CTableDataCell><CTableDataCell>{{ formatDate(repository.headCommit?.authoredAt ?? '') }}</CTableDataCell><CTableDataCell><CBadge :color="badgeColor(repository.status)">{{ repository.status }}</CBadge></CTableDataCell></CTableRow></CTableBody></CTable></CCardBody>
             </CCard>
 
-            <CRow :xs="{ cols: 1, gutter: 4 }" :xl="{ cols: 2 }" class="mb-4">
-              <CCol><CCard id="security" class="h-100"><CCardHeader><strong>{{ t('admin.security') }}</strong></CCardHeader><CCardBody><dl class="admin-definition-list"><div><dt>{{ t('admin.totpEnrollment') }}</dt><dd>{{ snapshot.security.totpAccounts }} / {{ snapshot.security.activeAccounts + snapshot.security.suspendedAccounts }}</dd></div><div><dt>{{ t('admin.verifiedRecovery') }}</dt><dd>{{ snapshot.security.verifiedRecoveries }}</dd></div><div><dt>{{ t('admin.registration') }}</dt><dd><CBadge :color="snapshot.security.registrationOpen ? 'success' : 'secondary'">{{ snapshot.security.registrationOpen ? t('admin.open') : t('admin.closed') }}</CBadge></dd></div><div><dt>Cloudflare Turnstile</dt><dd><CBadge :color="snapshot.security.turnstileEnabled ? 'success' : 'secondary'">{{ snapshot.security.turnstileEnabled ? t('admin.enabled') : t('admin.disabled') }}</CBadge></dd></div></dl></CCardBody></CCard></CCol>
-              <CCol><CCard id="system" class="h-100"><CCardHeader><strong>{{ t('admin.system') }}</strong><span class="ms-2 text-body-secondary small">{{ platform?.environment }} · {{ platform?.version }}</span></CCardHeader><CCardBody><dl class="admin-definition-list"><div><dt>{{ t('admin.databaseHealth') }}</dt><dd><CBadge :color="badgeColor(snapshot.storage.health)">{{ snapshot.storage.health }}</CBadge></dd></div><div><dt>{{ t('admin.lsmStorage') }}</dt><dd>{{ formatBytes(snapshot.storage.databaseBytes) }}</dd></div><div><dt>{{ t('admin.valueLog') }}</dt><dd>{{ formatBytes(snapshot.storage.valueLogBytes) }}</dd></div><div><dt>{{ t('admin.totalStorage') }}</dt><dd>{{ formatBytes(snapshot.storage.filesBytes) }}</dd></div></dl></CCardBody></CCard></CCol>
+            <CRow v-if="section === 'security' || section === 'system'" :xs="{ cols: 1, gutter: 4 }" class="mb-4">
+              <CCol v-if="section === 'security'"><CCard class="h-100"><CCardHeader><strong>{{ t('admin.security') }}</strong></CCardHeader><CCardBody><dl class="admin-definition-list"><div><dt>{{ t('admin.totpEnrollment') }}</dt><dd>{{ snapshot.security.totpAccounts }} / {{ snapshot.security.activeAccounts + snapshot.security.suspendedAccounts }}</dd></div><div><dt>{{ t('admin.verifiedRecovery') }}</dt><dd>{{ snapshot.security.verifiedRecoveries }}</dd></div><div><dt>{{ t('admin.registration') }}</dt><dd><CBadge :color="snapshot.security.registrationOpen ? 'success' : 'secondary'">{{ snapshot.security.registrationOpen ? t('admin.open') : t('admin.closed') }}</CBadge></dd></div><div><dt>Cloudflare Turnstile</dt><dd><CBadge :color="snapshot.security.turnstileEnabled ? 'success' : 'secondary'">{{ snapshot.security.turnstileEnabled ? t('admin.enabled') : t('admin.disabled') }}</CBadge></dd></div></dl></CCardBody></CCard></CCol>
+              <CCol v-if="section === 'system'"><CCard class="h-100"><CCardHeader><strong>{{ t('admin.system') }}</strong><span class="ms-2 text-body-secondary small">{{ platform?.environment }} · {{ platform?.version }}</span></CCardHeader><CCardBody><dl class="admin-definition-list"><div><dt>{{ t('admin.databaseHealth') }}</dt><dd><CBadge :color="badgeColor(snapshot.storage.health)">{{ snapshot.storage.health }}</CBadge></dd></div><div><dt>{{ t('admin.lsmStorage') }}</dt><dd>{{ formatBytes(snapshot.storage.databaseBytes) }}</dd></div><div><dt>{{ t('admin.valueLog') }}</dt><dd>{{ formatBytes(snapshot.storage.valueLogBytes) }}</dd></div><div><dt>{{ t('admin.totalStorage') }}</dt><dd>{{ formatBytes(snapshot.storage.filesBytes) }}</dd></div></dl><form class="admin-timezone-setting" @submit.prevent="saveLunaStevTimeZone"><label>{{ t('admin.lunaStevTimeZone') }}<select v-model="lunaStevTimeZone" class="form-select"><option v-for="zone in timeZones" :key="zone" :value="zone">{{ zone }}</option></select></label><p class="text-body-secondary small">{{ t('admin.lunaStevTimeZoneHelp') }}</p><CButton color="primary" type="submit">{{ t('common.save') }}</CButton></form><div v-if="actionError" class="alert alert-danger mt-3">{{ actionError }}</div></CCardBody></CCard></CCol>
             </CRow>
 
-            <CCard id="modules" class="mb-4"><CCardHeader><strong>{{ t('admin.modules') }}</strong></CCardHeader><CCardBody class="p-0"><CTable align="middle" class="mb-0 admin-table" hover responsive><CTableHead><CTableRow><CTableHeaderCell class="ps-4">{{ t('admin.module') }}</CTableHeaderCell><CTableHeaderCell>{{ t('admin.status') }}</CTableHeaderCell><CTableHeaderCell>{{ t('admin.availability') }}</CTableHeaderCell></CTableRow></CTableHead><CTableBody><CTableRow v-for="module in modules" :key="module.name"><CTableDataCell class="ps-4"><strong>{{ module.name }}</strong></CTableDataCell><CTableDataCell>{{ module.status }}</CTableDataCell><CTableDataCell><CBadge :color="module.enabled ? 'success' : 'secondary'">{{ module.enabled ? t('admin.enabled') : t('admin.disabled') }}</CBadge></CTableDataCell></CTableRow></CTableBody></CTable></CCardBody></CCard>
+            <CCard v-if="section === 'modules'" class="mb-4"><CCardHeader><strong>{{ t('admin.modules') }}</strong></CCardHeader><CCardBody class="p-0"><CTable align="middle" class="mb-0 admin-table" hover responsive><CTableHead><CTableRow><CTableHeaderCell class="ps-4">{{ t('admin.module') }}</CTableHeaderCell><CTableHeaderCell>{{ t('admin.status') }}</CTableHeaderCell><CTableHeaderCell>{{ t('admin.availability') }}</CTableHeaderCell></CTableRow></CTableHead><CTableBody><CTableRow v-for="module in modules" :key="module.name"><CTableDataCell class="ps-4"><strong>{{ module.name }}</strong></CTableDataCell><CTableDataCell>{{ module.status }}</CTableDataCell><CTableDataCell><CBadge :color="module.enabled ? 'success' : 'secondary'">{{ module.enabled ? t('admin.enabled') : t('admin.disabled') }}</CBadge></CTableDataCell></CTableRow></CTableBody></CTable></CCardBody></CCard>
 
-            <CCard id="audit-log" class="mb-4"><CCardHeader><strong>{{ t('admin.auditLog') }}</strong><span class="ms-2 text-body-secondary small">{{ t('admin.recentEvents') }}</span></CCardHeader><CCardBody class="p-0"><CTable align="middle" class="mb-0 admin-table" responsive><CTableHead><CTableRow><CTableHeaderCell class="ps-4">{{ t('admin.time') }}</CTableHeaderCell><CTableHeaderCell>{{ t('admin.actor') }}</CTableHeaderCell><CTableHeaderCell>{{ t('admin.action') }}</CTableHeaderCell><CTableHeaderCell>{{ t('admin.resource') }}</CTableHeaderCell><CTableHeaderCell>{{ t('admin.result') }}</CTableHeaderCell></CTableRow></CTableHead><CTableBody><CTableRow v-for="event in snapshot.auditLog" :key="event.id"><CTableDataCell class="ps-4">{{ formatDate(event.occurredAt) }}</CTableDataCell><CTableDataCell><code>{{ event.actorId }}</code></CTableDataCell><CTableDataCell>{{ event.action }}</CTableDataCell><CTableDataCell><code>{{ event.resourceId }}</code></CTableDataCell><CTableDataCell><CBadge :color="badgeColor(event.result)">{{ event.result }}</CBadge></CTableDataCell></CTableRow><CTableRow v-if="snapshot.auditLog.length === 0"><CTableDataCell colspan="5" class="py-4 text-center text-body-secondary">{{ t('admin.noAuditEvents') }}</CTableDataCell></CTableRow></CTableBody></CTable></CCardBody></CCard>
+            <CCard v-if="section === 'audit-log'" class="mb-4"><CCardHeader><strong>{{ t('admin.auditLog') }}</strong><span class="ms-2 text-body-secondary small">{{ t('admin.recentEvents') }}</span></CCardHeader><CCardBody class="p-0"><CTable align="middle" class="mb-0 admin-table" responsive><CTableHead><CTableRow><CTableHeaderCell class="ps-4">{{ t('admin.time') }}</CTableHeaderCell><CTableHeaderCell>{{ t('admin.actor') }}</CTableHeaderCell><CTableHeaderCell>{{ t('admin.action') }}</CTableHeaderCell><CTableHeaderCell>{{ t('admin.resource') }}</CTableHeaderCell><CTableHeaderCell>{{ t('admin.result') }}</CTableHeaderCell></CTableRow></CTableHead><CTableBody><CTableRow v-for="event in snapshot.auditLog" :key="event.id"><CTableDataCell class="ps-4">{{ formatDate(event.occurredAt) }}</CTableDataCell><CTableDataCell><code>{{ event.actorId }}</code></CTableDataCell><CTableDataCell>{{ event.action }}</CTableDataCell><CTableDataCell><code>{{ event.resourceId }}</code></CTableDataCell><CTableDataCell><CBadge :color="badgeColor(event.result)">{{ event.result }}</CBadge></CTableDataCell></CTableRow><CTableRow v-if="snapshot.auditLog.length === 0"><CTableDataCell colspan="5" class="py-4 text-center text-body-secondary">{{ t('admin.noAuditEvents') }}</CTableDataCell></CTableRow></CTableBody></CTable></CCardBody></CCard>
           </template>
         </CContainer>
       </div>
@@ -253,6 +287,12 @@ function changeLocale(event: Event) {
       <CModalHeader><CModalTitle>{{ t('admin.confirmAction') }}</CModalTitle></CModalHeader>
       <CModalBody v-if="pendingAction"><p>{{ pendingAction.kind === 'status' ? (pendingAction.status === 'suspended' ? t('admin.confirmSuspend') : t('admin.confirmRestore')) : (pendingAction.administrator ? t('admin.confirmMakeAdmin') : t('admin.confirmRemoveAdmin')) }}</p><strong>{{ pendingAction.account.displayName }}</strong><div class="text-body-secondary small">{{ pendingAction.account.email }}</div><div v-if="actionError" class="alert alert-danger mt-3 mb-0" role="alert">{{ actionError }}</div></CModalBody>
       <CModalFooter><CButton color="secondary" variant="outline" :disabled="actionLoading" @click="pendingAction = null">{{ t('common.cancel') }}</CButton><CButton :color="pendingAction?.kind === 'status' && pendingAction.status === 'suspended' ? 'danger' : 'primary'" :disabled="actionLoading" @click="confirmAction">{{ t('admin.confirm') }}</CButton></CModalFooter>
+    </CModal>
+
+    <CModal :visible="Boolean(managementMessage)" size="lg" alignment="center" @close="managementMessage = null">
+      <CModalHeader><CModalTitle>{{ managementMessage?.subject }}</CModalTitle></CModalHeader>
+      <CModalBody v-if="managementMessage"><dl class="admin-definition-list"><div><dt>{{ t('mail.from') }}</dt><dd>{{ managementMessage.from }}</dd></div><div><dt>{{ t('admin.recipient') }}</dt><dd>{{ managementMessage.to.join(', ') }}</dd></div><div><dt>{{ t('admin.time') }}</dt><dd>{{ formatDate(managementMessage.date) }}</dd></div></dl><pre class="admin-mail-body">{{ managementMessage.body }}</pre></CModalBody>
+      <CModalFooter><CButton color="secondary" variant="outline" @click="managementMessage = null">{{ t('common.close') }}</CButton></CModalFooter>
     </CModal>
   </main>
 </template>
@@ -286,6 +326,9 @@ body.coreui-admin-active { background-color: var(--cui-tertiary-bg); }
 .admin-definition-list > div:last-child { border-bottom: 0; }
 .admin-definition-list dt { color: var(--cui-secondary-color); font-weight: 500; }
 .admin-definition-list dd { margin: 0; font-weight: 650; }
+.admin-timezone-setting { max-width: 520px; margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--cui-border-color); }
+.admin-timezone-setting label { display: grid; gap: 7px; font-weight: 600; }
+.admin-mail-body { max-height: 52vh; overflow: auto; margin: 20px 0 0; padding: 16px; border: 1px solid var(--cui-border-color); background: var(--cui-tertiary-bg); color: var(--cui-body-color); font: 13px/1.6 ui-monospace, monospace; white-space: pre-wrap; }
 @media (max-width: 991.98px) { .coreui-admin-template .wrapper { padding-inline-start: 0; } }
 @media (max-width: 767.98px) { .admin-card-header { align-items: stretch; flex-direction: column; }.admin-search { width: 100%; }.admin-heading { align-items: flex-start; }.coreui-admin-template .container-fluid { padding-right: 16px !important; padding-left: 16px !important; }.admin-preference-select { max-width: 96px; }.coreui-admin-template .header .gap-3 { gap: .4rem !important; } }
 @media (max-width: 480px) { .coreui-admin-template .header strong { display: none; }.admin-preference-select { max-width: 88px; } }

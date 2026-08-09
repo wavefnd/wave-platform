@@ -122,6 +122,7 @@ export interface AdminSnapshot {
 	gitSyncInterval: string
 	auditLog: AdminAuditEvent[]
 	generatedAt: string
+	lunaStevTimeZone: string
 }
 
 export interface AuthConfig {
@@ -173,6 +174,7 @@ export interface AccountSession {
 	username: string
 	displayName: string
 	email: string
+	timeZone: string
 	administrator: boolean
 	owner: boolean
 	expiresAt: string
@@ -192,8 +194,28 @@ export interface MailboxItem {
 
 export interface MailboxView {
 	address: string
+	addresses?: string[]
 	folder: string
 	items: MailboxItem[]
+}
+
+export interface UserActivity {
+	kind: 'community-post' | 'community-comment' | 'question' | 'answer'
+	title: string
+	excerpt: string
+	url: string
+	createdAt: string
+}
+
+export interface UserProfile {
+	username: string
+	displayName: string
+	email: string
+	bio: string
+	timeZone: string
+	joinedAt: string
+	activities: UserActivity[]
+	addressChoiceAllowed: boolean
 }
 
 export interface MailMessageView {
@@ -222,6 +244,7 @@ export interface CommunityThreadSummary {
   spaceId: string
   title: string
   author: string
+	authorAccountId: string
   excerpt: string
   createdAt: string
   replyCount: number
@@ -369,6 +392,7 @@ function parseAccountSession(xml: XMLDocument): AccountSession {
 		username: textOf(xml, 'username'),
 		displayName: textOf(xml, 'display-name'),
 		email: textOf(xml, 'email'),
+		timeZone: textOf(xml, 'time-zone') || 'UTC',
 		administrator: textOf(xml, 'administrator') === 'true',
 		owner: textOf(xml, 'owner') === 'true',
 		expiresAt: textOf(xml, 'expires-at'),
@@ -383,6 +407,12 @@ export async function getAuthConfig(): Promise<AuthConfig> {
 		totpConfigured: textOf(xml, 'totp-configured') === 'true',
 		turnstileSiteKey: textOf(xml, 'turnstile-site-key'),
 	}
+}
+
+export async function getRegistrationAddress(displayName: string): Promise<{ localPart: string; choiceRequired: boolean }> {
+	const query = new URLSearchParams({ 'display-name': displayName })
+	const xml = await getXml(`/api/v1/auth/registration-address?${query}`)
+	return { localPart: textOf(xml, 'local-part'), choiceRequired: textOf(xml, 'choice-required') === 'true' }
 }
 
 export async function getCurrentAccount(): Promise<AccountSession | null> {
@@ -406,9 +436,9 @@ export async function login(identifier: string, code: string, challenge = ''): P
 	return parseAccountSession(xml)
 }
 
-export async function beginRegistration(displayName: string, recoveryEmail: string, challenge = ''): Promise<TOTPEnrollment> {
+export async function beginRegistration(displayName: string, username: string, recoveryEmail: string, challenge = ''): Promise<TOTPEnrollment> {
 	return parseEnrollment(await requestXml('/api/v1/auth/register/begin', 'POST', authDocument('registration', {
-		'display-name': displayName, 'recovery-email': recoveryEmail, 'challenge-token': challenge,
+		'display-name': displayName, username, 'recovery-email': recoveryEmail, 'challenge-token': challenge,
 	})))
 }
 
@@ -476,6 +506,7 @@ export async function getMailbox(folder = 'Inbox', q = ''): Promise<MailboxView>
 	const xml = await getXml(`/api/v1/mailbox?${query}`)
 	return {
 		address: textOf(xml, 'address'),
+		addresses: Array.from(xml.querySelectorAll('addresses > address')).map((item) => item.textContent?.trim() ?? '').filter(Boolean),
 		folder: textOf(xml, 'folder'),
 		items: Array.from(xml.querySelectorAll('items > item')).map((item) => ({
 			id: item.getAttribute('id') ?? '',
@@ -489,6 +520,75 @@ export async function getMailbox(folder = 'Inbox', q = ''): Promise<MailboxView>
 			deliveryStatus: childText(item, 'delivery-status'),
 		})),
 	}
+}
+
+function parseUserProfile(element: ParentNode): UserProfile {
+	return {
+		username: childText(element, 'username'), displayName: childText(element, 'display-name'),
+		email: childText(element, 'email'), bio: childContent(element, 'bio'), timeZone: childText(element, 'time-zone') || 'UTC', joinedAt: childText(element, 'joined-at'),
+		addressChoiceAllowed: childText(element, 'address-choice-allowed') === 'true',
+		activities: Array.from(element.querySelectorAll('activities > activity')).map((item) => ({
+			kind: childText(item, 'kind') as UserActivity['kind'], title: childText(item, 'title'),
+			excerpt: childContent(item, 'excerpt'), url: childText(item, 'url'), createdAt: childText(item, 'created-at'),
+		})),
+	}
+}
+
+export async function getUsers(): Promise<UserProfile[]> {
+	const xml = await getXml('/api/v1/users')
+	return Array.from(xml.documentElement.children).filter((item) => item.localName === 'user').map(parseUserProfile)
+}
+
+export async function getUser(username: string): Promise<UserProfile> {
+	return parseUserProfile((await getXml(`/api/v1/users/${encodeURIComponent(username)}`)).documentElement)
+}
+
+export async function getUserByID(accountID: string): Promise<UserProfile> {
+	return parseUserProfile((await getXml(`/api/v1/users/by-id/${encodeURIComponent(accountID)}`)).documentElement)
+}
+
+export async function updateUserProfile(displayName: string, bio: string, timeZone: string): Promise<UserProfile> {
+	const xml = await requestXml('/api/v1/users/me/profile', 'POST', authDocument('user-profile-update', {
+		'display-name': displayName, bio, 'time-zone': timeZone,
+	}))
+	if (!xml) throw new Error('The server returned an empty profile response.')
+	return parseUserProfile(xml.documentElement)
+}
+
+export async function updateWaveAddress(localPart: string, code: string): Promise<UserProfile> {
+	const xml = await requestXml('/api/v1/users/me/address', 'POST', authDocument('user-address-update', {
+		'local-part': localPart, code,
+	}))
+	if (!xml) throw new Error('The server returned an empty profile response.')
+	return parseUserProfile(xml.documentElement)
+}
+
+export async function getManagementMailbox(folder = 'Inbox', q = ''): Promise<MailboxView> {
+	const query = new URLSearchParams({ folder })
+	if (q) query.set('q', q)
+	const xml = await getXml(`/api/v1/admin/mailbox?${query}`)
+	return {
+		address: textOf(xml, 'address'),
+		addresses: Array.from(xml.querySelectorAll('addresses > address')).map((item) => item.textContent?.trim() ?? '').filter(Boolean),
+		folder: textOf(xml, 'folder'),
+		items: Array.from(xml.querySelectorAll('items > item')).map((item) => ({
+			id: item.getAttribute('id') ?? '', messageId: childText(item, 'message-id'), from: childText(item, 'from'),
+			to: Array.from(item.children).filter((child) => child.localName === 'to').map((child) => child.textContent?.trim() ?? '').filter(Boolean),
+			subject: childText(item, 'subject'), receivedAt: childText(item, 'received-at'), preview: childContent(item, 'preview'),
+			flags: Array.from(item.querySelectorAll('flags > flag')).map((flag) => flag.textContent?.trim() ?? '').filter(Boolean),
+			deliveryStatus: childText(item, 'delivery-status'),
+		})),
+	}
+}
+
+export async function getManagementMailMessage(entryId: string): Promise<MailMessageView> {
+	return parseMailMessage(await getXml(`/api/v1/admin/mailbox/messages/${encodeURIComponent(entryId)}`))
+}
+
+export async function updateManagementMailEntry(entryId: string, action: 'archive' | 'trash' | 'read' | 'unread'): Promise<MailMessageView> {
+	const xml = await requestXml(`/api/v1/admin/mailbox/messages/${encodeURIComponent(entryId)}/action`, 'POST', authDocument('mailbox-action', { action }))
+	if (!xml) throw new Error('The server returned an empty mailbox response.')
+	return parseMailMessage(xml)
 }
 
 function parseMailMessage(xml: XMLDocument): MailMessageView {
@@ -655,7 +755,17 @@ export async function getAdminSnapshot(): Promise<AdminSnapshot> {
 			result: childText(element, 'result'), occurredAt: childText(element, 'occurred-at'),
 		})),
 		generatedAt: childText(root, 'generated-at'),
+		lunaStevTimeZone: childText(root, 'lunastev-time-zone') || 'Asia/Seoul',
 	}
+}
+
+export async function getPlatformPreferences(): Promise<{ lunaStevTimeZone: string }> {
+	const xml = await getXml('/api/v1/platform/preferences')
+	return { lunaStevTimeZone: textOf(xml, 'lunastev-time-zone') || 'Asia/Seoul' }
+}
+
+export async function updateLunaStevTimeZone(timeZone: string): Promise<void> {
+	await requestXml('/api/v1/admin/settings/lunastev-time-zone', 'POST', authDocument('time-zone-setting', { 'time-zone': timeZone }))
 }
 
 export async function updateAdminAccountStatus(accountId: string, status: 'active' | 'suspended'): Promise<void> {
@@ -763,6 +873,7 @@ export async function getCommunityThreads(space = '', options: { sort?: string; 
       spaceId: childText(element, 'space-id'),
       title: childText(element, 'title'),
       author: childText(element, 'author'),
+		authorAccountId: childText(element, 'author-account-id'),
       excerpt: childContent(element, 'excerpt'),
       createdAt: childText(element, 'created-at'),
       replyCount: Number(childText(element, 'reply-count')) || 0,

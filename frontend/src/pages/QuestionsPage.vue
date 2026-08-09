@@ -40,10 +40,23 @@ function displayAuthor(value: string) {
   return label.replace(/^"(.*)"$/, '$1') || value
 }
 
+function authorEmail(value: string) {
+  const bracketed = value.match(/<([^>]+)>/)?.[1]
+  const address = (bracketed ?? value).trim().replace(/^"|"$/g, '')
+  return address.includes('@') ? address : ''
+}
+
+function authorProfile(value: string, accountID = '') {
+  if (accountID) return `/user/id/${encodeURIComponent(accountID)}`
+  const localPart = authorEmail(value).split('@')[0]
+  return localPart ? `/user/${encodeURIComponent(localPart)}` : ''
+}
+
 function formatDate(value: string) {
   if (!value) return ''
   return new Intl.DateTimeFormat(locale.value === 'ko' ? 'ko-KR' : 'en-US', {
     year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
+		timeZone: auth.account?.timeZone || undefined,
   }).format(new Date(value))
 }
 
@@ -209,7 +222,7 @@ watchEffect(() => {
             <RouterLink :to="`/questions/${item.id}`"><h2>{{ item.title }}</h2></RouterLink>
             <p>{{ item.excerpt }}</p>
             <div class="question-tags"><span v-for="tag in item.tags" :key="tag">{{ tag }}</span><small v-if="item.waveVersion">Wave {{ item.waveVersion }}</small></div>
-            <footer><span>{{ displayAuthor(item.author) }}</span><time :datetime="item.lastActivityAt">{{ formatDate(item.lastActivityAt) }}</time><em>{{ statusLabel(item.status) }}</em></footer>
+            <footer><RouterLink v-if="authorProfile(item.author, item.authorAccountId)" class="author-profile-link" :to="authorProfile(item.author, item.authorAccountId)" :title="authorEmail(item.author)">{{ displayAuthor(item.author) }}</RouterLink><span v-else>{{ displayAuthor(item.author) }}</span><time :datetime="item.lastActivityAt">{{ formatDate(item.lastActivityAt) }}</time><em>{{ statusLabel(item.status) }}</em></footer>
           </div>
         </article>
       </section>
@@ -239,12 +252,12 @@ watchEffect(() => {
         </header>
         <section class="question-post">
           <aside class="question-vote" :aria-label="t('questions.vote')"><button type="button" :class="{ active: question.viewerVote === 1 }" @click="castVote('question', question.root)"><ArrowUp :size="22" /></button><strong>{{ question.score }}</strong><button type="button" :class="{ active: question.viewerVote === -1 }" @click="downVote('question', question.root)"><ArrowDown :size="22" /></button></aside>
-          <div class="question-post-content"><pre>{{ question.root.body }}</pre><div class="question-tags"><span v-for="tag in question.tags" :key="tag">{{ tag }}</span></div><footer>{{ displayAuthor(question.root.author) }} · {{ formatDate(question.root.createdAt) }}</footer></div>
+          <div class="question-post-content"><pre>{{ question.root.body }}</pre><div class="question-tags"><span v-for="tag in question.tags" :key="tag">{{ tag }}</span></div><footer><RouterLink v-if="authorProfile(question.root.author, question.root.authorAccountId)" class="author-profile-link" :to="authorProfile(question.root.author, question.root.authorAccountId)" :title="authorEmail(question.root.author)">{{ displayAuthor(question.root.author) }}</RouterLink><span v-else>{{ displayAuthor(question.root.author) }}</span><span>· {{ formatDate(question.root.createdAt) }}</span></footer></div>
         </section>
         <h2 class="question-answer-count">{{ question.answers.length }} {{ t('questions.answers') }}</h2>
         <section v-for="answer in question.answers" :key="answer.id" class="question-post question-answer" :class="{ accepted: answer.accepted }">
           <aside class="question-vote"><button type="button" :class="{ active: answer.viewerVote === 1 }" @click="castVote('answer', answer)"><ArrowUp :size="22" /></button><strong>{{ answer.score }}</strong><button type="button" :class="{ active: answer.viewerVote === -1 }" @click="downVote('answer', answer)"><ArrowDown :size="22" /></button><button v-if="answer.accepted || canAccept" class="question-accept" :class="{ active: answer.accepted }" type="button" :disabled="!canAccept" :title="answer.accepted ? t('questions.accepted') : t('questions.accept')" @click="toggleAccepted(answer)"><Check :size="22" /></button></aside>
-          <div class="question-post-content"><pre>{{ answer.body }}</pre><footer>{{ displayAuthor(answer.author) }} · {{ formatDate(answer.createdAt) }}<strong v-if="answer.accepted">{{ t('questions.accepted') }}</strong></footer></div>
+          <div class="question-post-content"><pre>{{ answer.body }}</pre><footer><RouterLink v-if="authorProfile(answer.author, answer.authorAccountId)" class="author-profile-link" :to="authorProfile(answer.author, answer.authorAccountId)" :title="authorEmail(answer.author)">{{ displayAuthor(answer.author) }}</RouterLink><span v-else>{{ displayAuthor(answer.author) }}</span><span>· {{ formatDate(answer.createdAt) }}</span><strong v-if="answer.accepted">{{ t('questions.accepted') }}</strong></footer></div>
         </section>
         <p v-if="actionError" class="question-action-error" role="alert">{{ actionError }}</p>
         <form v-if="auth.account && question.status !== 'closed'" class="question-answer-editor" @submit.prevent="submitAnswer"><h2>{{ t('questions.yourAnswer') }}</h2><textarea v-model="answerBody" required maxlength="20000" rows="10" /><button class="ui-button primary" type="submit" :disabled="submitting">{{ t('questions.postAnswer') }}</button></form>

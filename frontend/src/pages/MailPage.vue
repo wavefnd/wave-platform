@@ -45,6 +45,7 @@ function formatDate(value: string) {
   if (!value) return ''
   return new Intl.DateTimeFormat(locale.value === 'ko' ? 'ko-KR' : 'en-US', {
     month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
+		timeZone: auth.account?.timeZone || undefined,
   }).format(new Date(value))
 }
 

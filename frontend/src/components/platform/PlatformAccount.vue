@@ -24,6 +24,7 @@ async function signOut() {
     </select>
     <template v-if="auth.account">
       <span class="account-address" :title="auth.account.email">{{ auth.account.displayName }}</span>
+	  <RouterLink :to="`/user/${encodeURIComponent(auth.account.username)}`">{{ t('user.profile') }}</RouterLink>
 	  <RouterLink to="/account/security">{{ t('auth.settings') }}</RouterLink>
       <button class="account-signout" type="button" :disabled="auth.loading" @click="signOut">{{ t('auth.signOut') }}</button>
     </template>

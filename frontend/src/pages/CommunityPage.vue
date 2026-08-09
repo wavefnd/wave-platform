@@ -10,7 +10,7 @@ import CommunityReplyEditor from '../components/community/CommunityReplyEditor.v
 import { useI18n } from '../i18n'
 import {
   createCommunityPost, createCommunityReply, getCommunitySpaces, getCommunityThread,
-  getCommunityThreads, subscribeCommunity, uploadLunaStevImage, voteCommunity,
+  getCommunityThreads, getPlatformPreferences, subscribeCommunity, uploadLunaStevImage, voteCommunity,
   type CommunityMessage, type CommunitySpace, type CommunityThread, type CommunityThreadSummary,
 } from '../services/http'
 import { useAuthStore } from '../stores/auth'
@@ -33,6 +33,7 @@ const hasMore = ref(false)
 const submitting = ref(false)
 const actionError = ref('')
 const searchText = ref('')
+const lunaStevTimeZone = ref('Asia/Seoul')
 
 const postSpace = ref('general')
 const postTitle = ref('')
@@ -139,15 +140,30 @@ function authorInitial(author: string) {
   return Array.from(authorName(author))[0]?.toUpperCase() ?? 'W'
 }
 
+function authorEmail(author: string) {
+  const bracketed = author.match(/<([^>]+)>/)?.[1]
+  const value = (bracketed ?? author).trim().replace(/^"|"$/g, '')
+  return value.includes('@') ? value : ''
+}
+
+function authorProfile(author: string, accountID = '') {
+  if (accountID) return `/user/id/${encodeURIComponent(accountID)}`
+  const email = authorEmail(author)
+  const localPart = email.split('@')[0]
+  return localPart ? `/user/${encodeURIComponent(localPart)}` : ''
+}
+
 function formatDate(value: string) {
   if (!value) return ''
   return new Intl.DateTimeFormat(locale.value === 'ko' ? 'ko-KR' : 'en-US', {
     year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
+		timeZone: personalMode.value ? lunaStevTimeZone.value : undefined,
   }).format(new Date(value))
 }
 
 function relativeDate(value: string) {
   if (!value) return ''
+	if (personalMode.value) return formatDate(value)
   const seconds = Math.round((new Date(value).getTime() - Date.now()) / 1000)
   const formatter = new Intl.RelativeTimeFormat(locale.value === 'ko' ? 'ko' : 'en', { numeric: 'auto' })
   const ranges: [Intl.RelativeTimeFormatUnit, number][] = [['year', 31536000], ['month', 2592000], ['day', 86400], ['hour', 3600], ['minute', 60]]
@@ -194,6 +210,7 @@ async function load() {
   searchText.value = activeQuery.value
   try {
     await auth.initialize()
+	if (personalMode.value) lunaStevTimeZone.value = (await getPlatformPreferences()).lunaStevTimeZone
     spaces.value = await getCommunitySpaces()
     if (selectedSpaceID.value && composerSpaces.value.some((space) => space.id === selectedSpaceID.value)) postSpace.value = selectedSpaceID.value
     else if (!composerSpaces.value.some((space) => space.id === postSpace.value)) postSpace.value = composerSpaces.value[0]?.id ?? ''
@@ -449,7 +466,7 @@ watchEffect(() => {
               <button type="button" :class="{ active: thread.viewerVote === -1 }" :aria-label="t('community.downvote')" @click="voteDetail('thread', thread.id, -1)"><ArrowBigDown :size="22" /></button>
             </div>
             <div class="forum-message-content">
-              <header><span class="author-avatar">{{ authorInitial(thread.root.author) }}</span><strong>{{ authorName(thread.root.author) }}</strong><time :datetime="thread.root.createdAt">{{ relativeDate(thread.root.createdAt) }}</time></header>
+              <header><span class="author-avatar">{{ authorInitial(thread.root.author) }}</span><RouterLink v-if="authorProfile(thread.root.author, thread.root.authorAccountId)" class="author-profile-link" :to="authorProfile(thread.root.author, thread.root.authorAccountId)" :title="authorEmail(thread.root.author)">{{ authorName(thread.root.author) }}</RouterLink><strong v-else>{{ authorName(thread.root.author) }}</strong><time :datetime="thread.root.createdAt">{{ relativeDate(thread.root.createdAt) }}</time></header>
               <MarkdownContent :source="thread.root.body" />
               <footer>
                 <span><MessageSquare :size="14" />{{ thread.replies.length }}</span><span><Eye :size="14" />{{ thread.viewCount }}</span>
@@ -474,7 +491,7 @@ watchEffect(() => {
                   <button type="button" :class="{ active: item.message.viewerVote === -1 }" :aria-label="t('community.downvote')" @click="voteDetail('message', item.message.id, -1, item.message)"><ArrowBigDown :size="18" /></button>
                 </div>
                 <div class="forum-message-content">
-                  <header><span class="author-avatar">{{ authorInitial(item.message.author) }}</span><strong>{{ authorName(item.message.author) }}</strong><time :datetime="item.message.createdAt">{{ relativeDate(item.message.createdAt) }}</time></header>
+                  <header><span class="author-avatar">{{ authorInitial(item.message.author) }}</span><RouterLink v-if="authorProfile(item.message.author, item.message.authorAccountId)" class="author-profile-link" :to="authorProfile(item.message.author, item.message.authorAccountId)" :title="authorEmail(item.message.author)">{{ authorName(item.message.author) }}</RouterLink><strong v-else>{{ authorName(item.message.author) }}</strong><time :datetime="item.message.createdAt">{{ relativeDate(item.message.createdAt) }}</time></header>
                   <MarkdownContent :source="item.message.body" />
                   <footer><button v-if="!thread.locked" type="button" @click="beginReply(item.message)">{{ t('community.reply') }}</button></footer>
                 </div>
@@ -511,7 +528,7 @@ watchEffect(() => {
                 <RouterLink :to="{ name: threadRouteName, params: { thread: item.id } }">{{ item.title }}</RouterLink>
                 <p>{{ item.excerpt }}</p>
                 <footer>
-                  <strong>{{ authorName(item.author) }}</strong><time :datetime="item.createdAt">{{ relativeDate(item.createdAt) }}</time>
+                  <RouterLink v-if="authorProfile(item.author, item.authorAccountId)" class="author-profile-link" :to="authorProfile(item.author, item.authorAccountId)" :title="authorEmail(item.author)">{{ authorName(item.author) }}</RouterLink><strong v-else>{{ authorName(item.author) }}</strong><time :datetime="item.createdAt">{{ relativeDate(item.createdAt) }}</time>
                   <span><MessageSquare :size="13" />{{ item.replyCount }}</span><span><Eye :size="13" />{{ item.viewCount }}</span>
                   <span>{{ t('community.activity') }} {{ relativeDate(item.lastActivityAt) }}</span>
                   <span v-for="tag in item.tags" :key="tag" class="thread-tag">{{ tag }}</span>
