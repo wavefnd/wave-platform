@@ -47,7 +47,7 @@ var address: ptr<u8> = null;
 
 ## 예약 키워드와 타입 철자
 
-v0.2.0-pre-beta lexer가 별도 토큰으로 인식하는 주요 키워드는 다음과 같습니다.
+lexer가 별도 토큰으로 인식하는 주요 키워드는 다음과 같습니다.
 
 `fun`, `extern`, `export`, `type`, `enum`, `static`, `var`, `deref`, `let`, `mut`, `const`, `if`, `else`, `proto`, `struct`, `while`, `for`, `module`, `class`, `in`, `out`, `clobber`, `is`, `as`, `asm`, `xnand`, `import`, `return`, `continue`, `print`, `input`, `println`, `match`, `break`, `true`, `false`, `null`.
 
@@ -55,4 +55,4 @@ v0.2.0-pre-beta lexer가 별도 토큰으로 인식하는 주요 키워드는 �
 
 > **예약과 지원은 다름**
 >
-> `module`, `class`, `is`, `xnand`처럼 lexer에 예약된 철자가 모두 v0.2.0-pre-beta의 완성된 문법 기능을 의미하지는 않습니다. 문법 페이지에서 실제 사용 형태가 설명된 기능만 릴리스 기능으로 취급하십시오.
+> `module`, `class`, `is`, `xnand`처럼 lexer에 예약된 철자가 모두 완성된 문법 기능을 의미하지는 않습니다. 문법 페이지에서 실제 사용 형태가 설명된 기능만 지원 기능으로 취급하십시오.

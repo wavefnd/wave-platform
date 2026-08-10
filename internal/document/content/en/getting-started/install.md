@@ -33,17 +33,17 @@ wavec --version
 wavec --help
 ```
 
-To follow this documentation exactly, verify that the installed version is `v0.2.0-pre-beta`.
+Record this output when reporting a documentation mismatch. The pages describe the current compiler contract; older installed binaries may expose a smaller command or syntax surface.
 
-## v0.2.0-pre-beta binary archives
+## Release archives
 
-The release publishes the following prebuilt archives:
+Release asset names include the selected version. Check the current release page for the exact version string and available platforms.
 
-| Platform | Release archive |
+| Platform | Archive pattern |
 | --- | --- |
-| Linux x86-64 GNU | `wave-v0.2.0-pre-beta-x86_64-linux-gnu.tar.gz` |
-| Windows x86-64 GNU | `wave-v0.2.0-pre-beta-x86_64-pc-windows-gnu.zip` |
-| macOS Apple Silicon | `wave-v0.2.0-pre-beta-aarch64-apple-darwin.tar.gz` |
+| Linux x86-64 GNU | `wave-<version>-x86_64-linux-gnu.tar.gz` |
+| Windows x86-64 GNU | `wave-<version>-x86_64-pc-windows-gnu.zip` |
+| macOS Apple Silicon | `wave-<version>-aarch64-apple-darwin.tar.gz` |
 
 A `SHA256SUMS` asset is also published for verifying manually downloaded archives.
 
@@ -54,8 +54,13 @@ Building the compiler repository requires a Rust toolchain.
 ```shell
 git clone https://github.com/wavefnd/Wave.git
 cd Wave
-git checkout v0.2.0-pre-beta
 cargo build
+```
+
+This builds the default branch. To reproduce a published release, check out its tag before running Cargo:
+
+```shell
+git checkout <release-tag>
 ```
 
 For an optimized compiler binary:

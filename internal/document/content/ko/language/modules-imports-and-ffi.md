@@ -49,7 +49,7 @@ import("math::vector::ops");
 외부 패키지 위치는 다음 옵션으로 제공할 수 있습니다.
 
 ```shell
-wavec --dep-root .vex/dep build main.wave
+wavec --dep-root .vex/deps build main.wave
 wavec --dep math=/absolute/path/to/math build main.wave
 ```
 

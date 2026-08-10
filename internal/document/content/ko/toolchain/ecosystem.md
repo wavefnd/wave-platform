@@ -5,54 +5,42 @@ locale: ko
 group: toolchain
 group_order: 4
 order: 1
-title: Wave 툴체인
-summary: wavec, 표준 라이브러리, Vex, Whale 상태와 네이티브 상호 운용의 역할을 구분합니다.
+title: Whale 툴체인
+summary: 별도 저수준 툴체인인 Whale의 역할, 구성 요소 경계와 현재 완성도를 설명합니다.
 ---
 
-## wavec
+## Whale이란
 
-`wavec`는 v0.2.0-pre-beta의 중심 컴파일러 명령행 도구입니다. Wave 소스를 검사·컴파일·링크·실행하고, 대상과 지원 기능을 질의하는 `print` 인터페이스를 제공합니다.
+Whale은 Rust로 작성된 별도의 저수준 툴체인입니다. 장기적으로 Wave와 다른 네이티브 코드 생성기가 재사용할 수 있는 어셈블리, 오브젝트, 링크와 중간 표현 구성 요소를 제공하는 것이 목적입니다.
 
-```shell
-wavec --version
-wavec build main.wave
-wavec run main.wave
-wavec print supported-targets
-```
+Whale은 Wave 개발 환경 전체를 부르는 이름이 아닙니다. 각 프로젝트의 책임은 다음처럼 구분됩니다.
 
-## 표준 라이브러리
+| 프로젝트 | 책임 |
+| --- | --- |
+| `wavec` | Wave 소스를 파싱·검증·컴파일하며 현재 LLVM을 통해 네이티브 코드를 생성합니다. |
+| Vex | Wave 패키지, manifest, 의존성 그래프, lockfile과 패키지 빌드를 관리합니다. |
+| Whale | 독립적인 assembler, object, linker와 IR 구성 요소를 개발합니다. |
+| Wave `std` | 런타임과 시스템 API를 Wave 소스 모듈로 제공합니다. |
 
-`std`는 컴파일러 저장소에 Wave 소스로 포함되어 있으며 문자열, 메모리, 파일, 네트워크, 프로세스 등 런타임 기능을 제공합니다.
+## 구성 요소
 
-```shell
-wavec print std-path
-```
+현재 Whale workspace는 네 가지 주요 라이브러리 영역으로 구성됩니다.
 
-현재 컴파일러가 사용하는 표준 라이브러리 경로를 확인한 뒤 실제 `.wave` 파일을 API 참조로 사용할 수 있습니다.
+- `assembler`: 토큰화, AMD64 파싱·인코딩, section, symbol과 relocation
+- `object`: 오브젝트 파일 모델과 ELF64 writer
+- `linker`: 개발 중인 링크 계층
+- `ir`: Whale IR 타입, builder, 출력, 검증과 선택적 frontend socket
 
-## Vex
+`whale` 실행 파일은 이 영역을 `asm`, `object`, `link`, `ir` 명령으로 제공합니다.
 
-Vex는 Wave 의존성과 패키지를 다루는 별도 패키지 관리 프로젝트입니다. `wavec` 자체는 외부 패키지 import를 위해 `--dep-root`와 `--dep name=path` 같은 안정적인 연결 지점을 제공합니다.
+## 현재 통합 상태
 
-따라서 패키지 매니저가 dependency tree를 준비하고, 컴파일러에는 최종 해석 경로를 전달하는 방식으로 역할을 나눌 수 있습니다.
+현재 일반적인 `wavec` 빌드는 LLVM 백엔드를 사용합니다. Whale은 독립 툴체인으로 개발되고 있으며 `wavec --whale` 옵션으로 선택하는 기능이 아닙니다.
 
-## Whale
+사용자와 도구 개발자는 이 경계를 지켜야 합니다. Whale을 설치해도 `wavec`의 동작이 자동으로 바뀌지 않으며 Whale 옵션을 Vex에 전달해서도 안 됩니다. 각 도구는 자신의 명령행 계약으로 직접 실행합니다.
 
-`wavec`에는 `--whale` 플래그가 남아 있지만 v0.2.0-pre-beta에서는 예약 상태이며 구현된 백엔드가 아닙니다. 컴파일 작업에는 사용하지 않습니다.
+## 완성도 경계
 
-## 네이티브 상호 운용
+Whale은 활발히 개발 중입니다. AMD64 assembler와 ELF64 object 경로는 제한된 실험에 사용할 수 있지만 AArch64 assembler 경로와 linker CLI는 아직 완성되지 않았습니다. IR socket 명령은 빌드할 때 기능을 명시적으로 켜야 합니다. 자동화에 사용하기 전 Whale 명령 참조에서 해당 하위 명령의 상태를 확인하십시오.
 
-Wave는 `extern(c)`, `export(c)`, 링크 라이브러리 옵션과 인라인 어셈블리를 통해 C/C++ 및 플랫폼 기능과 연결할 수 있습니다. 표준 라이브러리에서 제공하지 않는 기능도 좁은 네이티브 경계를 만들어 사용할 수 있습니다.
-
-## 도구가 기능을 확인하는 방법
-
-하드코딩된 대상 목록 대신 컴파일러에 직접 질의할 수 있습니다.
-
-```shell
-wavec print supported-targets
-wavec print supported-input-types
-wavec print supported-emit-kinds
-wavec print supported-print-items
-```
-
-JSON 출력이 필요한 도구는 `wavec print ... --format=json` 형태를 사용할 수 있습니다.
+구성 요소가 안정적인 계약을 선언하기 전에는 소스 수준에서 산출물을 재현할 수 있게 유지하고, object format, architecture, symbol과 relocation을 독립 도구로 검증하는 것이 좋습니다.

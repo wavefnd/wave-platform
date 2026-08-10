@@ -11,13 +11,13 @@ summary: Human and JSON diagnostics, check mode, debug output, and a reproducibl
 
 ## Check the version first
 
-Before investigating syntax behavior, verify that your compiler matches the documentation baseline.
+Before investigating syntax behavior, record the exact installed compiler version.
 
 ```shell
 wavec --version
 ```
 
-This documentation targets v0.2.0-pre-beta.
+Also compare the command surface with `wavec --help`; an older compiler may not implement the current documented contract.
 
 ## Check the front end only
 

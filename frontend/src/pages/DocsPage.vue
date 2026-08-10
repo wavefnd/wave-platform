@@ -72,7 +72,6 @@ watchEffect(() => {
       headline: document.value.title,
       abstract: document.value.summary,
       dateModified: document.value.updatedAt,
-      version: document.value.version,
     },
   })
 })
@@ -82,7 +81,7 @@ watchEffect(() => {
   <main class="docs-service">
     <header class="docs-service-header">
       <div class="docs-width docs-service-header-inner">
-        <div><h1>{{ t('docs.title') }}</h1><span>v{{ document?.version ?? documents[0]?.version ?? '0.2.0-pre-beta' }}</span></div>
+        <div><h1>{{ t('docs.title') }}</h1></div>
         <label class="docs-search"><Search :size="16" aria-hidden="true" /><input v-model="query" :placeholder="t('docs.search')" /></label>
       </div>
     </header>
@@ -100,7 +99,7 @@ watchEffect(() => {
 
       <article class="document-page">
         <nav class="document-breadcrumb"><RouterLink to="/docs">{{ t('docs.title') }}</RouterLink><span>/</span><span>{{ groupName(document.group) }}</span></nav>
-        <header><h1>{{ document.title }}</h1><p>{{ document.summary }}</p><div><span>v{{ document.version }}</span></div></header>
+        <header><h1>{{ document.title }}</h1><p>{{ document.summary }}</p></header>
         <div class="document-content"><MarkdownContent :source="document.markdown" /></div>
         <nav class="document-pagination">
           <RouterLink v-if="previous" :to="`/docs/${previous.path}`"><small>{{ t('docs.previous') }}</small><span>← {{ previous.title }}</span></RouterLink><span v-else />

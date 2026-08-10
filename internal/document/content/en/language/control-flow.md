@@ -11,7 +11,7 @@ summary: Parenthesized conditionals and loops, C-style for loops, match, break, 
 
 ## Conditionals
 
-In v0.2.0-pre-beta, conditions for `if` and `else if` **must be parenthesized**.
+Conditions for `if` and `else if` **must be parenthesized**.
 
 ```wave
 if (score >= 90) {
@@ -67,7 +67,7 @@ while (i < 20) {
 
 ## match
 
-The value matched by `match` is also parenthesized. In v0.2.0-pre-beta, patterns handle integer literals, identifier-shaped names, and the `_` wildcard.
+The value matched by `match` is also parenthesized. Current patterns handle integer literals, identifier-shaped names, and the `_` wildcard.
 
 ```wave
 match (status) {

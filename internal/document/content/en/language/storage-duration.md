@@ -45,7 +45,7 @@ The reassignment above is not allowed. Code generation rejects assignment when t
 
 ## Local const and static
 
-The v0.2.0-pre-beta function parser explicitly rejects `const` and `static` inside function bodies. The same restriction applies to for-loop initializers.
+The function parser explicitly rejects `const` and `static` inside function bodies. The same restriction applies to for-loop initializers.
 
 ## Lifetimes and pointers
 

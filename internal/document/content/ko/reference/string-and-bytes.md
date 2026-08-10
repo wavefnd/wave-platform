@@ -11,7 +11,7 @@ summary: string 하위 모듈, len/is_empty, 비교·검색·trim·ASCII와 endi
 
 ## 문자열 모듈 구성
 
-v0.2.0-pre-beta의 `std/string`에는 다음 소스 단위가 있습니다.
+현재 `std/string` 트리에는 다음 소스 단위가 있습니다.
 
 - `ascii.wave`
 - `cmp.wave`

@@ -11,7 +11,7 @@ summary: Wave's explicit low-level control, static typing, native interoperabili
 
 ## Design direction
 
-Wave aims to keep systems-level control visible in source code. In v0.2.0-pre-beta that direction appears in several concrete facilities:
+Wave aims to keep systems-level control visible in source code. That direction appears in several concrete facilities:
 
 - Types are written explicitly for variables, parameters, return values, and composite data.
 - `ptr<T>`, `&`, and `deref` make addresses and memory accesses explicit.
@@ -37,4 +37,4 @@ var counter: i32 = 0;
 
 ## Documentation policy for a pre-beta release
 
-v0.2.0-pre-beta contains spellings reserved by the lexer alongside implementation paths that are not complete. This documentation therefore does not treat the existence of a token as proof that a language feature is supported. It focuses on syntax that reaches the parser and code generator, with known release limitations called out explicitly.
+The current compiler contains spellings reserved by the lexer alongside implementation paths that are not complete. This documentation therefore does not treat the existence of a token as proof that a language feature is supported. It focuses on syntax that reaches the parser and code generator, with known limitations called out explicitly.

@@ -11,7 +11,7 @@ summary: Top-level declarations, the main entry point, import organization, and 
 
 ## Top-level source items
 
-A v0.2.0-pre-beta source file can contain top-level items such as:
+A Wave source file can contain top-level items such as:
 
 - `import(...)`
 - `const` and `static`

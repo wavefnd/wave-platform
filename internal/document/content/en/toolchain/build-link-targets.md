@@ -21,7 +21,7 @@ wavec build main.wave --emit=obj -o main.o
 wavec build main.wave --emit=bin -o app
 ```
 
-The artifact emit kinds in v0.2.0-pre-beta are `ast`, `ir`, `bc`, `asm`, `obj`, and `bin`. `check` is a control mode rather than an artifact kind and is intended to stand alone.
+The current artifact emit kinds are `ast`, `ir`, `bc`, `asm`, `obj`, and `bin`. `check` is a control mode rather than an artifact kind and is intended to stand alone.
 
 ```shell
 wavec print supported-emit-kinds
@@ -69,10 +69,48 @@ wavec print cpu-list --target <triple>
 wavec print target-features --target <triple>
 ```
 
+## Supported target families
+
+A full-target compiler build currently reports these target contracts. Always prefer `wavec print supported-targets` because a compiler built with a reduced backend feature set can expose fewer targets.
+
+| Target | Environment | Object format |
+| --- | --- | --- |
+| `x86_64-unknown-linux-gnu` | Hosted Linux GNU | ELF |
+| `x86_64-apple-darwin` | Hosted macOS | Mach-O |
+| `x86_64-w64-windows-gnu` | Hosted Windows GNU | COFF |
+| `x86_64-pc-windows-gnu` | Hosted Windows GNU alias | COFF |
+| `x86_64-unknown-none-elf` | Freestanding | ELF |
+| `aarch64-unknown-linux-gnu` | Hosted Linux GNU | ELF |
+| `aarch64-apple-darwin` | Hosted macOS | Mach-O |
+| `aarch64-unknown-none-elf` | Freestanding | ELF |
+| `riscv64-unknown-linux-gnu` | Hosted Linux GNU | ELF |
+| `riscv64-unknown-none-elf` | Freestanding | ELF |
+
+## RISC-V 64 contract
+
+The hosted RISC-V target defaults to `generic-rv64`, RV64GC, and the `lp64d` ABI. The freestanding target defaults to `generic-rv64`, RV64IMAC, and `lp64`.
+
+```shell
+wavec print target-spec --target riscv64-unknown-linux-gnu --format=json
+wavec print target-spec --target riscv64-unknown-none-elf --format=json
+```
+
+Supported RISC-V CPUs are `generic`, `generic-rv64`, `rocket-rv64`, and `sifive-u74`. Feature overrides use signed comma-separated names from `m`, `a`, `f`, `d`, `c`, `zicsr`, and `zifencei`:
+
+```shell
+wavec build main.wave \
+  --target riscv64-unknown-linux-gnu \
+  --features=+m,+a,+f,-d,+c,+zicsr \
+  --abi=lp64f
+```
+
+RISC-V validation rejects inconsistent combinations: `d` requires `f`, `f` requires `zicsr`, and `lp64`, `lp64f`, or `lp64d` must agree with the enabled floating-point features. When no ABI override is supplied, the compiler derives the ABI from those features.
+
 ## Freestanding linking
 
 ```shell
 wavec build kernel.wave \
+  --target riscv64-unknown-none-elf \
   --freestanding \
   --entry=_start \
   --linker-script=linker.ld \
@@ -83,6 +121,20 @@ wavec build kernel.wave \
 `--freestanding` adjusts the build away from default libraries. `--entry` sets the linker entry symbol, `--linker-script` supplies a linker script, and `--no-start-files` omits hosted startup files.
 
 Use `--dry-run` to inspect the planned build and link steps before execution.
+
+## Hosted cross-linking
+
+Code generation for a target does not provide that target's C runtime, startup objects, or libraries. A hosted cross-build needs a compatible sysroot and, when necessary, an explicit linker:
+
+```shell
+wavec build main.wave \
+  --target riscv64-unknown-linux-gnu \
+  --sysroot /path/to/riscv64-sysroot \
+  -C linker=/path/to/target-linker \
+  -o app-riscv64
+```
+
+The sysroot must contain files for the selected ABI. A host library with the same name is not a substitute for a target library.
 
 ## Cross-build checklist
 

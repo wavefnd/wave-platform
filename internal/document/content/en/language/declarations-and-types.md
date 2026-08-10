@@ -32,7 +32,7 @@ const PAGE_SIZE: i32 = 4096;
 static request_count: i64 = 0;
 ```
 
-In v0.2.0-pre-beta, `const` and `static` are top-level declarations. Use `var` or the `let` forms for locals inside function bodies.
+`const` and `static` are top-level declarations. Use `var` or the `let` forms for locals inside function bodies.
 
 ## Integer and floating-point types
 
@@ -42,7 +42,7 @@ The documented fixed-width integer spellings are:
 - Unsigned: `u8`, `u16`, `u32`, `u64`, `u128`, `u256`, `u512`, `u1024`
 - Floating point: `f32`, `f64`
 
-The lexer recognizes `isz` and `usz`, but the v0.2.0-pre-beta type-conversion path does not handle them. Do not use them in code targeting this release.
+The lexer recognizes `isz` and `usz`, but the current type-conversion path does not handle them. Do not use them until compiler support is documented.
 
 ## Other built-in types
 

@@ -47,7 +47,7 @@ Wave has integer, floating-point, string, character, Boolean, and `null` literal
 
 ## Reserved keywords and type spellings
 
-Major spellings tokenized specially by the v0.2.0-pre-beta lexer include:
+Major spellings tokenized specially by the lexer include:
 
 `fun`, `extern`, `export`, `type`, `enum`, `static`, `var`, `deref`, `let`, `mut`, `const`, `if`, `else`, `proto`, `struct`, `while`, `for`, `module`, `class`, `in`, `out`, `clobber`, `is`, `as`, `asm`, `xnand`, `import`, `return`, `continue`, `print`, `input`, `println`, `match`, `break`, `true`, `false`, and `null`.
 
@@ -55,4 +55,4 @@ Major spellings tokenized specially by the v0.2.0-pre-beta lexer include:
 
 > **Reserved does not mean implemented**
 >
-> Lexer-reserved spellings such as `module`, `class`, `is`, and `xnand` do not by themselves imply a completed v0.2.0-pre-beta language feature. Treat a feature as supported when its usable syntax is documented and implemented through parsing and code generation.
+> Lexer-reserved spellings such as `module`, `class`, `is`, and `xnand` do not by themselves imply a completed language feature. Treat a feature as supported when its usable syntax is documented and implemented through parsing and code generation.

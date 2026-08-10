@@ -50,7 +50,7 @@ func SeedOfficial(database *storage.Database) (int, error) {
 	for _, sourceDocument := range documents {
 		path := strings.Trim(sourceDocument.Path, "/")
 		id := "official/" + sourceDocument.Locale + "/" + path
-		revisionID := "v0.2.0-pre-beta"
+		revisionID := "current"
 		contentXML, err := xml.Marshal(Content{Markdown: sourceDocument.Markdown, Blocks: sourceDocument.Headings})
 		if err != nil {
 			return 0, fmt.Errorf("encode %s document content: %w", path, err)
@@ -63,7 +63,7 @@ func SeedOfficial(database *storage.Database) (int, error) {
 		if err := repository.UpsertDocument(Document{ID: id, TranslationSetID: sourceDocument.TranslationSetID,
 			Path: path, Locale: sourceDocument.Locale, Group: sourceDocument.Group, GroupOrder: sourceDocument.GroupOrder,
 			Order: sourceDocument.Order, Title: sourceDocument.Title, Summary: sourceDocument.Summary,
-			Version: "0.2.0-pre-beta", SourceRevision: "bd5549b", Status: "published",
+			Version: "", SourceRevision: "", Status: "published",
 			PublishedRevisionID: revisionID, CreatedAt: publishedAt, UpdatedAt: publishedAt}); err != nil {
 			return 0, err
 		}

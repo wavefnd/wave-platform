@@ -21,7 +21,7 @@ wavec build main.wave --emit=obj -o main.o
 wavec build main.wave --emit=bin -o app
 ```
 
-v0.2.0-pre-beta의 artifact emit 종류는 `ast`, `ir`, `bc`, `asm`, `obj`, `bin`입니다. `check`는 산출물 종류가 아니라 검사 제어 모드이며 다른 artifact emit과 섞지 않는 것이 전제입니다.
+현재 artifact emit 종류는 `ast`, `ir`, `bc`, `asm`, `obj`, `bin`입니다. `check`는 산출물 종류가 아니라 검사 제어 모드이며 다른 artifact emit과 섞지 않는 것이 전제입니다.
 
 ```shell
 wavec print supported-emit-kinds
@@ -69,10 +69,48 @@ wavec print cpu-list --target <triple>
 wavec print target-features --target <triple>
 ```
 
+## 지원 대상 계열
+
+모든 backend 기능을 켠 컴파일러 빌드는 현재 다음 대상 계약을 보고합니다. 일부 backend 기능만 포함해 빌드한 컴파일러는 더 적은 대상을 제공할 수 있으므로 항상 `wavec print supported-targets` 결과를 우선하십시오.
+
+| 대상 | 환경 | object format |
+| --- | --- | --- |
+| `x86_64-unknown-linux-gnu` | Hosted Linux GNU | ELF |
+| `x86_64-apple-darwin` | Hosted macOS | Mach-O |
+| `x86_64-w64-windows-gnu` | Hosted Windows GNU | COFF |
+| `x86_64-pc-windows-gnu` | Hosted Windows GNU alias | COFF |
+| `x86_64-unknown-none-elf` | Freestanding | ELF |
+| `aarch64-unknown-linux-gnu` | Hosted Linux GNU | ELF |
+| `aarch64-apple-darwin` | Hosted macOS | Mach-O |
+| `aarch64-unknown-none-elf` | Freestanding | ELF |
+| `riscv64-unknown-linux-gnu` | Hosted Linux GNU | ELF |
+| `riscv64-unknown-none-elf` | Freestanding | ELF |
+
+## RISC-V 64 계약
+
+Hosted RISC-V 대상의 기본값은 `generic-rv64`, RV64GC, `lp64d` ABI입니다. Freestanding 대상의 기본값은 `generic-rv64`, RV64IMAC, `lp64`입니다.
+
+```shell
+wavec print target-spec --target riscv64-unknown-linux-gnu --format=json
+wavec print target-spec --target riscv64-unknown-none-elf --format=json
+```
+
+지원 RISC-V CPU는 `generic`, `generic-rv64`, `rocket-rv64`, `sifive-u74`입니다. Feature override는 `m`, `a`, `f`, `d`, `c`, `zicsr`, `zifencei` 이름 앞에 부호를 붙여 쉼표로 구분합니다.
+
+```shell
+wavec build main.wave \
+  --target riscv64-unknown-linux-gnu \
+  --features=+m,+a,+f,-d,+c,+zicsr \
+  --abi=lp64f
+```
+
+RISC-V 검증은 일관되지 않은 조합을 거부합니다. `d`에는 `f`가 필요하고 `f`에는 `zicsr`가 필요합니다. `lp64`, `lp64f`, `lp64d`는 활성화한 부동소수점 feature와 일치해야 합니다. ABI를 직접 지정하지 않으면 컴파일러가 feature에서 ABI를 유도합니다.
+
 ## 프리스탠딩 링크
 
 ```shell
 wavec build kernel.wave \
+  --target riscv64-unknown-none-elf \
   --freestanding \
   --entry=_start \
   --linker-script=linker.ld \
@@ -83,6 +121,20 @@ wavec build kernel.wave \
 `--freestanding`은 기본 라이브러리를 사용하지 않는 쪽으로 빌드 설정을 조정합니다. `--entry`는 링커 엔트리를, `--linker-script`는 스크립트를, `--no-start-files`는 호스트 시작 파일 제외를 지정합니다.
 
 실제 실행 전 링크 계획을 확인할 때는 `--dry-run`을 사용할 수 있습니다.
+
+## Hosted 크로스 링크
+
+대상 코드를 생성할 수 있다는 사실이 대상의 C runtime, 시작 object와 라이브러리까지 제공한다는 뜻은 아닙니다. Hosted 크로스 빌드에는 호환되는 sysroot가 필요하며 상황에 따라 링커도 명시해야 합니다.
+
+```shell
+wavec build main.wave \
+  --target riscv64-unknown-linux-gnu \
+  --sysroot /path/to/riscv64-sysroot \
+  -C linker=/path/to/target-linker \
+  -o app-riscv64
+```
+
+sysroot에는 선택한 ABI용 파일이 들어 있어야 합니다. 이름이 같은 호스트 라이브러리는 대상 라이브러리를 대신할 수 없습니다.
 
 ## 크로스 빌드에서 확인할 것
 

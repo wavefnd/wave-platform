@@ -49,7 +49,7 @@ import("math::vector::ops");
 Provide external package locations with dependency options:
 
 ```shell
-wavec --dep-root .vex/dep build main.wave
+wavec --dep-root .vex/deps build main.wave
 wavec --dep math=/absolute/path/to/math build main.wave
 ```
 

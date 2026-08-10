@@ -49,7 +49,7 @@ fun main() {
 }
 ```
 
-Generic calls in v0.2.0-pre-beta **require explicit type arguments**. Calling a generic template as `identity(10)` without type arguments produces an error.
+Generic calls **require explicit type arguments**. Calling a generic template as `identity(10)` without type arguments produces an error.
 
 ## Generic structs
 
@@ -76,6 +76,6 @@ The function parser supports default parameter values represented by integer, fl
 ## Current generic limitations
 
 - Generic function calls require explicit type arguments.
-- Generic methods are not supported in v0.2.0-pre-beta.
+- Generic methods are not currently supported.
 - Functions exposed through `export(...)` cannot be generic.
 - `ptr<T>` and `array<T, N>` are built-in type forms handled specially by the type parser, not user-defined generic templates.

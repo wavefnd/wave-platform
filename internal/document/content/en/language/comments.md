@@ -26,7 +26,7 @@ var count: i32 = 10; // current request count
    multiple lines. */
 ```
 
-The v0.2.0-pre-beta lexer tracks block-comment depth, so **nested block comments are supported**.
+The lexer tracks block-comment depth, so **nested block comments are supported**.
 
 ```wave
 /* outer comment
@@ -45,6 +45,6 @@ var text: str = "https://wave-lang.dev";
 
 ## Unterminated block comments
 
-If the lexer reaches the end of the file before finding the final `*/`, it emits an `UnterminatedComment` diagnostic. v0.2.0-pre-beta uses diagnostic code `E1002` for this case.
+If the lexer reaches the end of the file before finding the final `*/`, it emits an `UnterminatedComment` diagnostic. The current diagnostic code for this case is `E1002`.
 
 When temporarily commenting out a large region, make sure nested comment depth remains balanced.

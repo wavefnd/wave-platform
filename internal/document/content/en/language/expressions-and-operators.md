@@ -32,7 +32,7 @@ area += 8;
 
 ## Precedence
 
-At a high level, the v0.2.0-pre-beta parser orders expressions from tighter to looser binding as follows:
+At a high level, the parser orders expressions from tighter to looser binding as follows:
 
 1. Primary and postfix operations: calls, field access, indexing, postfix `++` and `--`
 2. Unary operations: `!`, `~`, `&`, `deref`, prefix `++` and `--`, unary `+` and `-`
@@ -54,4 +54,4 @@ Assignment and `++`/`--` operate on storage locations such as variables, fields,
 
 ## Reserved operator spellings
 
-`is` and `xnand` exist as lexer tokens, but they are not wired into the v0.2.0-pre-beta expression parser as supported operators. They are therefore not documented as usable operators for this release.
+`is` and `xnand` exist as lexer tokens, but they are not wired into the expression parser as supported operators. They are therefore not documented as usable operators.

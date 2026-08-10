@@ -15,20 +15,24 @@ func TestSeedOfficialPublishesEnglishAndKoreanReference(t *testing.T) {
 	t.Cleanup(func() { _ = database.Close() })
 
 	count, err := SeedOfficial(database)
-	if err != nil || count != 48 {
+	if err != nil || count != 54 {
 		t.Fatalf("seed count=%d err=%v", count, err)
 	}
 	repository := NewRepository(database)
+	expectedTitles := map[string]string{
+		"en": "Pointers and explicit memory access",
+		"ko": "포인터와 명시적 메모리 접근",
+	}
 	for _, locale := range []string{"en", "ko"} {
 		items, err := repository.Summaries(locale)
-		if err != nil || len(items) != 24 {
+		if err != nil || len(items) != 27 {
 			t.Fatalf("%s summaries=%d err=%v", locale, len(items), err)
 		}
 		view, err := repository.Published(locale, "language/explicit-memory-type-model")
 		if err != nil {
 			t.Fatal(err)
 		}
-		if view.Title != "Wave Explicit Memory Type Model" || view.Version != "0.2.0-pre-beta" || view.SourceRevision != "bd5549b" {
+		if view.Title != expectedTitles[locale] || view.Version != "" || view.SourceRevision != "" {
 			t.Fatalf("unexpected memory document: %#v", view)
 		}
 		if !strings.Contains(view.Markdown, "ptr<T>") || !strings.Contains(view.Markdown, "```wave") {

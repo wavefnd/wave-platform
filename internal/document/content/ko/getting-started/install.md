@@ -33,17 +33,17 @@ wavec --version
 wavec --help
 ```
 
-문서와 정확히 같은 동작을 확인하려면 `v0.2.0-pre-beta`가 설치되어 있는지 확인합니다.
+문서와 다른 동작을 보고할 때 이 출력을 함께 기록하십시오. 문서는 현재 컴파일러 계약을 설명하므로 오래된 설치 바이너리는 더 작은 명령 또는 문법 범위를 제공할 수 있습니다.
 
-## v0.2.0-pre-beta 제공 바이너리
+## 릴리스 아카이브
 
-이 릴리스의 GitHub Release에는 다음 사전 빌드 아카이브가 게시되어 있습니다.
+릴리스 asset 이름에는 선택한 버전이 들어갑니다. 정확한 버전 문자열과 제공 플랫폼은 현재 릴리스 페이지에서 확인하십시오.
 
-| 플랫폼 | 릴리스 아카이브 |
+| 플랫폼 | 아카이브 이름 형태 |
 | --- | --- |
-| Linux x86-64 GNU | `wave-v0.2.0-pre-beta-x86_64-linux-gnu.tar.gz` |
-| Windows x86-64 GNU | `wave-v0.2.0-pre-beta-x86_64-pc-windows-gnu.zip` |
-| macOS Apple Silicon | `wave-v0.2.0-pre-beta-aarch64-apple-darwin.tar.gz` |
+| Linux x86-64 GNU | `wave-<version>-x86_64-linux-gnu.tar.gz` |
+| Windows x86-64 GNU | `wave-<version>-x86_64-pc-windows-gnu.zip` |
+| macOS Apple Silicon | `wave-<version>-aarch64-apple-darwin.tar.gz` |
 
 릴리스에는 `SHA256SUMS`도 함께 제공되므로 직접 아카이브를 내려받는 경우 체크섬을 검증할 수 있습니다.
 
@@ -54,8 +54,13 @@ wavec --help
 ```shell
 git clone https://github.com/wavefnd/Wave.git
 cd Wave
-git checkout v0.2.0-pre-beta
 cargo build
+```
+
+위 명령은 기본 브랜치를 빌드합니다. 게시된 릴리스를 재현하려면 Cargo를 실행하기 전에 해당 태그를 checkout합니다.
+
+```shell
+git checkout <release-tag>
 ```
 
 최적화된 컴파일러가 필요하면 Cargo의 release 프로필을 사용할 수 있습니다.

@@ -5,54 +5,42 @@ locale: en
 group: toolchain
 group_order: 4
 order: 1
-title: Wave toolchain
-summary: Separate the roles of wavec, the standard library, Vex, the reserved Whale path, and native interoperability.
+title: Whale toolchain
+summary: The role, component boundaries, and current maturity of the separate Whale low-level toolchain.
 ---
 
-## wavec
+## What Whale is
 
-`wavec` is the central compiler CLI in v0.2.0-pre-beta. It checks, compiles, links, and runs Wave sources and exposes a `print` interface for querying target and capability information.
+Whale is a separate low-level toolchain written in Rust. Its long-term role is to provide reusable assembly, object, linking, and intermediate-representation components for Wave and other native-code producers.
 
-```shell
-wavec --version
-wavec build main.wave
-wavec run main.wave
-wavec print supported-targets
-```
+Whale is not the name of the entire Wave developer experience. The projects have distinct responsibilities:
 
-## Standard library
+| Project | Responsibility |
+| --- | --- |
+| `wavec` | Parse, validate, compile, and currently generate native code through LLVM. |
+| Vex | Manage Wave packages, manifests, dependency graphs, lockfiles, and package builds. |
+| Whale | Develop independent low-level assembler, object, linker, and IR components. |
+| Wave `std` | Provide Wave source modules for runtime and system APIs. |
 
-`std` ships as Wave source in the compiler repository and provides runtime functionality for strings, memory, files, networking, processes, and more.
+## Components
 
-```shell
-wavec print std-path
-```
+The Whale workspace currently contains four main library areas:
 
-Use the printed directory to inspect the exact `.wave` APIs used by the installed compiler.
+- `assembler`: tokenization, AMD64 parsing and encoding, sections, symbols, and relocations
+- `object`: an object-file model and ELF64 writer
+- `linker`: the developing link layer
+- `ir`: Whale IR types, builders, printing, verification, and an optional frontend socket
 
-## Vex
+The `whale` executable exposes these areas as `asm`, `object`, `link`, and `ir` commands.
 
-Vex is a separate package-management project for Wave dependencies. `wavec` provides stable integration points such as `--dep-root` and `--dep name=path` for resolving external package imports.
+## Current integration status
 
-This allows a package manager to prepare a dependency tree while the compiler receives the final resolution paths.
+The current `wavec` uses its LLVM backend for normal builds. Whale is developed as an independent toolchain and is not selected by a `wavec --whale` option.
 
-## Whale
+This separation matters for both users and tool authors: do not assume that installing Whale changes `wavec`, and do not pass Whale options through Vex. Invoke each tool through its own command-line contract.
 
-`wavec` still recognizes `--whale`, but in v0.2.0-pre-beta it is reserved and does not select an implemented backend. Do not use it for normal builds.
+## Maturity boundary
 
-## Native interoperability
+Whale is under active development. The AMD64 assembler and ELF64 object paths are usable for focused experiments; the AArch64 assembler path and linker CLI are not complete. The IR socket command is opt-in at build time. Check the Whale command-reference page before depending on a subcommand in automation.
 
-Wave can connect to C/C++ and platform facilities through `extern(c)`, `export(c)`, native linker options, and inline assembly. Capabilities not yet covered by the standard library can be exposed behind small native boundaries.
-
-## Capability discovery for tools
-
-Query the compiler instead of hardcoding target lists:
-
-```shell
-wavec print supported-targets
-wavec print supported-input-types
-wavec print supported-emit-kinds
-wavec print supported-print-items
-```
-
-Tooling that needs structured data can use `wavec print ... --format=json`.
+Until a component declares a stable contract, keep generated artifacts reproducible at the source level and validate object format, architecture, symbols, and relocations with independent tools.

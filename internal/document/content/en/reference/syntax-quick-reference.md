@@ -6,7 +6,7 @@ group: reference
 group_order: 3
 order: 3
 title: Syntax quick reference
-summary: Frequently used v0.2.0-pre-beta declarations, control flow, types, pointers, and FFI syntax on one page.
+summary: Frequently used declarations, control flow, types, pointers, and FFI syntax on one page.
 ---
 
 ## Declarations
@@ -73,6 +73,12 @@ while (count < 10) {
 for (var i: i32 = 0; i < 10; i += 1) {
     println("{}", i);
 }
+
+match (status) {
+    Ready => { println("ready"); }
+    0 => { println("zero"); }
+    _ => { println("other"); }
+}
 ```
 
 `if`, `while`, `for`, and `match` use parenthesized headers in this release.
@@ -85,6 +91,16 @@ var p: ptr<i32> = &values[0];
 var first: i32 = deref p;
 ```
 
+## Console I/O
+
+```wave
+print("value = ");
+println("{}", value);
+input("{}", value);
+```
+
+The first argument is a string literal. Each exact `{}` placeholder requires one following expression; `input` destinations must be assignable.
+
 ## Imports and FFI
 
 ```wave
@@ -95,6 +111,29 @@ export(c) fun wave_call(value: i32) -> i32 {
     return value + 1;
 }
 ```
+
+## Target-conditioned items
+
+```wave
+#[target(os="linux", arch="riscv64")]
+extern(c) fun platform_call(value: i32) -> i32;
+```
+
+Supported condition keys are `arch`, `os`, `env`, and `abi`. The attribute controls the next top-level item.
+
+## Inline assembly
+
+```wave
+var result: i64 = 0;
+asm {
+    "mv a0, a1"
+    in("a1") 7
+    out("a0") result
+    clobber("memory")
+}
+```
+
+Instruction text and register names are target-specific. Declare every input, output, and hidden clobber required by the block.
 
 ## Compiler queries
 

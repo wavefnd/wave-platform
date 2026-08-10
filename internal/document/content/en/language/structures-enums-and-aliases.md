@@ -27,7 +27,7 @@ Struct fields use `name: type;`. Field access uses `value.field`.
 
 ## Methods and proto blocks
 
-The v0.2.0-pre-beta parser accepts `fun` methods directly inside a struct body. `proto` also provides a separate block for attaching methods to an already declared struct.
+The parser accepts `fun` methods directly inside a struct body. `proto` also provides a separate block for attaching methods to an already declared struct.
 
 ```wave
 struct Counter {

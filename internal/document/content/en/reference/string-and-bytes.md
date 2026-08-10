@@ -11,7 +11,7 @@ summary: String submodules, len/is_empty, comparison, search, trimming, ASCII he
 
 ## String module layout
 
-`std/string` in v0.2.0-pre-beta contains these source units:
+The current `std/string` tree contains these source units:
 
 - `ascii.wave`
 - `cmp.wave`

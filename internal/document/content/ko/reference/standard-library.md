@@ -6,12 +6,12 @@ group: reference
 group_order: 3
 order: 1
 title: 표준 라이브러리 색인
-summary: v0.2.0-pre-beta std manifest의 14개 최상위 모듈과 선택 기준을 정리합니다.
+summary: 현재 std manifest의 최상위 모듈과 선택 기준을 정리합니다.
 ---
 
 ## 릴리스에 포함된 최상위 모듈
 
-v0.2.0-pre-beta의 `std/manifest.json`에는 다음 14개 모듈이 선언되어 있습니다.
+현재 `std/manifest.json`에는 다음 최상위 모듈이 선언되어 있습니다.
 
 | 영역 | 모듈 | 대표 역할 |
 | --- | --- | --- |

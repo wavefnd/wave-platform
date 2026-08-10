@@ -6,14 +6,14 @@ group: getting-started
 group_order: 1
 order: 1
 title: Wave language overview
-summary: A practical overview of Wave 0.2.0-pre-beta, its program structure, and this documentation's release scope.
+summary: A practical overview of Wave, its program structure, and the documentation's compatibility scope.
 ---
 
 ## Documentation baseline
 
-Wave is a statically typed systems programming language designed for native code generation and explicit low-level control. This documentation targets **Wave v0.2.0-pre-beta**, commit `bd5549bd99a6cd8372b6542b4170a2221bac85d0`.
+Wave is a statically typed systems programming language designed for native code generation and explicit low-level control. This documentation describes the current Wave compiler contract: syntax accepted by the parser, semantic restrictions enforced by the compiler, and options reported by `wavec --help` and `wavec print`.
 
-Syntax added or changed on `master` after that release is outside this documentation baseline. If an example behaves differently with your compiler, check `wavec --version` first.
+Pre-beta behavior can still change. If an example behaves differently with your compiler, check `wavec --version` and query the installed compiler rather than relying on a hard-coded capability list.
 
 ## First program
 
@@ -58,7 +58,7 @@ fun main() {
 
 ## Console I/O
 
-In v0.2.0-pre-beta, `print`, `println`, and `input` are parser-recognized I/O statements rather than ordinary standard-library function calls. Their first argument must be a string literal, and the number of `{}` placeholders must match the number of following arguments.
+`print`, `println`, and `input` are parser-recognized I/O statements rather than ordinary standard-library function calls. Their first argument must be a string literal, and the number of `{}` placeholders must match the number of following arguments.
 
 ```wave
 fun main() {
@@ -79,4 +79,4 @@ Wave provides `ptr<T>`, address-of `&`, explicit `deref`, C ABI boundaries throu
 2. Learn declarations, types, expressions, and control flow.
 3. Learn functions, generics, structs, enums, and `proto`.
 4. Move on to pointers, imports, FFI, and the standard library.
-5. Use the toolchain and quick-reference pages as lookup material.
+5. Use the compiler, Vex, Whale, target, and quick-reference pages as lookup material.

@@ -6,12 +6,12 @@ group: reference
 group_order: 3
 order: 1
 title: Standard library index
-summary: The 14 top-level modules declared by the v0.2.0-pre-beta std manifest and how to navigate them.
+summary: The top-level modules declared by the current std manifest and how to navigate them.
 ---
 
 ## Top-level modules in this release
 
-`std/manifest.json` for v0.2.0-pre-beta declares 14 top-level modules:
+The current `std/manifest.json` declares these top-level modules:
 
 | Area | Modules | Representative purpose |
 | --- | --- | --- |
