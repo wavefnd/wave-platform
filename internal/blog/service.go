@@ -34,7 +34,6 @@ func (service *Service) Repository() *Repository { return service.repository }
 
 func (service *Service) Save(actorID string, input Input) (Post, error) {
 	input.Slug = strings.ToLower(strings.TrimSpace(input.Slug))
-	input.Locale = strings.ToLower(strings.TrimSpace(input.Locale))
 	input.Category = NormalizeCategory(input.Category)
 	input.Title = strings.TrimSpace(input.Title)
 	input.Summary = strings.TrimSpace(input.Summary)
@@ -42,9 +41,6 @@ func (service *Service) Save(actorID string, input Input) (Post, error) {
 	input.Status = strings.ToLower(strings.TrimSpace(input.Status))
 	if !slugPattern.MatchString(input.Slug) || len(input.Slug) > 120 {
 		return Post{}, fmt.Errorf("%w: slug must contain lowercase letters, numbers, and single hyphens", ErrInvalidPost)
-	}
-	if input.Locale != "en" && input.Locale != "ko" {
-		return Post{}, fmt.Errorf("%w: locale must be en or ko", ErrInvalidPost)
 	}
 	if input.Category != "article" && input.Category != "release" {
 		return Post{}, fmt.Errorf("%w: category must be article or release", ErrInvalidPost)
@@ -72,7 +68,7 @@ func (service *Service) Save(actorID string, input Input) (Post, error) {
 	} else if err != nil {
 		return Post{}, err
 	}
-	item.Locale, item.Category, item.Title, item.Summary, item.Content, item.Status = input.Locale, input.Category, input.Title, input.Summary, input.Content, input.Status
+	item.Category, item.Title, item.Summary, item.Content, item.Status = input.Category, input.Title, input.Summary, input.Content, input.Status
 	item.AuthorAccountID, item.AuthorName, item.UpdatedAt = author.ID, author.DisplayName, now
 	if item.Status == "published" && item.PublishedAt == "" {
 		item.PublishedAt = now.Format(timeLayout)

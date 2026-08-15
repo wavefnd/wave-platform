@@ -23,7 +23,7 @@ func TestSavePublishesAndUpdatesBlogPost(t *testing.T) {
 	}
 	service := NewService(database)
 	service.now = func() time.Time { return now }
-	item, err := service.Save("owner", Input{Slug: "wave-020", Locale: "en", Category: "release", Title: "Wave 0.2.0",
+	item, err := service.Save("owner", Input{Slug: "wave-020", Category: "release", Title: "Wave 0.2.0",
 		Summary: "Release summary", Content: "## Release\n\nDetails.", Status: "draft"})
 	if err != nil || item.PublishedAt != "" {
 		t.Fatalf("draft=%#v err=%v", item, err)
@@ -32,12 +32,12 @@ func TestSavePublishesAndUpdatesBlogPost(t *testing.T) {
 		t.Fatalf("public draft error=%v", err)
 	}
 	service.now = func() time.Time { return now.Add(time.Hour) }
-	item, err = service.Save("owner", Input{Slug: item.Slug, Locale: "en", Category: "release", Title: item.Title,
+	item, err = service.Save("owner", Input{Slug: item.Slug, Category: "release", Title: item.Title,
 		Summary: item.Summary, Content: item.Content, Status: "published"})
 	if err != nil || item.PublishedAt == "" {
 		t.Fatalf("published=%#v err=%v", item, err)
 	}
-	posts, err := service.Repository().Posts("en", false, 10)
+	posts, err := service.Repository().Posts(false, 10)
 	if err != nil || len(posts) != 1 || posts[0].AuthorName != "Wave Owner" || posts[0].Category != "release" {
 		t.Fatalf("posts=%#v err=%v", posts, err)
 	}
@@ -54,7 +54,7 @@ func TestSaveRejectsInvalidBlogPost(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = database.Close() })
 	service := NewService(database)
-	if _, err := service.Save("missing", Input{Slug: "Not Valid", Locale: "en", Title: "Title", Summary: "Summary", Content: "Body", Status: "published"}); !errors.Is(err, ErrInvalidPost) {
+	if _, err := service.Save("missing", Input{Slug: "Not Valid", Title: "Title", Summary: "Summary", Content: "Body", Status: "published"}); !errors.Is(err, ErrInvalidPost) {
 		t.Fatalf("invalid slug error=%v", err)
 	}
 }

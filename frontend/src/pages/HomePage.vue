@@ -66,7 +66,7 @@ async function copyInstall() {
 
 onMounted(async () => {
   const [releaseResult, discussionResult, spaceResult, questionResult, repositoryResult, sponsorResult, personalResult] = await Promise.allSettled([
-	getBlogPosts(undefined, 'release', 4),
+	getBlogPosts('release', 4),
     getCommunityThreads('', { sort: 'active', limit: 5 }),
     getCommunitySpaces(),
     getQuestions({ sort: 'unanswered', limit: 5 }),

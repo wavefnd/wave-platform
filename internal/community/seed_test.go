@@ -26,14 +26,14 @@ func TestSeedReleaseBlogPostsImportsOnlyVersionReleases(t *testing.T) {
 	}
 
 	repository := blogdomain.NewRepository(database)
-	items, err := repository.PostsByCategory("", "release", false, 0)
+	items, err := repository.PostsByCategory("release", false, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(items) != 15 {
 		t.Fatalf("releases = %d, want 15", len(items))
 	}
-	latestOnly, err := repository.PostsByCategory("", "release", false, 1)
+	latestOnly, err := repository.PostsByCategory("release", false, 1)
 	if err != nil || len(latestOnly) != 1 || latestOnly[0].Slug != items[0].Slug {
 		t.Fatalf("latest release = %#v, err = %v", latestOnly, err)
 	}

@@ -42,7 +42,7 @@ func (handler ReleasesHandler) List(writer http.ResponseWriter, request *http.Re
 		return
 	}
 	limit, _ := strconv.Atoi(request.URL.Query().Get("limit"))
-	items, err := handler.Service.Repository().PostsByCategory("", "release", false, limit)
+	items, err := handler.Service.Repository().PostsByCategory("release", false, limit)
 	if err != nil {
 		http.Error(writer, "failed to load releases", http.StatusInternalServerError)
 		return

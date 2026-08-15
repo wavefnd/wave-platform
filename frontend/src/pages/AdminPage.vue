@@ -49,7 +49,7 @@ const blogPosts = ref<BlogPostSummary[]>([])
 const blogSaving = ref(false)
 const blogNotice = ref('')
 const editingBlogSlug = ref('')
-const blogForm = ref<BlogPostInput>({ slug: '', locale: 'en', category: 'article', title: '', summary: '', content: '', status: 'draft' })
+const blogForm = ref<BlogPostInput>({ slug: '', category: 'article', title: '', summary: '', content: '', status: 'draft' })
 const timeZones = ['Asia/Seoul', 'UTC', 'Asia/Tokyo', 'Asia/Singapore', 'Europe/London', 'Europe/Paris', 'America/New_York', 'America/Los_Angeles']
 let stylesheet: HTMLLinkElement | null = null
 
@@ -128,7 +128,7 @@ function newBlogPost() {
 	editingBlogSlug.value = ''
 	blogNotice.value = ''
 	actionError.value = ''
-	blogForm.value = { slug: '', locale: locale.value, category: 'article', title: '', summary: '', content: '', status: 'draft' }
+	blogForm.value = { slug: '', category: 'article', title: '', summary: '', content: '', status: 'draft' }
 }
 
 async function editBlogPost(slug: string) {
@@ -137,7 +137,7 @@ async function editBlogPost(slug: string) {
 	try {
 		const item = await getAdminBlogPost(slug)
 		editingBlogSlug.value = item.slug
-		blogForm.value = { slug: item.slug, locale: item.locale, category: item.category, title: item.title, summary: item.summary, content: item.content, status: item.status || 'draft' }
+		blogForm.value = { slug: item.slug, category: item.category, title: item.title, summary: item.summary, content: item.content, status: item.status || 'draft' }
 	} catch (reason) {
 		actionError.value = reason instanceof Error ? reason.message : t('common.loadError')
 	}
@@ -150,7 +150,7 @@ async function saveBlogPost() {
 	try {
 		const saved = await saveAdminBlogPost(blogForm.value)
 		editingBlogSlug.value = saved.slug
-		blogForm.value = { slug: saved.slug, locale: saved.locale, category: saved.category, title: saved.title, summary: saved.summary, content: saved.content, status: saved.status || 'draft' }
+		blogForm.value = { slug: saved.slug, category: saved.category, title: saved.title, summary: saved.summary, content: saved.content, status: saved.status || 'draft' }
 		blogPosts.value = await getAdminBlogPosts()
 		blogNotice.value = t('admin.blogSaved')
 	} catch (reason) {
@@ -297,7 +297,7 @@ function changeLocale(event: Event) {
 				<div class="admin-blog-layout">
 				  <aside class="admin-blog-list">
 					<button v-for="post in blogPosts" :key="post.slug" type="button" :class="{ active: editingBlogSlug === post.slug }" @click="editBlogPost(post.slug)">
-					  <span><strong>{{ post.title }}</strong><small>{{ post.locale.toUpperCase() }} · {{ t(`blog.category.${post.category}`) }} · {{ post.status === 'published' ? t('admin.published') : t('admin.draft') }}</small></span>
+					  <span><strong>{{ post.title }}</strong><small>{{ t(`blog.category.${post.category}`) }} · {{ post.status === 'published' ? t('admin.published') : t('admin.draft') }}</small></span>
 					  <time :datetime="post.updatedAt">{{ formatDate(post.updatedAt) }}</time>
 					</button>
 					<p v-if="blogPosts.length === 0" class="text-body-secondary small p-3 mb-0">{{ t('admin.noBlogPosts') }}</p>
@@ -306,7 +306,6 @@ function changeLocale(event: Event) {
 					<h2 class="h5">{{ editingBlogSlug ? t('admin.editPost') : t('admin.newPost') }}</h2>
 					<div class="admin-blog-fields">
 					  <label>{{ t('admin.blogSlug') }}<input v-model="blogForm.slug" class="form-control" required maxlength="120" pattern="[a-z0-9]+(?:-[a-z0-9]+)*" :readonly="Boolean(editingBlogSlug)" /></label>
-					  <label>{{ t('admin.blogLocale') }}<select v-model="blogForm.locale" class="form-select"><option value="en">English</option><option value="ko">한국어</option></select></label>
 					  <label>{{ t('admin.blogCategory') }}<select v-model="blogForm.category" class="form-select"><option value="article">{{ t('blog.category.article') }}</option><option value="release">{{ t('blog.category.release') }}</option></select></label>
 					  <label class="wide">{{ t('admin.blogTitle') }}<input v-model="blogForm.title" class="form-control" required maxlength="160" /></label>
 					  <label class="wide">{{ t('admin.blogSummary') }}<textarea v-model="blogForm.summary" class="form-control" required maxlength="500" rows="3" /></label>

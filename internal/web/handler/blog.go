@@ -27,18 +27,13 @@ func (handler BlogHandler) List(writer http.ResponseWriter, request *http.Reques
 		writeAPIError(writer, http.StatusServiceUnavailable, "blog-unavailable", "The blog is unavailable.")
 		return
 	}
-	locale := normalizedBlogLocale(request.URL.Query().Get("locale"))
-	if request.URL.Query().Get("locale") != "" && locale == "" {
-		writeAPIError(writer, http.StatusBadRequest, "invalid-locale", "Blog locale must be en or ko.")
-		return
-	}
 	limit, _ := strconv.Atoi(request.URL.Query().Get("limit"))
 	category := normalizedBlogCategory(request.URL.Query().Get("category"))
 	if request.URL.Query().Get("category") != "" && category == "" {
 		writeAPIError(writer, http.StatusBadRequest, "invalid-category", "Blog category must be article or release.")
 		return
 	}
-	items, err := handler.Service.Repository().PostsByCategory(locale, category, false, limit)
+	items, err := handler.Service.Repository().PostsByCategory(category, false, limit)
 	if err != nil {
 		writeAPIError(writer, http.StatusInternalServerError, "blog-unavailable", "Blog posts could not be loaded.")
 		return
@@ -71,7 +66,7 @@ func (handler BlogHandler) AdminList(writer http.ResponseWriter, request *http.R
 	if _, ok := handler.authorize(writer, request, false); !ok {
 		return
 	}
-	items, err := handler.Service.Repository().Posts("", true, 0)
+	items, err := handler.Service.Repository().Posts(true, 0)
 	if err != nil {
 		writeAPIError(writer, http.StatusInternalServerError, "blog-unavailable", "Blog posts could not be loaded.")
 		return
@@ -141,14 +136,6 @@ func (handler BlogHandler) authorize(writer http.ResponseWriter, request *http.R
 		return "", false
 	}
 	return actor.ID, true
-}
-
-func normalizedBlogLocale(value string) string {
-	value = strings.ToLower(strings.TrimSpace(value))
-	if value == "en" || value == "ko" {
-		return value
-	}
-	return ""
 }
 
 func normalizedBlogCategory(value string) string {

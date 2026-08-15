@@ -25,7 +25,6 @@ export interface ModuleStatus {
 
 export interface BlogPostSummary {
 	slug: string
-	locale: 'en' | 'ko'
 	category: 'article' | 'release'
 	title: string
 	summary: string
@@ -43,7 +42,6 @@ export interface BlogPost extends BlogPostSummary {
 
 export interface BlogPostInput {
 	slug: string
-	locale: 'en' | 'ko'
 	category: 'article' | 'release'
 	title: string
 	summary: string
@@ -798,7 +796,7 @@ export async function updateAdminAccountRole(accountId: string, administrator: b
 
 function parseBlogSummary(element: ParentNode): BlogPostSummary {
 	return {
-		slug: childText(element, 'slug'), locale: childText(element, 'locale') === 'ko' ? 'ko' : 'en',
+		slug: childText(element, 'slug'),
 		category: childText(element, 'category') === 'release' ? 'release' : 'article',
 		title: childText(element, 'title'), summary: childContent(element, 'summary'),
 		status: childText(element, 'status') as BlogPostSummary['status'], authorName: childText(element, 'author-name'),
@@ -813,9 +811,8 @@ function parseBlogPost(element: ParentNode): BlogPost {
 	}
 }
 
-export async function getBlogPosts(locale?: 'en' | 'ko', category?: 'article' | 'release', limit = 0): Promise<BlogPostSummary[]> {
+export async function getBlogPosts(category?: 'article' | 'release', limit = 0): Promise<BlogPostSummary[]> {
 	const query = new URLSearchParams()
-	if (locale) query.set('locale', locale)
 	if (category) query.set('category', category)
 	if (limit > 0) query.set('limit', String(limit))
 	const xml = await getXml(`/api/v1/blog/posts${query.size ? `?${query}` : ''}`)
@@ -837,7 +834,7 @@ export async function getAdminBlogPost(slug: string): Promise<BlogPost> {
 
 export async function saveAdminBlogPost(input: BlogPostInput): Promise<BlogPost> {
 	const xml = await requestXml('/api/v1/admin/blog/posts', 'POST', authDocument('blog-post', {
-		slug: input.slug, locale: input.locale, category: input.category, title: input.title, summary: input.summary, content: input.content, status: input.status,
+		slug: input.slug, category: input.category, title: input.title, summary: input.summary, content: input.content, status: input.status,
 	}))
 	if (!xml) throw new Error('The server returned an empty blog response.')
 	return parseBlogPost(xml.documentElement)

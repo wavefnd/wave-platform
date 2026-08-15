@@ -33,7 +33,7 @@ async function load() {
 			post.value = await getBlogPost(String(route.params.slug))
 			posts.value = []
 		} else {
-			posts.value = await getBlogPosts(category.value === 'release' ? undefined : locale.value, category.value || undefined)
+			posts.value = await getBlogPosts(category.value || undefined)
 			post.value = null
 		}
 	} catch (reason) {
@@ -48,13 +48,13 @@ function selectCategory(value: 'article' | 'release' | '') {
 }
 
 onMounted(load)
-watch([() => route.fullPath, locale], load)
+watch(() => route.fullPath, load)
 watchEffect(() => {
 	if (!post.value) return
 	applyPageSEO({
 		title: `${post.value.title} · Wave Blog`,
 		description: plainTextDescription(post.value.summary || post.value.content, post.value.title),
-		locale: post.value.locale,
+		locale: locale.value,
 		path: route.path,
 		schema: { '@type': 'BlogPosting', headline: post.value.title, datePublished: post.value.publishedAt, dateModified: post.value.updatedAt },
 	})
@@ -78,7 +78,7 @@ watchEffect(() => {
 		<section v-else-if="!detail" class="blog-index">
 			<RouterLink v-for="item in posts" :key="item.slug" :to="`/blog/${encodeURIComponent(item.slug)}`" class="blog-row">
 				<time :datetime="item.publishedAt">{{ formatDate(item.publishedAt) }}</time>
-				<div><small class="blog-category">{{ t(`blog.category.${item.category}`) }}</small><h2>{{ item.title }}</h2><p>{{ item.summary }}</p><small>{{ item.authorName }} · {{ item.locale.toUpperCase() }}</small></div>
+				<div><small class="blog-category">{{ t(`blog.category.${item.category}`) }}</small><h2>{{ item.title }}</h2><p>{{ item.summary }}</p><small>{{ item.authorName }}</small></div>
 			</RouterLink>
 			<p v-if="posts.length === 0" class="compact-empty">{{ t('blog.empty') }}</p>
 		</section>

@@ -157,7 +157,6 @@ func parseReleasePost(filename, source string) (blogdomain.Post, error) {
 	}
 	return blogdomain.Post{
 		Slug:        slug,
-		Locale:      "en",
 		Category:    "release",
 		Title:       title,
 		Summary:     summary,

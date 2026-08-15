@@ -11,7 +11,6 @@ type Post struct {
 	XMLName xml.Name `xml:"https://wave-lang.dev/ns/platform/blog/v1 post"`
 
 	Slug            string    `xml:"slug"`
-	Locale          string    `xml:"locale"`
 	Category        string    `xml:"category"`
 	Title           string    `xml:"title"`
 	Summary         string    `xml:"summary"`
@@ -26,7 +25,6 @@ type Post struct {
 
 type Summary struct {
 	Slug        string `xml:"slug"`
-	Locale      string `xml:"locale"`
 	Category    string `xml:"category"`
 	Title       string `xml:"title"`
 	Summary     string `xml:"summary"`
@@ -38,7 +36,6 @@ type Summary struct {
 
 type Input struct {
 	Slug     string `xml:"slug"`
-	Locale   string `xml:"locale"`
 	Category string `xml:"category"`
 	Title    string `xml:"title"`
 	Summary  string `xml:"summary"`

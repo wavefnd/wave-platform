@@ -20,8 +20,8 @@ func TestLegacyReleaseAPIReadsReleaseBlogPosts(t *testing.T) {
 	repository := blogdomain.NewRepository(database)
 	now := time.Date(2026, 8, 15, 0, 0, 0, 0, time.UTC)
 	for _, item := range []blogdomain.Post{
-		{Slug: "wave-release", Locale: "en", Category: "release", Title: "Wave release", Summary: "Release summary", Content: "## Changes", Status: "published", PublishedAt: now.Format(time.RFC3339), CreatedAt: now, UpdatedAt: now},
-		{Slug: "engineering-note", Locale: "en", Category: "article", Title: "Engineering note", Summary: "Article summary", Content: "Details", Status: "published", PublishedAt: now.Add(time.Hour).Format(time.RFC3339), CreatedAt: now, UpdatedAt: now},
+		{Slug: "wave-release", Category: "release", Title: "Wave release", Summary: "Release summary", Content: "## Changes", Status: "published", PublishedAt: now.Format(time.RFC3339), CreatedAt: now, UpdatedAt: now},
+		{Slug: "engineering-note", Category: "article", Title: "Engineering note", Summary: "Article summary", Content: "Details", Status: "published", PublishedAt: now.Add(time.Hour).Format(time.RFC3339), CreatedAt: now, UpdatedAt: now},
 	} {
 		if err := repository.Upsert(item); err != nil {
 			t.Fatal(err)

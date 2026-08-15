@@ -85,7 +85,7 @@ func (handler SEOHandler) Sitemap(writer http.ResponseWriter, request *http.Requ
 		}
 	}
 	if handler.blog != nil {
-		if posts, err := handler.blog.Repository().Posts("", false, 0); err == nil {
+		if posts, err := handler.blog.Repository().Posts(false, 0); err == nil {
 			for _, post := range posts {
 				entries = append(entries, sitemapURL{Location: handler.location(base, "blog", post.Slug), LastModified: dateOnly(post.UpdatedAt.Format(time.RFC3339))})
 			}
