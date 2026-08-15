@@ -35,6 +35,9 @@ func (service *Service) Repository() *Repository { return service.repository }
 func (service *Service) Save(actorID string, input Input) (Post, error) {
 	input.Slug = strings.ToLower(strings.TrimSpace(input.Slug))
 	input.Category = NormalizeCategory(input.Category)
+	input.RoadmapStatus = strings.ToLower(strings.TrimSpace(input.RoadmapStatus))
+	input.TargetDate = strings.TrimSpace(input.TargetDate)
+	input.Cadence = strings.TrimSpace(input.Cadence)
 	input.Title = strings.TrimSpace(input.Title)
 	input.Summary = strings.TrimSpace(input.Summary)
 	input.Content = strings.TrimSpace(strings.ReplaceAll(input.Content, "\r\n", "\n"))
@@ -42,8 +45,25 @@ func (service *Service) Save(actorID string, input Input) (Post, error) {
 	if !slugPattern.MatchString(input.Slug) || len(input.Slug) > 120 {
 		return Post{}, fmt.Errorf("%w: slug must contain lowercase letters, numbers, and single hyphens", ErrInvalidPost)
 	}
-	if input.Category != "article" && input.Category != "release" {
-		return Post{}, fmt.Errorf("%w: category must be article or release", ErrInvalidPost)
+	if input.Category != "article" && input.Category != "release" && input.Category != "roadmap" {
+		return Post{}, fmt.Errorf("%w: category must be article, release, or roadmap", ErrInvalidPost)
+	}
+	if input.Category == "roadmap" {
+		if input.RoadmapStatus != "planned" && input.RoadmapStatus != "in-progress" && input.RoadmapStatus != "released" {
+			return Post{}, fmt.Errorf("%w: roadmap status must be planned, in-progress, or released", ErrInvalidPost)
+		}
+		if _, err := time.Parse("2006-01-02", input.TargetDate); err != nil {
+			return Post{}, fmt.Errorf("%w: roadmap target release date must use YYYY-MM-DD", ErrInvalidPost)
+		}
+		if input.RoadmapOrder < 1 || input.RoadmapOrder > 1000000 {
+			return Post{}, fmt.Errorf("%w: roadmap order must be between 1 and 1000000", ErrInvalidPost)
+		}
+		if len([]rune(input.Cadence)) < 1 || len([]rune(input.Cadence)) > 80 {
+			return Post{}, fmt.Errorf("%w: roadmap release cadence must contain between 1 and 80 characters", ErrInvalidPost)
+		}
+	} else {
+		input.RoadmapStatus, input.TargetDate, input.Cadence = "", "", ""
+		input.RoadmapOrder = 0
 	}
 	if len([]rune(input.Title)) < 1 || len([]rune(input.Title)) > 160 {
 		return Post{}, fmt.Errorf("%w: title must contain between 1 and 160 characters", ErrInvalidPost)
@@ -69,6 +89,8 @@ func (service *Service) Save(actorID string, input Input) (Post, error) {
 		return Post{}, err
 	}
 	item.Category, item.Title, item.Summary, item.Content, item.Status = input.Category, input.Title, input.Summary, input.Content, input.Status
+	item.RoadmapStatus, item.TargetDate, item.Cadence = input.RoadmapStatus, input.TargetDate, input.Cadence
+	item.RoadmapOrder = input.RoadmapOrder
 	item.AuthorAccountID, item.AuthorName, item.UpdatedAt = author.ID, author.DisplayName, now
 	if item.Status == "published" && item.PublishedAt == "" {
 		item.PublishedAt = now.Format(timeLayout)

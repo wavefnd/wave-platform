@@ -30,7 +30,7 @@ func (handler BlogHandler) List(writer http.ResponseWriter, request *http.Reques
 	limit, _ := strconv.Atoi(request.URL.Query().Get("limit"))
 	category := normalizedBlogCategory(request.URL.Query().Get("category"))
 	if request.URL.Query().Get("category") != "" && category == "" {
-		writeAPIError(writer, http.StatusBadRequest, "invalid-category", "Blog category must be article or release.")
+		writeAPIError(writer, http.StatusBadRequest, "invalid-category", "Blog category must be article, release, or roadmap.")
 		return
 	}
 	items, err := handler.Service.Repository().PostsByCategory(category, false, limit)
@@ -140,7 +140,7 @@ func (handler BlogHandler) authorize(writer http.ResponseWriter, request *http.R
 
 func normalizedBlogCategory(value string) string {
 	value = strings.ToLower(strings.TrimSpace(value))
-	if value == "article" || value == "release" {
+	if value == "article" || value == "release" || value == "roadmap" {
 		return value
 	}
 	return ""

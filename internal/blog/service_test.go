@@ -58,3 +58,35 @@ func TestSaveRejectsInvalidBlogPost(t *testing.T) {
 		t.Fatalf("invalid slug error=%v", err)
 	}
 }
+
+func TestRoadmapPostsUseEditableDisplayOrderInsteadOfTargetDate(t *testing.T) {
+	database, err := storage.Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = database.Close() })
+	now := time.Date(2026, 8, 15, 10, 0, 0, 0, time.UTC)
+	if err := account.NewRepository(database).Create(account.Account{ID: "owner", Username: "owner", DisplayName: "Wave Owner",
+		Email: "owner@wave.test", Status: "active", CreatedAt: now, UpdatedAt: now}); err != nil {
+		t.Fatal(err)
+	}
+	service := NewService(database)
+	service.now = func() time.Time { return now }
+	inputs := []Input{
+		{Slug: "wave-next", Category: "roadmap", RoadmapStatus: "planned", RoadmapOrder: 2, TargetDate: "2026-09-01", Cadence: "Every 8 weeks", Title: "Wave next", Summary: "Next version", Content: "- [ ] Parser", Status: "published"},
+		{Slug: "wave-later", Category: "roadmap", RoadmapStatus: "in-progress", RoadmapOrder: 1, TargetDate: "2026-12-01", Cadence: "Quarterly", Title: "Wave later", Summary: "Later version", Content: "- [x] Design", Status: "published"},
+	}
+	for _, input := range inputs {
+		if _, err := service.Save("owner", input); err != nil {
+			t.Fatal(err)
+		}
+	}
+	items, err := service.Repository().PostsByCategory("roadmap", false, 0)
+	if err != nil || len(items) != 2 || items[0].Slug != "wave-later" || items[1].Slug != "wave-next" {
+		t.Fatalf("roadmap order=%#v err=%v", items, err)
+	}
+	inputs[0].RoadmapOrder = 0
+	if _, err := service.Save("owner", inputs[0]); !errors.Is(err, ErrInvalidPost) {
+		t.Fatalf("invalid roadmap order error=%v", err)
+	}
+}

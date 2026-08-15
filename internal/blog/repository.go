@@ -61,6 +61,12 @@ func (repository *Repository) PostsByCategory(category string, includeDrafts boo
 		return nil, err
 	}
 	sort.Slice(items, func(left, right int) bool {
+		if category == "roadmap" {
+			if items[left].RoadmapOrder != items[right].RoadmapOrder {
+				return items[left].RoadmapOrder < items[right].RoadmapOrder
+			}
+			return items[left].Slug < items[right].Slug
+		}
 		leftDate, rightDate := items[left].PublishedAt, items[right].PublishedAt
 		if includeDrafts {
 			leftDate, rightDate = items[left].UpdatedAt.Format(timeLayout), items[right].UpdatedAt.Format(timeLayout)
@@ -80,6 +86,7 @@ func SummaryOf(item Post, includeStatus bool) Summary {
 	if includeStatus {
 		status = item.Status
 	}
-	return Summary{Slug: item.Slug, Category: NormalizeCategory(item.Category), Title: item.Title, Summary: item.Summary,
+	return Summary{Slug: item.Slug, Category: NormalizeCategory(item.Category), RoadmapStatus: item.RoadmapStatus,
+		RoadmapOrder: item.RoadmapOrder, TargetDate: item.TargetDate, Cadence: item.Cadence, Title: item.Title, Summary: item.Summary,
 		Status: status, AuthorName: item.AuthorName, PublishedAt: item.PublishedAt, UpdatedAt: item.UpdatedAt.Format(timeLayout)}
 }

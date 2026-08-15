@@ -16,13 +16,14 @@ const post = ref<BlogPost | null>(null)
 const loading = ref(true)
 const error = ref('')
 const detail = computed(() => typeof route.params.slug === 'string' && route.params.slug !== '')
-const category = computed<'article' | 'release' | ''>(() => route.query.category === 'release' || route.query.category === 'article' ? route.query.category : '')
+const category = computed<'article' | 'release' | 'roadmap' | ''>(() => ['release', 'article', 'roadmap'].includes(String(route.query.category)) ? route.query.category as 'article' | 'release' | 'roadmap' : '')
 
 function formatDate(value: string) {
 	if (!value) return ''
+	const parsed = /^\d{4}-\d{2}-\d{2}$/.test(value) ? new Date(`${value}T00:00:00`) : new Date(value)
 	return new Intl.DateTimeFormat(locale.value === 'ko' ? 'ko-KR' : 'en-US', {
 		year: 'numeric', month: 'long', day: 'numeric',
-	}).format(new Date(value))
+	}).format(parsed)
 }
 
 async function load() {
@@ -43,8 +44,12 @@ async function load() {
 	}
 }
 
-function selectCategory(value: 'article' | 'release' | '') {
+function selectCategory(value: 'article' | 'release' | 'roadmap' | '') {
 	void router.push({ name: 'blog', query: value ? { category: value } : {} })
+}
+
+function roadmapStatusLabel(value: BlogPostSummary['roadmapStatus']) {
+	return t(value === 'in-progress' ? 'blog.roadmap.inProgress' : value === 'released' ? 'blog.roadmap.released' : 'blog.roadmap.planned')
 }
 
 onMounted(load)
@@ -72,19 +77,21 @@ watchEffect(() => {
 			<button type="button" :class="{ active: category === '' }" @click="selectCategory('')">{{ t('blog.category.all') }}</button>
 			<button type="button" :class="{ active: category === 'release' }" @click="selectCategory('release')">{{ t('blog.category.release') }}</button>
 			<button type="button" :class="{ active: category === 'article' }" @click="selectCategory('article')">{{ t('blog.category.article') }}</button>
+			<button type="button" :class="{ active: category === 'roadmap' }" @click="selectCategory('roadmap')">{{ t('blog.category.roadmap') }}</button>
 		</nav>
 		<UiInlineState v-if="loading" :message="t('common.loading')" />
 		<UiInlineState v-else-if="error" :message="error" />
-		<section v-else-if="!detail" class="blog-index">
-			<RouterLink v-for="item in posts" :key="item.slug" :to="`/blog/${encodeURIComponent(item.slug)}`" class="blog-row">
-				<time :datetime="item.publishedAt">{{ formatDate(item.publishedAt) }}</time>
-				<div><small class="blog-category">{{ t(`blog.category.${item.category}`) }}</small><h2>{{ item.title }}</h2><p>{{ item.summary }}</p><small>{{ item.authorName }}</small></div>
+		<section v-else-if="!detail" class="blog-index" :class="{ 'roadmap-index': category === 'roadmap' }">
+			<RouterLink v-for="item in posts" :key="item.slug" :to="`/blog/${encodeURIComponent(item.slug)}`" class="blog-row" :class="{ 'roadmap-row': category === 'roadmap' }">
+				<div v-if="category === 'roadmap'" class="roadmap-issue-state"><span :class="`is-${item.roadmapStatus}`">{{ roadmapStatusLabel(item.roadmapStatus) }}</span><small>#{{ item.roadmapOrder }}</small></div>
+				<time :datetime="item.category === 'roadmap' ? item.targetDate : item.publishedAt">{{ formatDate(item.category === 'roadmap' ? item.targetDate : item.publishedAt) }}</time>
+				<div><small class="blog-category">{{ t(`blog.category.${item.category}`) }}</small><h2>{{ item.title }}</h2><p>{{ item.summary }}</p><small v-if="item.category === 'roadmap'" class="roadmap-schedule">{{ item.cadence }}</small><small v-else>{{ item.authorName }}</small></div>
 			</RouterLink>
-			<p v-if="posts.length === 0" class="compact-empty">{{ t('blog.empty') }}</p>
+			<p v-if="posts.length === 0" class="compact-empty">{{ category === 'roadmap' ? t('blog.roadmap.empty') : t('blog.empty') }}</p>
 		</section>
 		<article v-else-if="post" class="blog-article">
 			<RouterLink class="blog-back" to="/blog">← {{ t('blog.back') }}</RouterLink>
-			<header><span>{{ t(`blog.category.${post.category}`) }}</span><h1>{{ post.title }}</h1><div><time :datetime="post.publishedAt">{{ formatDate(post.publishedAt) }}</time><span>{{ post.authorName }}</span></div><p>{{ post.summary }}</p></header>
+			<header><span>{{ t(`blog.category.${post.category}`) }}</span><h1>{{ post.title }}</h1><div><template v-if="post.category === 'roadmap'"><span class="roadmap-detail-status" :class="`is-${post.roadmapStatus}`">{{ roadmapStatusLabel(post.roadmapStatus) }}</span><time :datetime="post.targetDate">{{ t('blog.roadmap.target') }} {{ formatDate(post.targetDate) }}</time><span>{{ post.cadence }}</span></template><template v-else><time :datetime="post.publishedAt">{{ formatDate(post.publishedAt) }}</time><span>{{ post.authorName }}</span></template></div><p>{{ post.summary }}</p></header>
 			<MarkdownContent :source="post.content" />
 		</article>
 	</main>
