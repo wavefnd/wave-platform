@@ -34,6 +34,32 @@ export interface Release extends ReleaseSummary {
   content: string
 }
 
+export interface BlogPostSummary {
+	slug: string
+	locale: 'en' | 'ko'
+	title: string
+	summary: string
+	status: 'draft' | 'published' | ''
+	authorName: string
+	publishedAt: string
+	updatedAt: string
+}
+
+export interface BlogPost extends BlogPostSummary {
+	content: string
+	authorAccountId: string
+	createdAt: string
+}
+
+export interface BlogPostInput {
+	slug: string
+	locale: 'en' | 'ko'
+	title: string
+	summary: string
+	content: string
+	status: 'draft' | 'published'
+}
+
 export interface DocumentSummary {
   id: string
   path: string
@@ -536,7 +562,7 @@ function parseUserProfile(element: ParentNode): UserProfile {
 
 export async function getUsers(): Promise<UserProfile[]> {
 	const xml = await getXml('/api/v1/users')
-	return Array.from(xml.documentElement.children).filter((item) => item.localName === 'user').map(parseUserProfile)
+	return Array.from(xml.documentElement.children).filter((item) => item.localName === 'user' || item.localName === 'user-profile').map(parseUserProfile)
 }
 
 export async function getUser(username: string): Promise<UserProfile> {
@@ -796,6 +822,48 @@ export async function getRelease(slug: string): Promise<Release> {
     summary: textOf(xml, 'summary'),
     content: textOf(xml, 'content'),
   }
+}
+
+function parseBlogSummary(element: ParentNode): BlogPostSummary {
+	return {
+		slug: childText(element, 'slug'), locale: childText(element, 'locale') === 'ko' ? 'ko' : 'en',
+		title: childText(element, 'title'), summary: childContent(element, 'summary'),
+		status: childText(element, 'status') as BlogPostSummary['status'], authorName: childText(element, 'author-name'),
+		publishedAt: childText(element, 'published-at'), updatedAt: childText(element, 'updated-at'),
+	}
+}
+
+function parseBlogPost(element: ParentNode): BlogPost {
+	return {
+		...parseBlogSummary(element), content: childContent(element, 'content'),
+		authorAccountId: childText(element, 'author-account-id'), createdAt: childText(element, 'created-at'),
+	}
+}
+
+export async function getBlogPosts(locale: 'en' | 'ko'): Promise<BlogPostSummary[]> {
+	const xml = await getXml(`/api/v1/blog/posts?locale=${locale}`)
+	return Array.from(xml.documentElement.children).filter((item) => item.localName === 'post').map(parseBlogSummary)
+}
+
+export async function getBlogPost(slug: string): Promise<BlogPost> {
+	return parseBlogPost((await getXml(`/api/v1/blog/posts/${encodeURIComponent(slug)}`)).documentElement)
+}
+
+export async function getAdminBlogPosts(): Promise<BlogPostSummary[]> {
+	const xml = await getXml('/api/v1/admin/blog/posts')
+	return Array.from(xml.documentElement.children).filter((item) => item.localName === 'post').map(parseBlogSummary)
+}
+
+export async function getAdminBlogPost(slug: string): Promise<BlogPost> {
+	return parseBlogPost((await getXml(`/api/v1/admin/blog/posts/${encodeURIComponent(slug)}`)).documentElement)
+}
+
+export async function saveAdminBlogPost(input: BlogPostInput): Promise<BlogPost> {
+	const xml = await requestXml('/api/v1/admin/blog/posts', 'POST', authDocument('blog-post', {
+		slug: input.slug, locale: input.locale, title: input.title, summary: input.summary, content: input.content, status: input.status,
+	}))
+	if (!xml) throw new Error('The server returned an empty blog response.')
+	return parseBlogPost(xml.documentElement)
 }
 
 function parseDocumentSummary(element: Element): DocumentSummary {

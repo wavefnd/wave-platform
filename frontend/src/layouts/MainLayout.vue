@@ -21,6 +21,7 @@ onMounted(() => auth.initialize())
 const service = computed(() => {
   const path = route.path
   if (path.startsWith('/mail')) return 'mail'
+	if (path.startsWith('/blog')) return 'blog'
   if (path.startsWith('/community')) return 'community'
   if (path.startsWith('/lunastev')) return 'personal'
   if (path.startsWith('/docs')) return 'docs'

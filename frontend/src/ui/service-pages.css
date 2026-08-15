@@ -218,6 +218,8 @@
 .user-profile-header { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 18px; align-items: start; padding: 28px 0; border-bottom: 1px solid var(--wave-border); }
 .user-profile-header h2 { margin: 0 0 3px; font-size: 25px; }
 .user-profile-header a { color: var(--wave-link); }
+.user-profile-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 7px 16px; }
+.user-profile-meta small { padding-left: 16px; border-left: 1px solid var(--wave-border); }
 .user-profile-header p { max-width: 720px; margin: 12px 0 7px; line-height: 1.55; white-space: pre-wrap; }
 .user-profile-header small { color: var(--wave-text-secondary); }
 .user-settings { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 32px; padding: 28px 0; border-bottom: 1px solid var(--wave-border); }
@@ -700,6 +702,8 @@
 }
 
 @media (max-width: 600px) {
+	.user-profile-meta { align-items: flex-start; flex-direction: column; gap: 5px; }
+	.user-profile-meta small { padding-left: 0; border-left: 0; }
   .portal-home { padding-top: 24px; }
   .portal-data-list li { grid-template-columns: minmax(0, 1fr); gap: 3px; }
   .terminal-command { white-space: pre-wrap; overflow-wrap: anywhere; }

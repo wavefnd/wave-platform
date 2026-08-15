@@ -9,19 +9,20 @@ import {
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
-  ArrowLeft, Boxes, Database, FileClock, Gauge, GitBranch, MailWarning, Menu, RefreshCw,
+  ArrowLeft, Boxes, Database, FileClock, FileText, Gauge, GitBranch, MailWarning, Menu, RefreshCw,
   Search, ShieldCheck, Users,
 } from '@lucide/vue'
 
 import {
   getAdminSnapshot, getManagementMailbox, getManagementMailMessage, getModules, getPlatformStatus,
-  updateAdminAccountRole, updateAdminAccountStatus, updateLunaStevTimeZone,
-  type AdminAccount, type AdminSnapshot, type MailboxView, type MailMessageView, type ModuleStatus, type PlatformStatus,
+  getAdminBlogPost, getAdminBlogPosts, saveAdminBlogPost, updateAdminAccountRole, updateAdminAccountStatus, updateLunaStevTimeZone,
+  type AdminAccount, type AdminSnapshot, type BlogPostInput, type BlogPostSummary, type MailboxView, type MailMessageView, type ModuleStatus, type PlatformStatus,
 } from '../services/http'
 import { useI18n } from '../i18n'
 import type { Locale } from '../i18n'
 import { useAuthStore } from '../stores/auth'
 import ThemeSelector from '../components/platform/ThemeSelector.vue'
+import MarkdownContent from '../components/MarkdownContent.vue'
 
 type PendingAction = { kind: 'status'; account: AdminAccount; status: 'active' | 'suspended' }
   | { kind: 'role'; account: AdminAccount; administrator: boolean }
@@ -37,12 +38,18 @@ const error = ref('')
 const actionError = ref('')
 const loading = ref(true)
 const actionLoading = ref(false)
-const sidebarVisible = ref(window.innerWidth >= 992)
+let desktopLayout = window.innerWidth >= 992
+const sidebarVisible = ref(desktopLayout)
 const accountQuery = ref('')
 const pendingAction = ref<PendingAction | null>(null)
 const managementMailbox = ref<MailboxView | null>(null)
 const managementMessage = ref<MailMessageView | null>(null)
 const lunaStevTimeZone = ref('Asia/Seoul')
+const blogPosts = ref<BlogPostSummary[]>([])
+const blogSaving = ref(false)
+const blogNotice = ref('')
+const editingBlogSlug = ref('')
+const blogForm = ref<BlogPostInput>({ slug: '', locale: 'en', title: '', summary: '', content: '', status: 'draft' })
 const timeZones = ['Asia/Seoul', 'UTC', 'Asia/Tokyo', 'Asia/Singapore', 'Europe/London', 'Europe/Paris', 'America/New_York', 'America/Los_Angeles']
 let stylesheet: HTMLLinkElement | null = null
 
@@ -55,7 +62,7 @@ const accounts = computed(() => {
 const mailAttention = computed(() => (snapshot.value?.mail.queued ?? 0) + (snapshot.value?.mail.delivering ?? 0)
   + (snapshot.value?.mail.deferred ?? 0) + (snapshot.value?.mail.failed ?? 0))
 const section = computed(() => String(route.params.section ?? route.meta.adminSection ?? 'overview'))
-const sectionTitle = computed(() => t(({ overview: 'admin.overview', accounts: 'admin.accounts', mailbox: 'admin.managementMailbox',
+const sectionTitle = computed(() => t(({ overview: 'admin.overview', blog: 'admin.blog', accounts: 'admin.accounts', mailbox: 'admin.managementMailbox',
   'mail-queue': 'admin.mailQueue', 'git-mirrors': 'admin.gitMirrors', 'audit-log': 'admin.auditLog', security: 'admin.security',
   modules: 'admin.modules', system: 'admin.system' } as Record<string, string>)[section.value] ?? 'admin.overview'))
 
@@ -66,14 +73,32 @@ onMounted(async () => {
   stylesheet.dataset.waveAdminStyles = 'coreui'
   document.head.append(stylesheet)
   document.body.classList.add('coreui-admin-active')
+	window.addEventListener('resize', syncSidebar)
   await load()
 })
-watch(() => route.fullPath, load)
+watch(section, async () => {
+	error.value = ''
+	actionError.value = ''
+	blogNotice.value = ''
+	managementMessage.value = null
+	pendingAction.value = null
+	if (window.innerWidth < 992) sidebarVisible.value = false
+	try { await loadSection() }
+	catch (reason) { error.value = reason instanceof Error ? reason.message : t('common.loadError') }
+})
 
 onBeforeUnmount(() => {
   stylesheet?.remove()
   document.body.classList.remove('coreui-admin-active')
+	window.removeEventListener('resize', syncSidebar)
 })
+
+function syncSidebar() {
+	const nextDesktopLayout = window.innerWidth >= 992
+	if (nextDesktopLayout === desktopLayout) return
+	desktopLayout = nextDesktopLayout
+	sidebarVisible.value = nextDesktopLayout
+}
 
 async function load() {
   loading.value = true
@@ -86,12 +111,53 @@ async function load() {
     snapshot.value = snapshotResult
 	lunaStevTimeZone.value = snapshotResult.lunaStevTimeZone
     platform.value = platformResult
-	if (section.value === 'mailbox') managementMailbox.value = await getManagementMailbox()
+	await loadSection()
   } catch (reason) {
     error.value = reason instanceof Error ? reason.message : t('common.loadError')
   } finally {
     loading.value = false
   }
+}
+
+async function loadSection() {
+	if (section.value === 'mailbox') managementMailbox.value = await getManagementMailbox()
+	if (section.value === 'blog') blogPosts.value = await getAdminBlogPosts()
+}
+
+function newBlogPost() {
+	editingBlogSlug.value = ''
+	blogNotice.value = ''
+	actionError.value = ''
+	blogForm.value = { slug: '', locale: locale.value, title: '', summary: '', content: '', status: 'draft' }
+}
+
+async function editBlogPost(slug: string) {
+	actionError.value = ''
+	blogNotice.value = ''
+	try {
+		const item = await getAdminBlogPost(slug)
+		editingBlogSlug.value = item.slug
+		blogForm.value = { slug: item.slug, locale: item.locale, title: item.title, summary: item.summary, content: item.content, status: item.status || 'draft' }
+	} catch (reason) {
+		actionError.value = reason instanceof Error ? reason.message : t('common.loadError')
+	}
+}
+
+async function saveBlogPost() {
+	blogSaving.value = true
+	actionError.value = ''
+	blogNotice.value = ''
+	try {
+		const saved = await saveAdminBlogPost(blogForm.value)
+		editingBlogSlug.value = saved.slug
+		blogForm.value = { slug: saved.slug, locale: saved.locale, title: saved.title, summary: saved.summary, content: saved.content, status: saved.status || 'draft' }
+		blogPosts.value = await getAdminBlogPosts()
+		blogNotice.value = t('admin.blogSaved')
+	} catch (reason) {
+		actionError.value = reason instanceof Error ? reason.message : t('admin.actionFailed')
+	} finally {
+		blogSaving.value = false
+	}
 }
 
 async function saveLunaStevTimeZone() {
@@ -170,6 +236,7 @@ function changeLocale(event: Event) {
       <CSidebarNav>
         <CNavItem><RouterLink class="nav-link" :class="{ active: section === 'overview' }" to="/admin"><Gauge class="nav-icon" :size="20" />{{ t('admin.overview') }}</RouterLink></CNavItem>
         <CNavTitle>{{ t('admin.management') }}</CNavTitle>
+		<CNavItem><RouterLink class="nav-link" :class="{ active: section === 'blog' }" to="/admin/blog"><FileText class="nav-icon" :size="20" />{{ t('admin.blog') }}</RouterLink></CNavItem>
         <CNavItem><RouterLink class="nav-link" :class="{ active: section === 'accounts' }" to="/admin/accounts"><Users class="nav-icon" :size="20" />{{ t('admin.accounts') }}</RouterLink></CNavItem>
         <CNavItem><RouterLink class="nav-link" :class="{ active: section === 'mailbox' }" to="/admin/mailbox"><MailWarning class="nav-icon" :size="20" />{{ t('admin.managementMailbox') }}</RouterLink></CNavItem>
         <CNavItem><RouterLink class="nav-link" :class="{ active: section === 'mail-queue' }" to="/admin/mail-queue"><MailWarning class="nav-icon" :size="20" />{{ t('admin.mailQueue') }}</RouterLink></CNavItem>
@@ -220,6 +287,38 @@ function changeLocale(event: Event) {
               <CCol><CCard class="h-100"><CCardBody><div class="text-body-secondary small">{{ t('admin.gitMirrors') }}</div><div class="fs-3 fw-semibold">{{ snapshot.gitMirrors.filter((item) => item.status === 'ready').length }} / {{ snapshot.gitMirrors.length }}</div><small class="text-body-secondary">{{ t('admin.ready') }}</small></CCardBody></CCard></CCol>
               <CCol><CCard class="h-100"><CCardBody><div class="text-body-secondary small">{{ t('admin.storageUsed') }}</div><div class="fs-3 fw-semibold">{{ formatBytes(snapshot.storage.filesBytes) }}</div><small class="text-body-secondary">{{ snapshot.storage.health }}</small></CCardBody></CCard></CCol>
             </CRow>
+
+			<CCard v-if="section === 'blog'" class="mb-4">
+			  <CCardHeader class="admin-card-header">
+				<div><strong>{{ t('admin.blogPosts') }}</strong><div class="text-body-secondary small">{{ t('admin.blogHelp') }}</div></div>
+				<CButton color="primary" size="sm" @click="newBlogPost">{{ t('admin.newPost') }}</CButton>
+			  </CCardHeader>
+			  <CCardBody class="p-0">
+				<div class="admin-blog-layout">
+				  <aside class="admin-blog-list">
+					<button v-for="post in blogPosts" :key="post.slug" type="button" :class="{ active: editingBlogSlug === post.slug }" @click="editBlogPost(post.slug)">
+					  <span><strong>{{ post.title }}</strong><small>{{ post.locale.toUpperCase() }} · {{ post.status === 'published' ? t('admin.published') : t('admin.draft') }}</small></span>
+					  <time :datetime="post.updatedAt">{{ formatDate(post.updatedAt) }}</time>
+					</button>
+					<p v-if="blogPosts.length === 0" class="text-body-secondary small p-3 mb-0">{{ t('admin.noBlogPosts') }}</p>
+				  </aside>
+				  <form class="admin-blog-editor" @submit.prevent="saveBlogPost">
+					<h2 class="h5">{{ editingBlogSlug ? t('admin.editPost') : t('admin.newPost') }}</h2>
+					<div class="admin-blog-fields">
+					  <label>{{ t('admin.blogSlug') }}<input v-model="blogForm.slug" class="form-control" required maxlength="120" pattern="[a-z0-9]+(?:-[a-z0-9]+)*" :readonly="Boolean(editingBlogSlug)" /></label>
+					  <label>{{ t('admin.blogLocale') }}<select v-model="blogForm.locale" class="form-select"><option value="en">English</option><option value="ko">한국어</option></select></label>
+					  <label class="wide">{{ t('admin.blogTitle') }}<input v-model="blogForm.title" class="form-control" required maxlength="160" /></label>
+					  <label class="wide">{{ t('admin.blogSummary') }}<textarea v-model="blogForm.summary" class="form-control" required maxlength="500" rows="3" /></label>
+					  <label class="wide">{{ t('admin.blogContent') }}<textarea v-model="blogForm.content" class="form-control admin-blog-content" required rows="18" /></label>
+					  <label>{{ t('admin.blogStatus') }}<select v-model="blogForm.status" class="form-select"><option value="draft">{{ t('admin.draft') }}</option><option value="published">{{ t('admin.published') }}</option></select></label>
+					</div>
+					<div class="d-flex align-items-center gap-3"><CButton color="primary" type="submit" :disabled="blogSaving">{{ t('common.save') }}</CButton><span v-if="blogNotice" class="text-success small" role="status">{{ blogNotice }}</span></div>
+					<div v-if="actionError" class="alert alert-danger mt-3 mb-0" role="alert">{{ actionError }}</div>
+					<section v-if="blogForm.content" class="admin-blog-preview"><h3 class="h6">{{ t('admin.blogPreview') }}</h3><MarkdownContent :source="blogForm.content" /></section>
+				  </form>
+				</div>
+			  </CCardBody>
+			</CCard>
 
             <CCard v-if="section === 'accounts'" class="mb-4">
               <CCardHeader class="admin-card-header">
@@ -329,7 +428,21 @@ body.coreui-admin-active { background-color: var(--cui-tertiary-bg); }
 .admin-timezone-setting { max-width: 520px; margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--cui-border-color); }
 .admin-timezone-setting label { display: grid; gap: 7px; font-weight: 600; }
 .admin-mail-body { max-height: 52vh; overflow: auto; margin: 20px 0 0; padding: 16px; border: 1px solid var(--cui-border-color); background: var(--cui-tertiary-bg); color: var(--cui-body-color); font: 13px/1.6 ui-monospace, monospace; white-space: pre-wrap; }
+.admin-blog-layout { display: grid; grid-template-columns: minmax(240px, 320px) minmax(0, 1fr); min-height: 620px; }
+.admin-blog-list { border-right: 1px solid var(--cui-border-color); }
+.admin-blog-list > button { display: grid; width: 100%; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; padding: 13px 16px; border: 0; border-bottom: 1px solid var(--cui-border-color); background: transparent; color: var(--cui-body-color); text-align: left; }
+.admin-blog-list > button:hover, .admin-blog-list > button.active { background: var(--cui-tertiary-bg); }
+.admin-blog-list span, .admin-blog-list strong, .admin-blog-list small { display: block; min-width: 0; }
+.admin-blog-list strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.admin-blog-list small, .admin-blog-list time { margin-top: 3px; color: var(--cui-secondary-color); font-size: .72rem; }
+.admin-blog-editor { min-width: 0; padding: 22px 24px 32px; }
+.admin-blog-fields { display: grid; grid-template-columns: minmax(0, 2fr) minmax(150px, 1fr); gap: 16px; margin: 18px 0; }
+.admin-blog-fields label { display: grid; align-content: start; gap: 6px; font-size: .82rem; font-weight: 600; }
+.admin-blog-fields .wide { grid-column: 1 / -1; }
+.admin-blog-content { min-height: 340px; font: 13px/1.55 ui-monospace, SFMono-Regular, Consolas, monospace; resize: vertical; }
+.admin-blog-preview { margin-top: 28px; padding-top: 20px; border-top: 1px solid var(--cui-border-color); }
+.admin-blog-preview .markdown-content { max-width: 820px; }
 @media (max-width: 991.98px) { .coreui-admin-template .wrapper { padding-inline-start: 0; } }
-@media (max-width: 767.98px) { .admin-card-header { align-items: stretch; flex-direction: column; }.admin-search { width: 100%; }.admin-heading { align-items: flex-start; }.coreui-admin-template .container-fluid { padding-right: 16px !important; padding-left: 16px !important; }.admin-preference-select { max-width: 96px; }.coreui-admin-template .header .gap-3 { gap: .4rem !important; } }
+@media (max-width: 767.98px) { .admin-card-header { align-items: stretch; flex-direction: column; }.admin-search { width: 100%; }.admin-heading { align-items: flex-start; }.coreui-admin-template .container-fluid { padding-right: 16px !important; padding-left: 16px !important; }.admin-preference-select { max-width: 96px; }.coreui-admin-template .header .gap-3 { gap: .4rem !important; }.admin-blog-layout { grid-template-columns: 1fr; }.admin-blog-list { max-height: 260px; overflow-y: auto; border-right: 0; border-bottom: 1px solid var(--cui-border-color); }.admin-blog-fields { grid-template-columns: 1fr; }.admin-blog-fields .wide { grid-column: auto; }.admin-blog-editor { padding: 18px 16px 26px; } }
 @media (max-width: 480px) { .coreui-admin-template .header strong { display: none; }.admin-preference-select { max-width: 88px; } }
 </style>

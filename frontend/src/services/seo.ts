@@ -5,6 +5,7 @@ import type { Locale } from '../i18n'
 const descriptions = {
   en: {
     portal: 'The official home for the Wave programming language, documentation, releases, community, questions, source, and mail.',
+	blog: 'Official Wave programming language news, engineering updates, and release articles.',
     docs: 'Official Wave programming language guides and reference documentation.',
     community: 'Wave programming language community posts and technical discussions.',
     questions: 'Technical questions and answers about the Wave programming language.',
@@ -13,6 +14,7 @@ const descriptions = {
   },
   ko: {
     portal: 'Wave 프로그래밍 언어의 공식 문서, 릴리즈, 커뮤니티, 질문, 소스와 메일을 제공하는 플랫폼입니다.',
+	blog: 'Wave 프로그래밍 언어의 공식 소식, 개발 이야기와 릴리즈 글입니다.',
     docs: 'Wave 프로그래밍 언어의 공식 안내서와 레퍼런스 문서입니다.',
     community: 'Wave 프로그래밍 언어 커뮤니티 글과 기술 토론입니다.',
     questions: 'Wave 프로그래밍 언어에 관한 기술 질문과 답변입니다.',
@@ -21,7 +23,7 @@ const descriptions = {
   },
 } as const
 
-const labels = { portal: 'Wave', docs: 'Documentation', community: 'Community', questions: 'Questions', source: 'Source', mail: 'Mail', account: 'Account', admin: 'Administration', personal: 'LunaStev' } as const
+const labels = { portal: 'Wave', blog: 'Blog', docs: 'Documentation', community: 'Community', questions: 'Questions', source: 'Source', mail: 'Mail', account: 'Account', admin: 'Administration', personal: 'LunaStev' } as const
 type Service = keyof typeof labels
 
 const nonIndexableRoutes = new Set([
@@ -52,7 +54,8 @@ function upsertLink(selector: string, attributes: Record<string, string>) {
 
 function schemaType(service: Service, detail: boolean): string {
   if (service === 'docs') return detail ? 'TechArticle' : 'CollectionPage'
-  if (service === 'source') return detail ? 'SoftwareSourceCode' : 'CollectionPage'
+	if (service === 'source') return detail ? 'SoftwareSourceCode' : 'CollectionPage'
+	if (service === 'blog') return detail ? 'BlogPosting' : 'CollectionPage'
   if (['community', 'questions', 'personal'].includes(service)) return detail ? 'WebPage' : 'CollectionPage'
   return 'WebPage'
 }

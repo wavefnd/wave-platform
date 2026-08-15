@@ -93,7 +93,7 @@ watch(() => route.fullPath, load)
     <template v-else-if="profile">
       <section class="user-profile-header">
         <span class="user-avatar large">{{ Array.from(profile.displayName)[0]?.toUpperCase() ?? 'W' }}</span>
-        <div><h2>{{ profile.displayName }}</h2><a :href="`mailto:${profile.email}`">{{ profile.email }}</a><p v-if="profile.bio">{{ profile.bio }}</p><small>{{ t('user.joined') }} {{ formatDate(profile.joinedAt) }}</small></div>
+        <div><h2>{{ profile.displayName }}</h2><div class="user-profile-meta"><a :href="`mailto:${profile.email}`">{{ profile.email }}</a><small>{{ t('user.joined') }} {{ formatDate(profile.joinedAt) }}</small></div><p v-if="profile.bio">{{ profile.bio }}</p></div>
         <button v-if="ownProfile" class="ui-button" type="button" @click="editing = !editing">{{ t('user.editProfile') }}</button>
       </section>
 

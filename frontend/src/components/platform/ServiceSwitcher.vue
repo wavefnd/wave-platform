@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { BookOpenText, CircleHelp, GitFork, Grid2X2, Mail, MessagesSquare, NotebookPen, ShieldCheck } from '@lucide/vue'
+import { BookOpenText, CircleHelp, GitFork, Grid2X2, Mail, MessagesSquare, Newspaper, NotebookPen, ShieldCheck } from '@lucide/vue'
 
 import { useI18n } from '../../i18n'
 import { useAuthStore } from '../../stores/auth'
@@ -11,6 +11,7 @@ const auth = useAuthStore()
 
 const publicServices = [
   { to: '/', key: 'nav.home', icon: Grid2X2 },
+	{ to: '/blog', key: 'nav.blog', icon: Newspaper },
   { to: '/mail', key: 'nav.mail', icon: Mail },
   { to: '/community', key: 'nav.community', icon: MessagesSquare },
   { to: '/lunastev', key: 'nav.personal', icon: NotebookPen },

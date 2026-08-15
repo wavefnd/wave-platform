@@ -1,18 +1,41 @@
 <script setup lang="ts">
+import { ChevronDown } from '@lucide/vue'
+import { onBeforeUnmount, onMounted, ref } from 'vue'
+
 import { useI18n, type Locale } from '../../i18n'
 import { useAuthStore } from '../../stores/auth'
 import ThemeSelector from './ThemeSelector.vue'
 
 const { locale, setLocale, t } = useI18n()
 const auth = useAuthStore()
+const accountMenu = ref<HTMLElement | null>(null)
+const menuOpen = ref(false)
 
 function changeLocale(event: Event) {
   setLocale((event.target as HTMLSelectElement).value as Locale)
 }
 
 async function signOut() {
+	menuOpen.value = false
 	await auth.signOut()
 }
+
+function closeFromOutside(event: PointerEvent) {
+	if (menuOpen.value && !accountMenu.value?.contains(event.target as Node)) menuOpen.value = false
+}
+
+function closeFromEscape(event: KeyboardEvent) {
+	if (event.key === 'Escape') menuOpen.value = false
+}
+
+onMounted(() => {
+	document.addEventListener('pointerdown', closeFromOutside)
+	document.addEventListener('keydown', closeFromEscape)
+})
+onBeforeUnmount(() => {
+	document.removeEventListener('pointerdown', closeFromOutside)
+	document.removeEventListener('keydown', closeFromEscape)
+})
 </script>
 
 <template>
@@ -23,10 +46,16 @@ async function signOut() {
       <option value="ko">한국어</option>
     </select>
     <template v-if="auth.account">
-      <span class="account-address" :title="auth.account.email">{{ auth.account.displayName }}</span>
-	  <RouterLink :to="`/user/${encodeURIComponent(auth.account.username)}`">{{ t('user.profile') }}</RouterLink>
-	  <RouterLink to="/account/security">{{ t('auth.settings') }}</RouterLink>
-      <button class="account-signout" type="button" :disabled="auth.loading" @click="signOut">{{ t('auth.signOut') }}</button>
+	  <div ref="accountMenu" class="account-menu">
+		<button class="account-menu-trigger" type="button" :aria-expanded="menuOpen" aria-haspopup="menu" @click="menuOpen = !menuOpen">
+		  <span :title="auth.account.email">{{ auth.account.displayName }}</span><ChevronDown :size="14" aria-hidden="true" />
+		</button>
+		<div v-if="menuOpen" class="account-menu-panel" role="menu">
+		  <RouterLink role="menuitem" :to="`/user/${encodeURIComponent(auth.account.username)}`" @click="menuOpen = false">{{ t('user.profile') }}</RouterLink>
+		  <RouterLink role="menuitem" to="/account/security" @click="menuOpen = false">{{ t('auth.settings') }}</RouterLink>
+		  <button class="account-signout" role="menuitem" type="button" :disabled="auth.loading" @click="signOut">{{ t('auth.signOut') }}</button>
+		</div>
+	  </div>
     </template>
     <template v-else>
       <RouterLink to="/login">{{ t('auth.signIn') }}</RouterLink>
