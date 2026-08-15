@@ -38,7 +38,7 @@ func TestBlogAdministrationRequiresAdministratorAndPublishes(t *testing.T) {
 		t.Fatal(err)
 	}
 	handler := BlogHandler{Service: blogdomain.NewService(database), Auth: &AuthHandler{Service: identityService}}
-	body := `<blog-post xmlns="https://wave-lang.dev/ns/platform/api/v1"><slug>wave-release</slug><locale>en</locale><title>Wave release</title><summary>Release summary</summary><content>## Ready</content><status>published</status></blog-post>`
+	body := `<blog-post xmlns="https://wave-lang.dev/ns/platform/api/v1"><slug>wave-release</slug><locale>en</locale><category>release</category><title>Wave release</title><summary>Release summary</summary><content>## Ready</content><status>published</status></blog-post>`
 	for _, test := range []struct {
 		name, token string
 		status      int

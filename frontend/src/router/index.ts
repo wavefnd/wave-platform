@@ -8,7 +8,6 @@ import BlogPage from '../pages/BlogPage.vue'
 import MailPage from '../pages/MailPage.vue'
 import NotFoundPage from '../pages/NotFoundPage.vue'
 import QuestionsPage from '../pages/QuestionsPage.vue'
-import ReleasePage from '../pages/ReleasePage.vue'
 import SearchPage from '../pages/SearchPage.vue'
 import SourcePage from '../pages/SourcePage.vue'
 import { useAuthStore } from '../stores/auth'
@@ -36,8 +35,8 @@ const router = createRouter({
         { path: 'lunastev', name: 'personal-space', component: CommunityPage, meta: { personalSpace: true } },
         { path: 'lunastev/new', name: 'personal-space-new', component: CommunityPage, meta: { personalSpace: true } },
         { path: 'lunastev/thread/:thread', name: 'personal-space-thread', component: CommunityPage, meta: { personalSpace: true } },
-        { path: 'releases/:slug', name: 'release', component: ReleasePage },
-        { path: 'community/announcements/:slug', redirect: (to) => `/releases/${String(to.params.slug)}` },
+		{ path: 'releases/:slug', redirect: (to) => `/blog/${String(to.params.slug)}` },
+		{ path: 'community/announcements/:slug', redirect: (to) => `/blog/${String(to.params.slug)}` },
         { path: 'questions', name: 'questions', component: QuestionsPage },
         { path: 'questions/new', name: 'question-new', component: QuestionsPage },
         { path: 'questions/:question', name: 'question-detail', component: QuestionsPage },

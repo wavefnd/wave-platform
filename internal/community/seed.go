@@ -5,15 +5,14 @@ import (
 	"embed"
 	"encoding/hex"
 	"encoding/xml"
+	"errors"
 	"fmt"
-	"net/textproto"
 	"path/filepath"
 	"regexp"
 	"strings"
 	"time"
 
-	maildomain "github.com/wavefnd/wave-platform/internal/mail"
-	releasedomain "github.com/wavefnd/wave-platform/internal/release"
+	blogdomain "github.com/wavefnd/wave-platform/internal/blog"
 	"github.com/wavefnd/wave-platform/internal/storage"
 )
 
@@ -45,14 +44,14 @@ func SeedSpaces(database *storage.Database) error {
 	return nil
 }
 
-func SeedLanguageReleases(database *storage.Database) (int, error) {
+func SeedReleaseBlogPosts(database *storage.Database) (int, error) {
 	entries, err := releasePosts.ReadDir("seed/posts")
 	if err != nil {
 		return 0, fmt.Errorf("read embedded release posts: %w", err)
 	}
 
 	hash := sha256.New()
-	releases := make([]releasedomain.Release, 0, len(entries))
+	posts := make([]blogdomain.Post, 0, len(entries))
 	for _, entry := range entries {
 		if entry.IsDir() || filepath.Ext(entry.Name()) != ".md" {
 			continue
@@ -68,36 +67,29 @@ func SeedLanguageReleases(database *storage.Database) (int, error) {
 		if err != nil {
 			return 0, err
 		}
-		releases = append(releases, item)
+		posts = append(posts, item)
 	}
 
 	marker := storage.Key(
-		"meta", "import", "wave-blog", "language-releases-v2",
+		"meta", "import", "wave-blog", "release-blog-posts-v1",
 		hex.EncodeToString(hash.Sum(nil)),
 	)
 	if _, err := database.Get(marker); err == nil {
 		return 0, nil
 	}
 
-	repository := releasedomain.NewRepository(database)
-	mailRepository := maildomain.NewRepository(database)
-	for _, item := range releases {
-		published, err := time.Parse(time.RFC3339, item.PublishedAt)
-		if err != nil {
-			return 0, fmt.Errorf("parse normalized release time: %w", err)
-		}
-		raw := releaseMailMessage(item, published)
-		if err := mailRepository.UpsertMessage(maildomain.Message{
-			ID: item.MessageID, MessageID: "<" + item.Slug + "@wave-lang.dev>",
-			ThreadID: item.MessageID, From: "Wave Foundation <release@wave-lang.dev>",
-			To: []string{"releases@wave-lang.dev"}, Subject: item.Title,
-			ReceivedAt: published, CreatedAt: published,
-		}, raw); err != nil {
+	repository := blogdomain.NewRepository(database)
+	imported := 0
+	for _, item := range posts {
+		if _, err := repository.Post(item.Slug, true); err == nil {
+			continue
+		} else if !errors.Is(err, storage.ErrNotFound) {
 			return 0, err
 		}
 		if err := repository.Upsert(item); err != nil {
 			return 0, err
 		}
+		imported++
 	}
 	legacyKeys := make([][]byte, 0)
 	if err := database.Scan(storage.Prefix("community", "announcement", "object"), func(key, value []byte) error {
@@ -120,29 +112,29 @@ func SeedLanguageReleases(database *storage.Database) (int, error) {
 		return 0, err
 	}
 
-	return len(releases), nil
+	return imported, nil
 }
 
-func parseReleasePost(filename, source string) (releasedomain.Release, error) {
+func parseReleasePost(filename, source string) (blogdomain.Post, error) {
 	if strings.Contains(strings.ToLower(filename), "patch") {
-		return releasedomain.Release{}, fmt.Errorf("patch post is not a release: %s", filename)
+		return blogdomain.Post{}, fmt.Errorf("patch post is not a release: %s", filename)
 	}
 
 	normalized := strings.ReplaceAll(source, "\r\n", "\n")
 	if !strings.HasPrefix(normalized, "---\n") {
-		return releasedomain.Release{}, fmt.Errorf("invalid front matter: %s", filename)
+		return blogdomain.Post{}, fmt.Errorf("invalid front matter: %s", filename)
 	}
 	remainder := strings.TrimPrefix(normalized, "---\n")
 	separator := strings.Index(remainder, "\n---\n")
 	if separator < 0 {
-		return releasedomain.Release{}, fmt.Errorf("invalid front matter: %s", filename)
+		return blogdomain.Post{}, fmt.Errorf("invalid front matter: %s", filename)
 	}
 
 	metadata := remainder[:separator]
 	body := strings.TrimSpace(remainder[separator+5:])
 	title := frontMatterValue(metadata, "title")
 	if !releaseTitlePattern.MatchString(title) {
-		return releasedomain.Release{}, fmt.Errorf("post is not a version release: %s", filename)
+		return blogdomain.Post{}, fmt.Errorf("post is not a version release: %s", filename)
 	}
 
 	published, err := time.ParseInLocation(
@@ -151,7 +143,7 @@ func parseReleasePost(filename, source string) (releasedomain.Release, error) {
 		time.FixedZone("Asia/Seoul", 9*60*60),
 	)
 	if err != nil {
-		return releasedomain.Release{}, fmt.Errorf("parse release date %q: %w", filename, err)
+		return blogdomain.Post{}, fmt.Errorf("parse release date %q: %w", filename, err)
 	}
 
 	slug := strings.TrimSuffix(filename, filepath.Ext(filename))
@@ -163,48 +155,19 @@ func parseReleasePost(filename, source string) (releasedomain.Release, error) {
 	if summary == "" {
 		summary = firstParagraph(body)
 	}
-	sourceName := frontMatterValue(metadata, "source")
-	idPrefix := "wave-blog"
-	if sourceName == "" {
-		sourceName = "github.com/LunaStev/wave-blog"
-	} else {
-		idPrefix = "wave-release"
-	}
-
-	return releasedomain.Release{
-		ID:          idPrefix + "/" + slug,
+	return blogdomain.Post{
 		Slug:        slug,
+		Locale:      "en",
+		Category:    "release",
 		Title:       title,
-		PublishedAt: published.Format(time.RFC3339),
 		Summary:     summary,
-		MessageID:   idPrefix + "/" + slug,
 		Content:     body,
-		Source:      sourceName,
+		Status:      "published",
+		AuthorName:  "Wave Foundation",
+		PublishedAt: published.Format(time.RFC3339),
+		CreatedAt:   published.UTC(),
+		UpdatedAt:   published.UTC(),
 	}, nil
-}
-
-func releaseMailMessage(item releasedomain.Release, published time.Time) []byte {
-	headers := textproto.MIMEHeader{}
-	headers.Set("From", "Wave Foundation <release@wave-lang.dev>")
-	headers.Set("To", "releases@wave-lang.dev")
-	headers.Set("Subject", item.Title)
-	headers.Set("Date", published.Format(time.RFC1123Z))
-	headers.Set("Message-ID", "<"+item.Slug+"@wave-lang.dev>")
-	headers.Set("MIME-Version", "1.0")
-	headers.Set("Content-Type", "text/markdown; charset=utf-8")
-	headers.Set("Content-Transfer-Encoding", "8bit")
-
-	order := []string{"From", "To", "Subject", "Date", "Message-ID", "MIME-Version", "Content-Type", "Content-Transfer-Encoding"}
-	var message strings.Builder
-	for _, name := range order {
-		message.WriteString(name)
-		message.WriteString(": ")
-		message.WriteString(headers.Get(name))
-		message.WriteString("\r\n")
-	}
-	message.WriteString("\r\n")
-	message.WriteString(item.Content)
-	return []byte(message.String())
 }
 
 func frontMatterValue(metadata, key string) string {

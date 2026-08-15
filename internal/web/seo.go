@@ -14,7 +14,6 @@ import (
 	communitydomain "github.com/wavefnd/wave-platform/internal/community"
 	documentdomain "github.com/wavefnd/wave-platform/internal/document"
 	questiondomain "github.com/wavefnd/wave-platform/internal/question"
-	releasedomain "github.com/wavefnd/wave-platform/internal/release"
 )
 
 type sitemapURL struct {
@@ -31,7 +30,6 @@ type sitemapURLSet struct {
 type SEOHandler struct {
 	publicURL string
 	documents *documentdomain.Repository
-	releases  *releasedomain.Repository
 	blog      *blogdomain.Service
 	community *communitydomain.Repository
 	questions *questiondomain.Repository
@@ -49,14 +47,13 @@ type pageMetadata struct {
 func NewSEOHandler(
 	publicURL string,
 	documents *documentdomain.Repository,
-	releases *releasedomain.Repository,
 	blog *blogdomain.Service,
 	community *communitydomain.Repository,
 	questions *questiondomain.Repository,
 ) SEOHandler {
 	return SEOHandler{
 		publicURL: strings.TrimRight(publicURL, "/"), documents: documents,
-		releases: releases, blog: blog, community: community, questions: questions,
+		blog: blog, community: community, questions: questions,
 	}
 }
 
@@ -84,13 +81,6 @@ func (handler SEOHandler) Sitemap(writer http.ResponseWriter, request *http.Requ
 		if documents, err := handler.documents.Summaries("en"); err == nil {
 			for _, document := range documents {
 				entries = append(entries, sitemapURL{Location: handler.location(base, "docs", document.Path)})
-			}
-		}
-	}
-	if handler.releases != nil {
-		if releases, err := handler.releases.Releases(0); err == nil {
-			for _, release := range releases {
-				entries = append(entries, sitemapURL{Location: handler.location(base, "releases", release.Slug), LastModified: dateOnly(release.PublishedAt)})
 			}
 		}
 	}
@@ -188,17 +178,6 @@ func (handler SEOHandler) metadata(requestPath, base string) pageMetadata {
 				metadata.Description = document.Summary.Summary
 				metadata.OpenGraph = "article"
 				metadata.SchemaType = "TechArticle"
-			}
-		}
-	case "releases":
-		metadata.Title = "Release notes · Wave"
-		metadata.Description = "Official Wave programming language release notes."
-		if len(segments) > 1 && handler.releases != nil {
-			if release, err := handler.releases.Release(segments[1]); err == nil {
-				metadata.Title = release.Title + " · Wave"
-				metadata.Description = release.Summary
-				metadata.OpenGraph = "article"
-				metadata.SchemaType = "Article"
 			}
 		}
 	case "blog":

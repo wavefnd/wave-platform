@@ -35,6 +35,7 @@ func (service *Service) Repository() *Repository { return service.repository }
 func (service *Service) Save(actorID string, input Input) (Post, error) {
 	input.Slug = strings.ToLower(strings.TrimSpace(input.Slug))
 	input.Locale = strings.ToLower(strings.TrimSpace(input.Locale))
+	input.Category = NormalizeCategory(input.Category)
 	input.Title = strings.TrimSpace(input.Title)
 	input.Summary = strings.TrimSpace(input.Summary)
 	input.Content = strings.TrimSpace(strings.ReplaceAll(input.Content, "\r\n", "\n"))
@@ -44,6 +45,9 @@ func (service *Service) Save(actorID string, input Input) (Post, error) {
 	}
 	if input.Locale != "en" && input.Locale != "ko" {
 		return Post{}, fmt.Errorf("%w: locale must be en or ko", ErrInvalidPost)
+	}
+	if input.Category != "article" && input.Category != "release" {
+		return Post{}, fmt.Errorf("%w: category must be article or release", ErrInvalidPost)
 	}
 	if len([]rune(input.Title)) < 1 || len([]rune(input.Title)) > 160 {
 		return Post{}, fmt.Errorf("%w: title must contain between 1 and 160 characters", ErrInvalidPost)
@@ -68,7 +72,7 @@ func (service *Service) Save(actorID string, input Input) (Post, error) {
 	} else if err != nil {
 		return Post{}, err
 	}
-	item.Locale, item.Title, item.Summary, item.Content, item.Status = input.Locale, input.Title, input.Summary, input.Content, input.Status
+	item.Locale, item.Category, item.Title, item.Summary, item.Content, item.Status = input.Locale, input.Category, input.Title, input.Summary, input.Content, input.Status
 	item.AuthorAccountID, item.AuthorName, item.UpdatedAt = author.ID, author.DisplayName, now
 	if item.Status == "published" && item.PublishedAt == "" {
 		item.PublishedAt = now.Format(timeLayout)
@@ -80,6 +84,14 @@ func (service *Service) Save(actorID string, input Input) (Post, error) {
 		return Post{}, err
 	}
 	return item, nil
+}
+
+func NormalizeCategory(value string) string {
+	value = strings.ToLower(strings.TrimSpace(value))
+	if value == "" {
+		return "article"
+	}
+	return value
 }
 
 func (service *Service) appendAudit(actorID, slug, action string) error {

@@ -6,19 +6,19 @@ import { useI18n } from '../i18n'
 import {
   getCommunityThreads,
   getCommunitySpaces,
+	getBlogPosts,
   getQuestions,
-  getReleases,
   getSourceRepositories,
 	getSponsors,
   type CommunityThreadSummary,
   type QuestionSummary,
-  type ReleaseSummary,
+	type BlogPostSummary,
 	type SponsorsView,
 } from '../services/http'
 import type { SourceRepository } from '../components/source/types'
 
 const { locale, t } = useI18n()
-const releases = ref<ReleaseSummary[]>([])
+const releases = ref<BlogPostSummary[]>([])
 const discussions = ref<CommunityThreadSummary[]>([])
 const personalPosts = ref<CommunityThreadSummary[]>([])
 const unansweredQuestions = ref<QuestionSummary[]>([])
@@ -66,7 +66,7 @@ async function copyInstall() {
 
 onMounted(async () => {
   const [releaseResult, discussionResult, spaceResult, questionResult, repositoryResult, sponsorResult, personalResult] = await Promise.allSettled([
-    getReleases(4),
+	getBlogPosts(undefined, 'release', 4),
     getCommunityThreads('', { sort: 'active', limit: 5 }),
     getCommunitySpaces(),
     getQuestions({ sort: 'unanswered', limit: 5 }),
@@ -101,10 +101,11 @@ onMounted(async () => {
       <section v-if="releases.length" id="releases" class="portal-module">
         <header>
           <h1>{{ t('home.latestReleases') }}</h1>
+		  <RouterLink to="/blog?category=release">{{ t('common.more') }}</RouterLink>
         </header>
         <ul class="portal-data-list">
           <li v-for="(release, index) in releases" :key="release.slug" :class="{ featured: index === 0 }">
-            <RouterLink :to="`/releases/${release.slug}`" :title="release.title">{{ release.title }}</RouterLink>
+            <RouterLink :to="`/blog/${release.slug}`" :title="release.title">{{ release.title }}</RouterLink>
             <time :datetime="release.publishedAt">{{ formatDate(release.publishedAt) }}</time>
           </li>
         </ul>

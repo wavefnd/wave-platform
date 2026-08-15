@@ -34,18 +34,25 @@ func (repository *Repository) Post(slug string, includeDrafts bool) (Post, error
 	if !includeDrafts && item.Status != "published" {
 		return Post{}, storage.ErrNotFound
 	}
+	item.Category = NormalizeCategory(item.Category)
 	return item, nil
 }
 
 func (repository *Repository) Posts(locale string, includeDrafts bool, limit int) ([]Post, error) {
+	return repository.PostsByCategory(locale, "", includeDrafts, limit)
+}
+
+func (repository *Repository) PostsByCategory(locale, category string, includeDrafts bool, limit int) ([]Post, error) {
 	locale = strings.ToLower(strings.TrimSpace(locale))
+	category = strings.ToLower(strings.TrimSpace(category))
 	items := make([]Post, 0)
 	err := repository.database.Scan(storage.Prefix("blog", "post"), func(_, value []byte) error {
 		var item Post
 		if err := xml.Unmarshal(value, &item); err != nil {
 			return fmt.Errorf("decode blog post: %w", err)
 		}
-		if (!includeDrafts && item.Status != "published") || (locale != "" && item.Locale != locale) {
+		item.Category = NormalizeCategory(item.Category)
+		if (!includeDrafts && item.Status != "published") || (locale != "" && item.Locale != locale) || (category != "" && item.Category != category) {
 			return nil
 		}
 		items = append(items, item)
@@ -74,6 +81,6 @@ func SummaryOf(item Post, includeStatus bool) Summary {
 	if includeStatus {
 		status = item.Status
 	}
-	return Summary{Slug: item.Slug, Locale: item.Locale, Title: item.Title, Summary: item.Summary,
+	return Summary{Slug: item.Slug, Locale: item.Locale, Category: NormalizeCategory(item.Category), Title: item.Title, Summary: item.Summary,
 		Status: status, AuthorName: item.AuthorName, PublishedAt: item.PublishedAt, UpdatedAt: item.UpdatedAt.Format(timeLayout)}
 }

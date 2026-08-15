@@ -15,7 +15,6 @@ import (
 	mediadomain "github.com/wavefnd/wave-platform/internal/media"
 	"github.com/wavefnd/wave-platform/internal/platformstats"
 	questiondomain "github.com/wavefnd/wave-platform/internal/question"
-	releasedomain "github.com/wavefnd/wave-platform/internal/release"
 	"github.com/wavefnd/wave-platform/internal/sponsor"
 	"github.com/wavefnd/wave-platform/internal/web/handler"
 )
@@ -27,7 +26,6 @@ func NewRouter(
 	version string,
 	modules []handler.ModuleStatus,
 	databaseCheck func() error,
-	releaseRepository *releasedomain.Repository,
 	blogService *blogdomain.Service,
 	documentRepository *documentdomain.Repository,
 	communityRepository *communitydomain.Repository,
@@ -49,7 +47,7 @@ func NewRouter(
 	}
 	modulesHandler := handler.ModulesHandler{Modules: modules, Auth: authHandler}
 	healthHandler := handler.HealthHandler{DatabaseCheck: databaseCheck}
-	releasesHandler := handler.ReleasesHandler{Repository: releaseRepository}
+	releasesHandler := handler.ReleasesHandler{Service: blogService}
 	blogHandler := handler.BlogHandler{Service: blogService, Auth: authHandler}
 	documentsHandler := handler.DocumentsHandler{Repository: documentRepository}
 	communityHandler := handler.CommunityHandler{Repository: communityRepository, Service: communityService, Auth: authHandler}
@@ -60,7 +58,7 @@ func NewRouter(
 	sponsorsHandler := handler.SponsorsHandler{Service: sponsor.NewService()}
 	mediaHandler := handler.MediaHandler{Service: mediaService, Auth: authHandler}
 	usersHandler := handler.UsersHandler{Community: communityRepository, Questions: questionRepository, Auth: authHandler}
-	seoHandler := NewSEOHandler(publicURL, documentRepository, releaseRepository, blogService, communityRepository, questionRepository)
+	seoHandler := NewSEOHandler(publicURL, documentRepository, blogService, communityRepository, questionRepository)
 
 	mux.HandleFunc("GET /api/v1/platform", platformHandler.Status)
 	mux.HandleFunc("GET /api/v1/modules", modulesHandler.Status)
@@ -138,6 +136,12 @@ func NewRouter(
 	mux.HandleFunc("GET /health/ready", healthHandler.Ready)
 	mux.HandleFunc("GET /robots.txt", seoHandler.Robots)
 	mux.HandleFunc("GET /sitemap.xml", seoHandler.Sitemap)
+	mux.HandleFunc("GET /releases/{slug}", func(writer http.ResponseWriter, request *http.Request) {
+		http.Redirect(writer, request, "/blog/"+request.PathValue("slug"), http.StatusPermanentRedirect)
+	})
+	mux.HandleFunc("GET /community/announcements/{slug}", func(writer http.ResponseWriter, request *http.Request) {
+		http.Redirect(writer, request, "/blog/"+request.PathValue("slug"), http.StatusPermanentRedirect)
+	})
 
 	mux.Handle("/", frontendHandler(frontendPath, seoHandler))
 

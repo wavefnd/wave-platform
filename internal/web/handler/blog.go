@@ -33,7 +33,12 @@ func (handler BlogHandler) List(writer http.ResponseWriter, request *http.Reques
 		return
 	}
 	limit, _ := strconv.Atoi(request.URL.Query().Get("limit"))
-	items, err := handler.Service.Repository().Posts(locale, false, limit)
+	category := normalizedBlogCategory(request.URL.Query().Get("category"))
+	if request.URL.Query().Get("category") != "" && category == "" {
+		writeAPIError(writer, http.StatusBadRequest, "invalid-category", "Blog category must be article or release.")
+		return
+	}
+	items, err := handler.Service.Repository().PostsByCategory(locale, category, false, limit)
 	if err != nil {
 		writeAPIError(writer, http.StatusInternalServerError, "blog-unavailable", "Blog posts could not be loaded.")
 		return
@@ -141,6 +146,14 @@ func (handler BlogHandler) authorize(writer http.ResponseWriter, request *http.R
 func normalizedBlogLocale(value string) string {
 	value = strings.ToLower(strings.TrimSpace(value))
 	if value == "en" || value == "ko" {
+		return value
+	}
+	return ""
+}
+
+func normalizedBlogCategory(value string) string {
+	value = strings.ToLower(strings.TrimSpace(value))
+	if value == "article" || value == "release" {
 		return value
 	}
 	return ""

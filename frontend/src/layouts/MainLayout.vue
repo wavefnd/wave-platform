@@ -30,7 +30,6 @@ const service = computed(() => {
   if (path.startsWith('/admin')) return 'admin'
 	if (path.startsWith('/user')) return 'account'
 	if (path.startsWith('/account') || path.startsWith('/login') || path.startsWith('/register')) return 'account'
-  if (path.startsWith('/releases')) return 'portal'
   if (path.startsWith('/search')) return 'portal'
   return 'portal'
 })

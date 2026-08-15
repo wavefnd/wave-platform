@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch, watchEffect } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 
 import MarkdownContent from '../components/MarkdownContent.vue'
 import { useI18n } from '../i18n'
@@ -9,12 +9,14 @@ import { applyPageSEO, plainTextDescription } from '../services/seo'
 import UiInlineState from '../ui/UiInlineState.vue'
 
 const route = useRoute()
+const router = useRouter()
 const { locale, t } = useI18n()
 const posts = ref<BlogPostSummary[]>([])
 const post = ref<BlogPost | null>(null)
 const loading = ref(true)
 const error = ref('')
 const detail = computed(() => typeof route.params.slug === 'string' && route.params.slug !== '')
+const category = computed<'article' | 'release' | ''>(() => route.query.category === 'release' || route.query.category === 'article' ? route.query.category : '')
 
 function formatDate(value: string) {
 	if (!value) return ''
@@ -31,7 +33,7 @@ async function load() {
 			post.value = await getBlogPost(String(route.params.slug))
 			posts.value = []
 		} else {
-			posts.value = await getBlogPosts(locale.value)
+			posts.value = await getBlogPosts(category.value === 'release' ? undefined : locale.value, category.value || undefined)
 			post.value = null
 		}
 	} catch (reason) {
@@ -39,6 +41,10 @@ async function load() {
 	} finally {
 		loading.value = false
 	}
+}
+
+function selectCategory(value: 'article' | 'release' | '') {
+	void router.push({ name: 'blog', query: value ? { category: value } : {} })
 }
 
 onMounted(load)
@@ -62,18 +68,23 @@ watchEffect(() => {
 			<h1>{{ t('blog.title') }}</h1>
 			<p>{{ t('blog.lead') }}</p>
 		</header>
+		<nav v-if="!detail" class="blog-categories" :aria-label="t('blog.categories')">
+			<button type="button" :class="{ active: category === '' }" @click="selectCategory('')">{{ t('blog.category.all') }}</button>
+			<button type="button" :class="{ active: category === 'release' }" @click="selectCategory('release')">{{ t('blog.category.release') }}</button>
+			<button type="button" :class="{ active: category === 'article' }" @click="selectCategory('article')">{{ t('blog.category.article') }}</button>
+		</nav>
 		<UiInlineState v-if="loading" :message="t('common.loading')" />
 		<UiInlineState v-else-if="error" :message="error" />
 		<section v-else-if="!detail" class="blog-index">
 			<RouterLink v-for="item in posts" :key="item.slug" :to="`/blog/${encodeURIComponent(item.slug)}`" class="blog-row">
 				<time :datetime="item.publishedAt">{{ formatDate(item.publishedAt) }}</time>
-				<div><h2>{{ item.title }}</h2><p>{{ item.summary }}</p><small>{{ item.authorName }}</small></div>
+				<div><small class="blog-category">{{ t(`blog.category.${item.category}`) }}</small><h2>{{ item.title }}</h2><p>{{ item.summary }}</p><small>{{ item.authorName }} · {{ item.locale.toUpperCase() }}</small></div>
 			</RouterLink>
 			<p v-if="posts.length === 0" class="compact-empty">{{ t('blog.empty') }}</p>
 		</section>
 		<article v-else-if="post" class="blog-article">
 			<RouterLink class="blog-back" to="/blog">← {{ t('blog.back') }}</RouterLink>
-			<header><span>Wave Blog</span><h1>{{ post.title }}</h1><div><time :datetime="post.publishedAt">{{ formatDate(post.publishedAt) }}</time><span>{{ post.authorName }}</span></div><p>{{ post.summary }}</p></header>
+			<header><span>{{ t(`blog.category.${post.category}`) }}</span><h1>{{ post.title }}</h1><div><time :datetime="post.publishedAt">{{ formatDate(post.publishedAt) }}</time><span>{{ post.authorName }}</span></div><p>{{ post.summary }}</p></header>
 			<MarkdownContent :source="post.content" />
 		</article>
 	</main>

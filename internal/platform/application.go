@@ -24,7 +24,6 @@ import (
 	"github.com/wavefnd/wave-platform/internal/mediapolicy"
 	"github.com/wavefnd/wave-platform/internal/platformstats"
 	questiondomain "github.com/wavefnd/wave-platform/internal/question"
-	releasedomain "github.com/wavefnd/wave-platform/internal/release"
 	"github.com/wavefnd/wave-platform/internal/sourceanalysis"
 	"github.com/wavefnd/wave-platform/internal/storage"
 	"github.com/wavefnd/wave-platform/internal/waveruntime"
@@ -74,9 +73,9 @@ func New(configPath string) (*Application, error) {
 		_ = database.Close()
 		return nil, fmt.Errorf("initialize management mailbox: %w", err)
 	}
-	if _, err := community.SeedLanguageReleases(database); err != nil {
+	if _, err := community.SeedReleaseBlogPosts(database); err != nil {
 		_ = database.Close()
-		return nil, fmt.Errorf("seed language releases: %w", err)
+		return nil, fmt.Errorf("seed release blog posts: %w", err)
 	}
 	if err := community.SeedSpaces(database); err != nil {
 		_ = database.Close()
@@ -96,7 +95,6 @@ func New(configPath string) (*Application, error) {
 	if removedCommunityEntries > 0 {
 		log.Printf("Removed %d legacy community mailbox entries", removedCommunityEntries)
 	}
-	releaseRepository := releasedomain.NewRepository(database)
 	blogService := blogdomain.NewService(database)
 	documentRepository := document.NewRepository(database)
 	communityRepository := community.NewRepository(database)
@@ -176,7 +174,6 @@ func New(configPath string) (*Application, error) {
 		Version,
 		modules,
 		database.Health,
-		releaseRepository,
 		blogService,
 		documentRepository,
 		communityRepository,

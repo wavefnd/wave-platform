@@ -12,6 +12,7 @@ type Post struct {
 
 	Slug            string    `xml:"slug"`
 	Locale          string    `xml:"locale"`
+	Category        string    `xml:"category"`
 	Title           string    `xml:"title"`
 	Summary         string    `xml:"summary"`
 	Content         string    `xml:"content"`
@@ -26,6 +27,7 @@ type Post struct {
 type Summary struct {
 	Slug        string `xml:"slug"`
 	Locale      string `xml:"locale"`
+	Category    string `xml:"category"`
 	Title       string `xml:"title"`
 	Summary     string `xml:"summary"`
 	Status      string `xml:"status,omitempty"`
@@ -35,10 +37,11 @@ type Summary struct {
 }
 
 type Input struct {
-	Slug    string `xml:"slug"`
-	Locale  string `xml:"locale"`
-	Title   string `xml:"title"`
-	Summary string `xml:"summary"`
-	Content string `xml:"content"`
-	Status  string `xml:"status"`
+	Slug     string `xml:"slug"`
+	Locale   string `xml:"locale"`
+	Category string `xml:"category"`
+	Title    string `xml:"title"`
+	Summary  string `xml:"summary"`
+	Content  string `xml:"content"`
+	Status   string `xml:"status"`
 }

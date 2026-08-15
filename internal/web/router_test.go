@@ -38,7 +38,6 @@ func TestRouterServesAPIAndSPA(t *testing.T) {
 		nil,
 		nil,
 		nil,
-		nil,
 	)
 
 	for _, test := range []struct {
@@ -89,6 +88,13 @@ func TestRouterServesAPIAndSPA(t *testing.T) {
 		}
 	}
 
+	releaseRequest := httptest.NewRequest(http.MethodGet, "/releases/wave-v0-2-0", nil)
+	releaseResponse := httptest.NewRecorder()
+	router.ServeHTTP(releaseResponse, releaseRequest)
+	if releaseResponse.Code != http.StatusPermanentRedirect || releaseResponse.Header().Get("Location") != "/blog/wave-v0-2-0" {
+		t.Fatalf("release redirect status=%d location=%q", releaseResponse.Code, releaseResponse.Header().Get("Location"))
+	}
+
 	request := httptest.NewRequest(http.MethodGet, "/account/security", nil)
 	response := httptest.NewRecorder()
 	router.ServeHTTP(response, request)
@@ -100,7 +106,7 @@ func TestRouterServesAPIAndSPA(t *testing.T) {
 func TestRouterReportsUnavailableDatabase(t *testing.T) {
 	router := NewRouter("test", t.TempDir(), "https://wave.example", "0.1.0", nil, func() error {
 		return errors.New("database unavailable")
-	}, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil)
+	}, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil)
 	request := httptest.NewRequest(http.MethodGet, "/health/ready", nil)
 	response := httptest.NewRecorder()
 	router.ServeHTTP(response, request)
