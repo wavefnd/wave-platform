@@ -49,7 +49,7 @@ const blogPosts = ref<BlogPostSummary[]>([])
 const blogSaving = ref(false)
 const blogNotice = ref('')
 const editingBlogSlug = ref('')
-const blogForm = ref<BlogPostInput>({ slug: '', category: 'article', roadmapStatus: '', roadmapOrder: 0, targetDate: '', title: '', content: '', status: 'draft' })
+const blogForm = ref<BlogPostInput>({ slug: '', category: 'article', roadmapStatus: '', roadmapOrder: 0, targetDate: '', title: '', summary: '', content: '', status: 'draft' })
 const timeZones = ['Asia/Seoul', 'UTC', 'Asia/Tokyo', 'Asia/Singapore', 'Europe/London', 'Europe/Paris', 'America/New_York', 'America/Los_Angeles']
 let stylesheet: HTMLLinkElement | null = null
 
@@ -128,7 +128,7 @@ function newBlogPost() {
 	editingBlogSlug.value = ''
 	blogNotice.value = ''
 	actionError.value = ''
-	blogForm.value = { slug: '', category: 'article', roadmapStatus: '', roadmapOrder: 0, targetDate: '', title: '', content: '', status: 'draft' }
+	blogForm.value = { slug: '', category: 'article', roadmapStatus: '', roadmapOrder: 0, targetDate: '', title: '', summary: '', content: '', status: 'draft' }
 }
 
 async function editBlogPost(slug: string) {
@@ -137,7 +137,7 @@ async function editBlogPost(slug: string) {
 	try {
 		const item = await getAdminBlogPost(slug)
 		editingBlogSlug.value = item.slug
-		blogForm.value = { slug: item.slug, category: item.category, roadmapStatus: item.roadmapStatus, roadmapOrder: item.roadmapOrder, targetDate: item.targetDate, title: item.title, content: item.content, status: item.status || 'draft' }
+		blogForm.value = { slug: item.slug, category: item.category, roadmapStatus: item.roadmapStatus, roadmapOrder: item.roadmapOrder, targetDate: item.targetDate, title: item.title, summary: item.summary, content: item.content, status: item.status || 'draft' }
 	} catch (reason) {
 		actionError.value = reason instanceof Error ? reason.message : t('common.loadError')
 	}
@@ -152,7 +152,7 @@ async function saveBlogPost() {
 		if (input.category === 'roadmap' && !editingBlogSlug.value) input.slug = ''
 		const saved = await saveAdminBlogPost(input)
 		editingBlogSlug.value = saved.slug
-		blogForm.value = { slug: saved.slug, category: saved.category, roadmapStatus: saved.roadmapStatus, roadmapOrder: saved.roadmapOrder, targetDate: saved.targetDate, title: saved.title, content: saved.content, status: saved.status || 'draft' }
+		blogForm.value = { slug: saved.slug, category: saved.category, roadmapStatus: saved.roadmapStatus, roadmapOrder: saved.roadmapOrder, targetDate: saved.targetDate, title: saved.title, summary: saved.summary, content: saved.content, status: saved.status || 'draft' }
 		blogPosts.value = await getAdminBlogPosts()
 		blogNotice.value = t('admin.blogSaved')
 	} catch (reason) {
@@ -315,6 +315,7 @@ function changeLocale(event: Event) {
 						<label>{{ t('admin.targetReleaseDate') }}<input v-model="blogForm.targetDate" class="form-control" type="date" required /></label>
 					  </template>
 					  <label class="wide">{{ t('admin.blogTitle') }}<input v-model="blogForm.title" class="form-control" required maxlength="160" /></label>
+					  <label v-if="blogForm.category !== 'roadmap'" class="wide">{{ t('admin.blogSummary') }}<textarea v-model="blogForm.summary" class="form-control" required maxlength="500" rows="3" /></label>
 					  <label class="wide">{{ t('admin.blogContent') }}<textarea v-model="blogForm.content" class="form-control admin-blog-content" required rows="18" /></label>
 					  <label>{{ t('admin.blogStatus') }}<select v-model="blogForm.status" class="form-select"><option value="draft">{{ t('admin.draft') }}</option><option value="published">{{ t('admin.published') }}</option></select></label>
 					</div>

@@ -47,6 +47,7 @@ type Input struct {
 	RoadmapOrder  int    `xml:"roadmap-order"`
 	TargetDate    string `xml:"target-release-date"`
 	Title         string `xml:"title"`
+	Summary       string `xml:"summary"`
 	Content       string `xml:"content"`
 	Status        string `xml:"status"`
 }

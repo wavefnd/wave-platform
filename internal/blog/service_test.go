@@ -24,7 +24,7 @@ func TestSavePublishesAndUpdatesBlogPost(t *testing.T) {
 	service := NewService(database)
 	service.now = func() time.Time { return now }
 	item, err := service.Save("owner", Input{Slug: "wave-020", Category: "release", Title: "Wave 0.2.0",
-		Content: "## Release\n\nDetails.", Status: "draft"})
+		Summary: "Release summary", Content: "## Release\n\nDetails.", Status: "draft"})
 	if err != nil || item.PublishedAt != "" {
 		t.Fatalf("draft=%#v err=%v", item, err)
 	}
@@ -33,7 +33,7 @@ func TestSavePublishesAndUpdatesBlogPost(t *testing.T) {
 	}
 	service.now = func() time.Time { return now.Add(time.Hour) }
 	item, err = service.Save("owner", Input{Slug: item.Slug, Category: "release", Title: item.Title,
-		Content: item.Content, Status: "published"})
+		Summary: item.Summary, Content: item.Content, Status: "published"})
 	if err != nil || item.PublishedAt == "" {
 		t.Fatalf("published=%#v err=%v", item, err)
 	}
@@ -54,7 +54,7 @@ func TestSaveRejectsInvalidBlogPost(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = database.Close() })
 	service := NewService(database)
-	if _, err := service.Save("missing", Input{Slug: "Not Valid", Title: "Title", Content: "Body", Status: "published"}); !errors.Is(err, ErrInvalidPost) {
+	if _, err := service.Save("missing", Input{Slug: "Not Valid", Title: "Title", Summary: "Summary", Content: "Body", Status: "published"}); !errors.Is(err, ErrInvalidPost) {
 		t.Fatalf("invalid slug error=%v", err)
 	}
 }

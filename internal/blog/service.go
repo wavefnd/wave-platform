@@ -37,6 +37,7 @@ func (service *Service) Save(actorID string, input Input) (Post, error) {
 	input.RoadmapStatus = strings.ToLower(strings.TrimSpace(input.RoadmapStatus))
 	input.TargetDate = strings.TrimSpace(input.TargetDate)
 	input.Title = strings.TrimSpace(input.Title)
+	input.Summary = strings.TrimSpace(input.Summary)
 	input.Content = strings.TrimSpace(strings.ReplaceAll(input.Content, "\r\n", "\n"))
 	input.Status = strings.ToLower(strings.TrimSpace(input.Status))
 	input.Slug = strings.ToLower(strings.TrimSpace(input.Slug))
@@ -66,6 +67,9 @@ func (service *Service) Save(actorID string, input Input) (Post, error) {
 	if len([]rune(input.Title)) < 1 || len([]rune(input.Title)) > 160 {
 		return Post{}, fmt.Errorf("%w: title must contain between 1 and 160 characters", ErrInvalidPost)
 	}
+	if input.Category != "roadmap" && (len([]rune(input.Summary)) < 1 || len([]rune(input.Summary)) > 500) {
+		return Post{}, fmt.Errorf("%w: summary must contain between 1 and 500 characters", ErrInvalidPost)
+	}
 	if len([]rune(input.Content)) < 1 || len([]rune(input.Content)) > 200000 {
 		return Post{}, fmt.Errorf("%w: content must contain between 1 and 200000 characters", ErrInvalidPost)
 	}
@@ -84,7 +88,10 @@ func (service *Service) Save(actorID string, input Input) (Post, error) {
 		return Post{}, err
 	}
 	item.Category, item.Title, item.Content, item.Status = input.Category, input.Title, input.Content, input.Status
-	item.Summary = SummaryFromContent(input.Content)
+	item.Summary = input.Summary
+	if item.Category == "roadmap" {
+		item.Summary = SummaryFromContent(input.Content)
+	}
 	item.RoadmapStatus, item.TargetDate = input.RoadmapStatus, input.TargetDate
 	item.RoadmapOrder = input.RoadmapOrder
 	item.AuthorAccountID, item.AuthorName, item.UpdatedAt = author.ID, author.DisplayName, now

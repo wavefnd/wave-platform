@@ -50,6 +50,7 @@ export interface BlogPostInput {
 	roadmapOrder: number
 	targetDate: string
 	title: string
+	summary: string
 	content: string
 	status: 'draft' | 'published'
 }
@@ -845,7 +846,7 @@ export async function saveAdminBlogPost(input: BlogPostInput): Promise<BlogPost>
 		slug: input.slug, category: input.category, 'roadmap-status': input.roadmapStatus,
 		'roadmap-order': String(input.roadmapOrder),
 		'target-release-date': input.targetDate,
-		title: input.title, content: input.content, status: input.status,
+		title: input.title, summary: input.summary, content: input.content, status: input.status,
 	}))
 	if (!xml) throw new Error('The server returned an empty blog response.')
 	return parseBlogPost(xml.documentElement)
