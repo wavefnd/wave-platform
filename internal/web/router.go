@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	admindomain "github.com/wavefnd/wave-platform/internal/admin"
+	blogdomain "github.com/wavefnd/wave-platform/internal/blog"
 	communitydomain "github.com/wavefnd/wave-platform/internal/community"
 	documentdomain "github.com/wavefnd/wave-platform/internal/document"
 	"github.com/wavefnd/wave-platform/internal/gitmirror"
@@ -27,6 +28,7 @@ func NewRouter(
 	modules []handler.ModuleStatus,
 	databaseCheck func() error,
 	releaseRepository *releasedomain.Repository,
+	blogService *blogdomain.Service,
 	documentRepository *documentdomain.Repository,
 	communityRepository *communitydomain.Repository,
 	communityService *communitydomain.Service,
@@ -48,6 +50,7 @@ func NewRouter(
 	modulesHandler := handler.ModulesHandler{Modules: modules, Auth: authHandler}
 	healthHandler := handler.HealthHandler{DatabaseCheck: databaseCheck}
 	releasesHandler := handler.ReleasesHandler{Repository: releaseRepository}
+	blogHandler := handler.BlogHandler{Service: blogService, Auth: authHandler}
 	documentsHandler := handler.DocumentsHandler{Repository: documentRepository}
 	communityHandler := handler.CommunityHandler{Repository: communityRepository, Service: communityService, Auth: authHandler}
 	questionsHandler := handler.QuestionsHandler{Repository: questionRepository, Service: questionService, Auth: authHandler}
@@ -57,12 +60,14 @@ func NewRouter(
 	sponsorsHandler := handler.SponsorsHandler{Service: sponsor.NewService()}
 	mediaHandler := handler.MediaHandler{Service: mediaService, Auth: authHandler}
 	usersHandler := handler.UsersHandler{Community: communityRepository, Questions: questionRepository, Auth: authHandler}
-	seoHandler := NewSEOHandler(publicURL, documentRepository, releaseRepository, communityRepository, questionRepository)
+	seoHandler := NewSEOHandler(publicURL, documentRepository, releaseRepository, blogService, communityRepository, questionRepository)
 
 	mux.HandleFunc("GET /api/v1/platform", platformHandler.Status)
 	mux.HandleFunc("GET /api/v1/modules", modulesHandler.Status)
 	mux.HandleFunc("GET /api/v1/releases", releasesHandler.List)
 	mux.HandleFunc("GET /api/v1/releases/{slug}", releasesHandler.Get)
+	mux.HandleFunc("GET /api/v1/blog/posts", blogHandler.List)
+	mux.HandleFunc("GET /api/v1/blog/posts/{slug}", blogHandler.Get)
 	mux.HandleFunc("GET /api/v1/sponsors", sponsorsHandler.List)
 	mux.HandleFunc("GET /api/v1/documents", documentsHandler.List)
 	mux.HandleFunc("GET /api/v1/documents/{path...}", documentsHandler.Get)
@@ -97,6 +102,9 @@ func NewRouter(
 	mux.HandleFunc("POST /api/v1/admin/accounts/{account}/status", adminHandler.AccountStatus)
 	mux.HandleFunc("POST /api/v1/admin/accounts/{account}/role", adminHandler.AccountRole)
 	mux.HandleFunc("POST /api/v1/admin/settings/lunastev-time-zone", adminHandler.LunaStevTimeZone)
+	mux.HandleFunc("GET /api/v1/admin/blog/posts", blogHandler.AdminList)
+	mux.HandleFunc("GET /api/v1/admin/blog/posts/{slug}", blogHandler.AdminGet)
+	mux.HandleFunc("POST /api/v1/admin/blog/posts", blogHandler.Save)
 	mux.HandleFunc("POST /api/v1/media/lunastev/images", mediaHandler.UploadLunaStevImage)
 	mux.HandleFunc("GET /media/lunastev/{image}", mediaHandler.LunaStevImage)
 	if authHandler != nil {

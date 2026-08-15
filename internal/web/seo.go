@@ -8,7 +8,9 @@ import (
 	"net/url"
 	"path"
 	"strings"
+	"time"
 
+	blogdomain "github.com/wavefnd/wave-platform/internal/blog"
 	communitydomain "github.com/wavefnd/wave-platform/internal/community"
 	documentdomain "github.com/wavefnd/wave-platform/internal/document"
 	questiondomain "github.com/wavefnd/wave-platform/internal/question"
@@ -30,6 +32,7 @@ type SEOHandler struct {
 	publicURL string
 	documents *documentdomain.Repository
 	releases  *releasedomain.Repository
+	blog      *blogdomain.Service
 	community *communitydomain.Repository
 	questions *questiondomain.Repository
 }
@@ -47,12 +50,13 @@ func NewSEOHandler(
 	publicURL string,
 	documents *documentdomain.Repository,
 	releases *releasedomain.Repository,
+	blog *blogdomain.Service,
 	community *communitydomain.Repository,
 	questions *questiondomain.Repository,
 ) SEOHandler {
 	return SEOHandler{
 		publicURL: strings.TrimRight(publicURL, "/"), documents: documents,
-		releases: releases, community: community, questions: questions,
+		releases: releases, blog: blog, community: community, questions: questions,
 	}
 }
 
@@ -68,6 +72,7 @@ func (handler SEOHandler) Sitemap(writer http.ResponseWriter, request *http.Requ
 	entries := []sitemapURL{
 		{Location: base + "/"},
 		{Location: base + "/docs"},
+		{Location: base + "/blog"},
 		{Location: base + "/community"},
 		{Location: base + "/lunastev"},
 		{Location: base + "/questions"},
@@ -85,6 +90,13 @@ func (handler SEOHandler) Sitemap(writer http.ResponseWriter, request *http.Requ
 		if releases, err := handler.releases.Releases(0); err == nil {
 			for _, release := range releases {
 				entries = append(entries, sitemapURL{Location: handler.location(base, "releases", release.Slug), LastModified: dateOnly(release.PublishedAt)})
+			}
+		}
+	}
+	if handler.blog != nil {
+		if posts, err := handler.blog.Repository().Posts("", false, 0); err == nil {
+			for _, post := range posts {
+				entries = append(entries, sitemapURL{Location: handler.location(base, "blog", post.Slug), LastModified: dateOnly(post.UpdatedAt.Format(time.RFC3339))})
 			}
 		}
 	}
@@ -180,6 +192,18 @@ func (handler SEOHandler) metadata(requestPath, base string) pageMetadata {
 			if release, err := handler.releases.Release(segments[1]); err == nil {
 				metadata.Title = release.Title + " · Wave"
 				metadata.Description = release.Summary
+				metadata.OpenGraph = "article"
+				metadata.SchemaType = "Article"
+			}
+		}
+	case "blog":
+		metadata.Title = "Blog · Wave"
+		metadata.Description = "Official Wave programming language news, engineering updates, and release articles."
+		metadata.SchemaType = "CollectionPage"
+		if len(segments) > 1 && handler.blog != nil {
+			if post, err := handler.blog.Repository().Post(segments[1], false); err == nil {
+				metadata.Title = post.Title + " · Wave Blog"
+				metadata.Description = post.Summary
 				metadata.OpenGraph = "article"
 				metadata.SchemaType = "Article"
 			}

@@ -33,7 +33,7 @@ func TestUserDirectoryIsPublicAndProfileUpdateRequiresAuthentication(t *testing.
 
 	directory := httptest.NewRecorder()
 	handler.Directory(directory, httptest.NewRequest(http.MethodGet, "http://wave.test/api/v1/users", nil))
-	if directory.Code != http.StatusOK || !strings.Contains(directory.Body.String(), member.Email) {
+	if directory.Code != http.StatusOK || !strings.Contains(directory.Body.String(), member.Email) || !strings.Contains(directory.Body.String(), "<user-profile") {
 		t.Fatalf("directory status=%d body=%s", directory.Code, directory.Body.String())
 	}
 

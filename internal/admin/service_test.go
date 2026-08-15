@@ -18,7 +18,7 @@ func TestAccountManagementProtectsOwnersAndWritesAuditLog(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = database.Close() })
-	now := time.Date(2026, 8, 8, 12, 0, 0, 0, time.UTC)
+	now := time.Now().UTC().Truncate(time.Second)
 	accounts := account.NewRepository(database)
 	permissions := permission.NewRepository(database)
 	for _, item := range []account.Account{

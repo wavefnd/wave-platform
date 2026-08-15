@@ -44,7 +44,7 @@ type UserProfileResponse struct {
 
 type UserDirectoryResponse struct {
 	XMLName xml.Name              `xml:"https://wave-lang.dev/ns/platform/api/v1 users"`
-	Items   []UserProfileResponse `xml:"user"`
+	Items   []UserProfileResponse `xml:"user-profile"`
 }
 
 type UserProfileUpdateRequest struct {

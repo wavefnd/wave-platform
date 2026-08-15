@@ -13,6 +13,7 @@ import (
 	admindomain "github.com/wavefnd/wave-platform/internal/admin"
 	"github.com/wavefnd/wave-platform/internal/audit"
 	"github.com/wavefnd/wave-platform/internal/auth"
+	blogdomain "github.com/wavefnd/wave-platform/internal/blog"
 	"github.com/wavefnd/wave-platform/internal/community"
 	"github.com/wavefnd/wave-platform/internal/config"
 	"github.com/wavefnd/wave-platform/internal/document"
@@ -96,6 +97,7 @@ func New(configPath string) (*Application, error) {
 		log.Printf("Removed %d legacy community mailbox entries", removedCommunityEntries)
 	}
 	releaseRepository := releasedomain.NewRepository(database)
+	blogService := blogdomain.NewService(database)
 	documentRepository := document.NewRepository(database)
 	communityRepository := community.NewRepository(database)
 	communityService := community.NewService(database, cfg.Identity.MailDomain)
@@ -175,6 +177,7 @@ func New(configPath string) (*Application, error) {
 		modules,
 		database.Health,
 		releaseRepository,
+		blogService,
 		documentRepository,
 		communityRepository,
 		communityService,
