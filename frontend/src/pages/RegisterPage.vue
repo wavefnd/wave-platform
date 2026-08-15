@@ -5,7 +5,9 @@ import { useRoute, useRouter } from 'vue-router'
 
 import TurnstileWidget from '../components/auth/TurnstileWidget.vue'
 import AuthenticatorEnrollmentDialog from '../components/auth/AuthenticatorEnrollmentDialog.vue'
+import GmailDeliveryWarning from '../components/GmailDeliveryWarning.vue'
 import { useI18n } from '../i18n'
+import { containsGmailAddress } from '../services/email-address'
 import { beginRegistration, getAuthConfig, getRegistrationAddress, type TOTPEnrollment } from '../services/http'
 import { useAuthStore } from '../stores/auth'
 
@@ -33,6 +35,7 @@ const addressPreview = computed(() => {
 	const local = addressChoiceRequired.value ? username.value.trim().toLocaleLowerCase() : (suggestedUsername.value || generated)
   return local ? `${local}@${mailDomain.value}` : ''
 })
+const gmailRecovery = computed(() => containsGmailAddress(recoveryEmail.value))
 
 async function checkAddress() {
   if (!displayName.value.trim()) return
@@ -99,6 +102,7 @@ async function finish() {
 		<p v-if="!addressChoiceRequired" class="auth-help">{{ t('auth.waveAddressHelp') }}</p>
         <label for="register-recovery">{{ t('auth.recoveryEmail') }}</label>
         <input id="register-recovery" v-model="recoveryEmail" type="email" autocomplete="email" required />
+        <GmailDeliveryWarning v-if="gmailRecovery" />
         <p class="auth-help">{{ t('auth.recoveryEmailHelp') }}</p>
         <TurnstileWidget :site-key="siteKey" action="register" @token="challenge = $event" />
         <button class="portal-button primary" type="submit" :disabled="!registrationOpen || !totpConfigured">{{ t('auth.setupAuthenticator') }}</button>

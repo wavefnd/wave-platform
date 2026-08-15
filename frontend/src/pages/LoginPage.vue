@@ -3,6 +3,7 @@ import { onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import TurnstileWidget from '../components/auth/TurnstileWidget.vue'
+import GmailDeliveryWarning from '../components/GmailDeliveryWarning.vue'
 import { useI18n } from '../i18n'
 import { getAuthConfig, requestRecovery } from '../services/http'
 import { useAuthStore } from '../stores/auth'
@@ -64,6 +65,7 @@ async function recover() {
         <button class="portal-button primary" type="submit" :disabled="recoverySent">{{ t('auth.sendRecovery') }}</button>
         <p v-if="recoverySent" class="form-notice" role="status">{{ t('auth.recoverySent') }}</p>
 		<p v-if="recoverySent" class="mail-delivery-hint">{{ t('auth.checkSpam') }}</p>
+		<GmailDeliveryWarning v-if="recoverySent" />
         <p v-if="error" class="form-notice error" role="alert">{{ error }}</p>
         <button class="auth-text-action" type="button" @click="recoveryMode = false; challenge = ''">{{ t('auth.backToSignIn') }}</button>
       </form>

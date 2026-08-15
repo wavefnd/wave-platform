@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import QRCode from 'qrcode'
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 
 import AuthenticatorEnrollmentDialog from '../components/auth/AuthenticatorEnrollmentDialog.vue'
+import GmailDeliveryWarning from '../components/GmailDeliveryWarning.vue'
 import { useI18n } from '../i18n'
+import { containsGmailAddress } from '../services/email-address'
 import { beginTOTPRotation, changeRecoveryEmail, finishTOTPRotation, getAccountSecurity, type AccountSecurity, type TOTPEnrollment } from '../services/http'
 import { useAuthStore } from '../stores/auth'
 
@@ -19,6 +21,7 @@ const enrollment = ref<TOTPEnrollment | null>(null)
 const qrCode = ref('')
 const notice = ref('')
 const error = ref('')
+const gmailRecovery = computed(() => containsGmailAddress(recoveryEmail.value || security.value?.recoveryEmail || ''))
 
 async function load() { security.value = await getAccountSecurity() }
 onMounted(async () => { try { await load() } catch (reason) { error.value = reason instanceof Error ? reason.message : t('auth.failed') } })
@@ -66,6 +69,7 @@ async function updateRecovery() {
       <p v-if="security">{{ security.recoveryEmail }} · {{ security.recoveryVerified ? t('auth.verified') : t('auth.unverified') }}</p>
       <form class="settings-form" @submit.prevent="updateRecovery">
         <label for="recovery-new">{{ t('auth.newRecoveryEmail') }}</label><input id="recovery-new" v-model="recoveryEmail" type="email" autocomplete="email" required />
+        <GmailDeliveryWarning v-if="gmailRecovery" />
         <label for="recovery-code">{{ t('auth.currentCode') }}</label><input id="recovery-code" v-model="currentCode" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" required />
         <button class="portal-button" type="submit">{{ t('auth.sendVerification') }}</button>
       </form>

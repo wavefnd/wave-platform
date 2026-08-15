@@ -4,7 +4,9 @@ import {
 } from '@lucide/vue'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 
+import GmailDeliveryWarning from '../components/GmailDeliveryWarning.vue'
 import { useI18n } from '../i18n'
+import { containsGmailAddress } from '../services/email-address'
 import {
   getMailbox, getMailMessage, sendMail, updateMailEntry,
   type MailboxItem, type MailboxView, type MailMessageView,
@@ -27,6 +29,7 @@ const composing = ref(false)
 const composeTo = ref('')
 const composeSubject = ref('')
 const composeBody = ref('')
+const gmailRecipient = computed(() => containsGmailAddress(composeTo.value))
 let refreshTimer: number | undefined
 
 const folders = computed(() => [
@@ -194,6 +197,7 @@ watch(() => auth.account?.id, async () => { mailbox.value = null; selected.value
         <form v-else-if="composing" class="mail-composer" @submit.prevent="submitMail">
           <h1>{{ t('mail.newMessage') }}</h1>
           <label>{{ t('mail.to') }}<input v-model="composeTo" required type="text" inputmode="email" :placeholder="t('mail.toPlaceholder')" /></label>
+          <GmailDeliveryWarning v-if="gmailRecipient" />
           <label>{{ t('mail.subject') }}<input v-model="composeSubject" required maxlength="180" /></label>
           <label class="mail-compose-body"><span class="sr-only">{{ t('mail.body') }}</span><textarea v-model="composeBody" required maxlength="50000" rows="16" /></label>
           <p v-if="actionError" class="mail-action-error" role="alert">{{ actionError }}</p>
