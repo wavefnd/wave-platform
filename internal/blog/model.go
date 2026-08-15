@@ -15,7 +15,6 @@ type Post struct {
 	RoadmapStatus   string    `xml:"roadmap-status,omitempty"`
 	RoadmapOrder    int       `xml:"roadmap-order,omitempty"`
 	TargetDate      string    `xml:"target-release-date,omitempty"`
-	Cadence         string    `xml:"release-cadence,omitempty"`
 	Title           string    `xml:"title"`
 	Summary         string    `xml:"summary"`
 	Content         string    `xml:"content"`
@@ -33,7 +32,6 @@ type Summary struct {
 	RoadmapStatus string `xml:"roadmap-status,omitempty"`
 	RoadmapOrder  int    `xml:"roadmap-order,omitempty"`
 	TargetDate    string `xml:"target-release-date,omitempty"`
-	Cadence       string `xml:"release-cadence,omitempty"`
 	Title         string `xml:"title"`
 	Summary       string `xml:"summary"`
 	Status        string `xml:"status,omitempty"`
@@ -48,9 +46,7 @@ type Input struct {
 	RoadmapStatus string `xml:"roadmap-status"`
 	RoadmapOrder  int    `xml:"roadmap-order"`
 	TargetDate    string `xml:"target-release-date"`
-	Cadence       string `xml:"release-cadence"`
 	Title         string `xml:"title"`
-	Summary       string `xml:"summary"`
 	Content       string `xml:"content"`
 	Status        string `xml:"status"`
 }

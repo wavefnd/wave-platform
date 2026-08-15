@@ -29,7 +29,6 @@ export interface BlogPostSummary {
 	roadmapStatus: 'planned' | 'in-progress' | 'released' | ''
 	roadmapOrder: number
 	targetDate: string
-	cadence: string
 	title: string
 	summary: string
 	status: 'draft' | 'published' | ''
@@ -50,9 +49,7 @@ export interface BlogPostInput {
 	roadmapStatus: 'planned' | 'in-progress' | 'released' | ''
 	roadmapOrder: number
 	targetDate: string
-	cadence: string
 	title: string
-	summary: string
 	content: string
 	status: 'draft' | 'published'
 }
@@ -808,7 +805,7 @@ function parseBlogSummary(element: ParentNode): BlogPostSummary {
 		category: ['release', 'roadmap'].includes(childText(element, 'category')) ? childText(element, 'category') as BlogPostSummary['category'] : 'article',
 		roadmapStatus: childText(element, 'roadmap-status') as BlogPostSummary['roadmapStatus'],
 		roadmapOrder: Number(childText(element, 'roadmap-order')) || 0,
-		targetDate: childText(element, 'target-release-date'), cadence: childContent(element, 'release-cadence'),
+		targetDate: childText(element, 'target-release-date'),
 		title: childText(element, 'title'), summary: childContent(element, 'summary'),
 		status: childText(element, 'status') as BlogPostSummary['status'], authorName: childText(element, 'author-name'),
 		publishedAt: childText(element, 'published-at'), updatedAt: childText(element, 'updated-at'),
@@ -847,8 +844,8 @@ export async function saveAdminBlogPost(input: BlogPostInput): Promise<BlogPost>
 	const xml = await requestXml('/api/v1/admin/blog/posts', 'POST', authDocument('blog-post', {
 		slug: input.slug, category: input.category, 'roadmap-status': input.roadmapStatus,
 		'roadmap-order': String(input.roadmapOrder),
-		'target-release-date': input.targetDate, 'release-cadence': input.cadence,
-		title: input.title, summary: input.summary, content: input.content, status: input.status,
+		'target-release-date': input.targetDate,
+		title: input.title, content: input.content, status: input.status,
 	}))
 	if (!xml) throw new Error('The server returned an empty blog response.')
 	return parseBlogPost(xml.documentElement)

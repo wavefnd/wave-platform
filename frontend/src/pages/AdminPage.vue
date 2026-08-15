@@ -38,8 +38,8 @@ const error = ref('')
 const actionError = ref('')
 const loading = ref(true)
 const actionLoading = ref(false)
-let desktopLayout = window.innerWidth >= 992
-const sidebarVisible = ref(desktopLayout)
+const desktopLayout = ref(window.innerWidth >= 992)
+const sidebarVisible = ref(desktopLayout.value)
 const accountQuery = ref('')
 const pendingAction = ref<PendingAction | null>(null)
 const managementMailbox = ref<MailboxView | null>(null)
@@ -49,7 +49,7 @@ const blogPosts = ref<BlogPostSummary[]>([])
 const blogSaving = ref(false)
 const blogNotice = ref('')
 const editingBlogSlug = ref('')
-const blogForm = ref<BlogPostInput>({ slug: '', category: 'article', roadmapStatus: '', roadmapOrder: 0, targetDate: '', cadence: '', title: '', summary: '', content: '', status: 'draft' })
+const blogForm = ref<BlogPostInput>({ slug: '', category: 'article', roadmapStatus: '', roadmapOrder: 0, targetDate: '', title: '', content: '', status: 'draft' })
 const timeZones = ['Asia/Seoul', 'UTC', 'Asia/Tokyo', 'Asia/Singapore', 'Europe/London', 'Europe/Paris', 'America/New_York', 'America/Los_Angeles']
 let stylesheet: HTMLLinkElement | null = null
 
@@ -95,8 +95,8 @@ onBeforeUnmount(() => {
 
 function syncSidebar() {
 	const nextDesktopLayout = window.innerWidth >= 992
-	if (nextDesktopLayout === desktopLayout) return
-	desktopLayout = nextDesktopLayout
+	if (nextDesktopLayout === desktopLayout.value) return
+	desktopLayout.value = nextDesktopLayout
 	sidebarVisible.value = nextDesktopLayout
 }
 
@@ -128,7 +128,7 @@ function newBlogPost() {
 	editingBlogSlug.value = ''
 	blogNotice.value = ''
 	actionError.value = ''
-	blogForm.value = { slug: '', category: 'article', roadmapStatus: '', roadmapOrder: 0, targetDate: '', cadence: '', title: '', summary: '', content: '', status: 'draft' }
+	blogForm.value = { slug: '', category: 'article', roadmapStatus: '', roadmapOrder: 0, targetDate: '', title: '', content: '', status: 'draft' }
 }
 
 async function editBlogPost(slug: string) {
@@ -137,7 +137,7 @@ async function editBlogPost(slug: string) {
 	try {
 		const item = await getAdminBlogPost(slug)
 		editingBlogSlug.value = item.slug
-		blogForm.value = { slug: item.slug, category: item.category, roadmapStatus: item.roadmapStatus, roadmapOrder: item.roadmapOrder, targetDate: item.targetDate, cadence: item.cadence, title: item.title, summary: item.summary, content: item.content, status: item.status || 'draft' }
+		blogForm.value = { slug: item.slug, category: item.category, roadmapStatus: item.roadmapStatus, roadmapOrder: item.roadmapOrder, targetDate: item.targetDate, title: item.title, content: item.content, status: item.status || 'draft' }
 	} catch (reason) {
 		actionError.value = reason instanceof Error ? reason.message : t('common.loadError')
 	}
@@ -148,9 +148,11 @@ async function saveBlogPost() {
 	actionError.value = ''
 	blogNotice.value = ''
 	try {
-		const saved = await saveAdminBlogPost(blogForm.value)
+		const input = { ...blogForm.value }
+		if (input.category === 'roadmap' && !editingBlogSlug.value) input.slug = ''
+		const saved = await saveAdminBlogPost(input)
 		editingBlogSlug.value = saved.slug
-		blogForm.value = { slug: saved.slug, category: saved.category, roadmapStatus: saved.roadmapStatus, roadmapOrder: saved.roadmapOrder, targetDate: saved.targetDate, cadence: saved.cadence, title: saved.title, summary: saved.summary, content: saved.content, status: saved.status || 'draft' }
+		blogForm.value = { slug: saved.slug, category: saved.category, roadmapStatus: saved.roadmapStatus, roadmapOrder: saved.roadmapOrder, targetDate: saved.targetDate, title: saved.title, content: saved.content, status: saved.status || 'draft' }
 		blogPosts.value = await getAdminBlogPosts()
 		blogNotice.value = t('admin.blogSaved')
 	} catch (reason) {
@@ -229,7 +231,7 @@ function changeLocale(event: Event) {
 
 <template>
   <main class="coreui-admin-template">
-    <CSidebar class="border-end" color-scheme="dark" position="fixed" :visible="sidebarVisible" @visible-change="sidebarVisible = $event">
+    <CSidebar class="border-end admin-mobile-sidebar" color-scheme="dark" position="fixed" :overlaid="!desktopLayout" :visible="sidebarVisible" @visible-change="sidebarVisible = $event">
       <CSidebarHeader class="border-bottom">
         <CSidebarBrand as="div" class="admin-brand">Wave <span>{{ t('admin.title') }}</span></CSidebarBrand>
       </CSidebarHeader>
@@ -305,16 +307,14 @@ function changeLocale(event: Event) {
 				  <form class="admin-blog-editor" @submit.prevent="saveBlogPost">
 					<h2 class="h5">{{ editingBlogSlug ? t('admin.editPost') : t('admin.newPost') }}</h2>
 					<div class="admin-blog-fields">
-					  <label>{{ t('admin.blogSlug') }}<input v-model="blogForm.slug" class="form-control" required maxlength="120" pattern="[a-z0-9]+(?:-[a-z0-9]+)*" :readonly="Boolean(editingBlogSlug)" /></label>
+					  <label v-if="blogForm.category !== 'roadmap'">{{ t('admin.blogSlug') }}<input v-model="blogForm.slug" class="form-control" required maxlength="120" pattern="[a-z0-9]+(?:[.-][a-z0-9]+)*" :readonly="Boolean(editingBlogSlug)" /></label>
 					  <label>{{ t('admin.blogCategory') }}<select v-model="blogForm.category" class="form-select"><option value="article">{{ t('blog.category.article') }}</option><option value="release">{{ t('blog.category.release') }}</option><option value="roadmap">{{ t('blog.category.roadmap') }}</option></select></label>
 					  <template v-if="blogForm.category === 'roadmap'">
 						<label>{{ t('admin.roadmapStatus') }}<select v-model="blogForm.roadmapStatus" class="form-select" required><option value="" disabled>{{ t('admin.selectRoadmapStatus') }}</option><option value="planned">{{ t('blog.roadmap.planned') }}</option><option value="in-progress">{{ t('blog.roadmap.inProgress') }}</option><option value="released">{{ t('blog.roadmap.released') }}</option></select></label>
 						<label>{{ t('admin.roadmapOrder') }}<input v-model.number="blogForm.roadmapOrder" class="form-control" type="number" min="1" max="1000000" required /><small class="text-body-secondary">{{ t('admin.roadmapOrderHelp') }}</small></label>
 						<label>{{ t('admin.targetReleaseDate') }}<input v-model="blogForm.targetDate" class="form-control" type="date" required /></label>
-						<label class="wide">{{ t('admin.releaseCadence') }}<input v-model="blogForm.cadence" class="form-control" required maxlength="80" :placeholder="t('admin.releaseCadencePlaceholder')" /></label>
 					  </template>
 					  <label class="wide">{{ t('admin.blogTitle') }}<input v-model="blogForm.title" class="form-control" required maxlength="160" /></label>
-					  <label class="wide">{{ t('admin.blogSummary') }}<textarea v-model="blogForm.summary" class="form-control" required maxlength="500" rows="3" /></label>
 					  <label class="wide">{{ t('admin.blogContent') }}<textarea v-model="blogForm.content" class="form-control admin-blog-content" required rows="18" /></label>
 					  <label>{{ t('admin.blogStatus') }}<select v-model="blogForm.status" class="form-select"><option value="draft">{{ t('admin.draft') }}</option><option value="published">{{ t('admin.published') }}</option></select></label>
 					</div>
@@ -448,7 +448,7 @@ body.coreui-admin-active { background-color: var(--cui-tertiary-bg); }
 .admin-blog-content { min-height: 340px; font: 13px/1.55 ui-monospace, SFMono-Regular, Consolas, monospace; resize: vertical; }
 .admin-blog-preview { margin-top: 28px; padding-top: 20px; border-top: 1px solid var(--cui-border-color); }
 .admin-blog-preview .markdown-content { max-width: 820px; }
-@media (max-width: 991.98px) { .coreui-admin-template .wrapper { padding-inline-start: 0; } }
+@media (max-width: 991.98px) { .coreui-admin-template .wrapper { padding-inline-start: 0; }.coreui-admin-template .admin-mobile-sidebar { --cui-is-mobile: 1; } }
 @media (max-width: 767.98px) { .admin-card-header { align-items: stretch; flex-direction: column; }.admin-search { width: 100%; }.admin-heading { align-items: flex-start; }.coreui-admin-template .container-fluid { padding-right: 16px !important; padding-left: 16px !important; }.admin-preference-select { max-width: 96px; }.coreui-admin-template .header .gap-3 { gap: .4rem !important; }.admin-blog-layout { grid-template-columns: 1fr; }.admin-blog-list { max-height: 260px; overflow-y: auto; border-right: 0; border-bottom: 1px solid var(--cui-border-color); }.admin-blog-fields { grid-template-columns: 1fr; }.admin-blog-fields .wide { grid-column: auto; }.admin-blog-editor { padding: 18px 16px 26px; } }
 @media (max-width: 480px) { .coreui-admin-template .header strong { display: none; }.admin-preference-select { max-width: 88px; } }
 </style>

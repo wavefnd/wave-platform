@@ -420,7 +420,6 @@ a:hover { color: var(--wave-link-hover); }
 .roadmap-issue-state span.is-in-progress, .roadmap-detail-status.is-in-progress { border-color: var(--wave-info-text); background: var(--wave-info-soft); color: var(--wave-info-text); }
 .roadmap-issue-state span.is-released, .roadmap-detail-status.is-released { border-color: var(--wave-success); background: var(--wave-success-soft); color: var(--wave-success); }
 .roadmap-issue-state small { color: var(--wave-text-muted); font: 11px ui-monospace, SFMono-Regular, Consolas, monospace; }
-.blog-row .roadmap-schedule { color: var(--wave-text-secondary); }
 .blog-article > header .roadmap-detail-status { color: var(--wave-text-secondary); }
 .blog-article { max-width: 820px; margin: 0 auto; }
 .blog-back { display: inline-block; margin-bottom: 26px; color: var(--wave-text-secondary); text-decoration: none; }

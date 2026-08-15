@@ -172,7 +172,7 @@
 	<xs:element name="user-profile" type="tns:userProfile"/>
 	<xs:element name="users"><xs:complexType><xs:sequence><xs:element name="user-profile" type="tns:userProfile" minOccurs="0" maxOccurs="unbounded"/></xs:sequence></xs:complexType></xs:element>
 	<xs:element name="blog-posts"><xs:complexType><xs:sequence><xs:element name="post" minOccurs="0" maxOccurs="unbounded"><xs:complexType><xs:sequence>
-		<xs:element name="slug" type="xs:string"/><xs:element name="category" type="xs:string"/><xs:element name="roadmap-status" type="xs:string" minOccurs="0"/><xs:element name="roadmap-order" type="xs:positiveInteger" minOccurs="0"/><xs:element name="target-release-date" type="xs:date" minOccurs="0"/><xs:element name="release-cadence" type="xs:string" minOccurs="0"/><xs:element name="title" type="xs:string"/><xs:element name="summary" type="xs:string"/>
+		<xs:element name="slug" type="xs:string"/><xs:element name="category" type="xs:string"/><xs:element name="roadmap-status" type="xs:string" minOccurs="0"/><xs:element name="roadmap-order" type="xs:positiveInteger" minOccurs="0"/><xs:element name="target-release-date" type="xs:date" minOccurs="0"/><xs:element name="title" type="xs:string"/><xs:element name="summary" type="xs:string"/>
 		<xs:element name="status" type="xs:string" minOccurs="0"/><xs:element name="author-name" type="xs:string"/><xs:element name="published-at" type="xs:dateTime" minOccurs="0"/><xs:element name="updated-at" type="xs:dateTime"/>
 	</xs:sequence></xs:complexType></xs:element></xs:sequence></xs:complexType></xs:element>
 	<xs:element name="error">

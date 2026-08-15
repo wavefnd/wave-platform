@@ -15,7 +15,7 @@ import (
 
 var (
 	ErrInvalidPost = errors.New("invalid blog post")
-	slugPattern    = regexp.MustCompile(`^[a-z0-9]+(?:-[a-z0-9]+)*$`)
+	slugPattern    = regexp.MustCompile(`^[a-z0-9]+(?:[.-][a-z0-9]+)*$`)
 )
 
 type Service struct {
@@ -33,17 +33,18 @@ func NewService(database *storage.Database) *Service {
 func (service *Service) Repository() *Repository { return service.repository }
 
 func (service *Service) Save(actorID string, input Input) (Post, error) {
-	input.Slug = strings.ToLower(strings.TrimSpace(input.Slug))
 	input.Category = NormalizeCategory(input.Category)
 	input.RoadmapStatus = strings.ToLower(strings.TrimSpace(input.RoadmapStatus))
 	input.TargetDate = strings.TrimSpace(input.TargetDate)
-	input.Cadence = strings.TrimSpace(input.Cadence)
 	input.Title = strings.TrimSpace(input.Title)
-	input.Summary = strings.TrimSpace(input.Summary)
 	input.Content = strings.TrimSpace(strings.ReplaceAll(input.Content, "\r\n", "\n"))
 	input.Status = strings.ToLower(strings.TrimSpace(input.Status))
+	input.Slug = strings.ToLower(strings.TrimSpace(input.Slug))
+	if input.Category == "roadmap" && input.Slug == "" {
+		input.Slug = SlugFromTitle(input.Title)
+	}
 	if !slugPattern.MatchString(input.Slug) || len(input.Slug) > 120 {
-		return Post{}, fmt.Errorf("%w: slug must contain lowercase letters, numbers, and single hyphens", ErrInvalidPost)
+		return Post{}, fmt.Errorf("%w: slug must contain lowercase letters, numbers, dots, and single hyphens", ErrInvalidPost)
 	}
 	if input.Category != "article" && input.Category != "release" && input.Category != "roadmap" {
 		return Post{}, fmt.Errorf("%w: category must be article, release, or roadmap", ErrInvalidPost)
@@ -58,18 +59,12 @@ func (service *Service) Save(actorID string, input Input) (Post, error) {
 		if input.RoadmapOrder < 1 || input.RoadmapOrder > 1000000 {
 			return Post{}, fmt.Errorf("%w: roadmap order must be between 1 and 1000000", ErrInvalidPost)
 		}
-		if len([]rune(input.Cadence)) < 1 || len([]rune(input.Cadence)) > 80 {
-			return Post{}, fmt.Errorf("%w: roadmap release cadence must contain between 1 and 80 characters", ErrInvalidPost)
-		}
 	} else {
-		input.RoadmapStatus, input.TargetDate, input.Cadence = "", "", ""
+		input.RoadmapStatus, input.TargetDate = "", ""
 		input.RoadmapOrder = 0
 	}
 	if len([]rune(input.Title)) < 1 || len([]rune(input.Title)) > 160 {
 		return Post{}, fmt.Errorf("%w: title must contain between 1 and 160 characters", ErrInvalidPost)
-	}
-	if len([]rune(input.Summary)) < 1 || len([]rune(input.Summary)) > 500 {
-		return Post{}, fmt.Errorf("%w: summary must contain between 1 and 500 characters", ErrInvalidPost)
 	}
 	if len([]rune(input.Content)) < 1 || len([]rune(input.Content)) > 200000 {
 		return Post{}, fmt.Errorf("%w: content must contain between 1 and 200000 characters", ErrInvalidPost)
@@ -88,8 +83,9 @@ func (service *Service) Save(actorID string, input Input) (Post, error) {
 	} else if err != nil {
 		return Post{}, err
 	}
-	item.Category, item.Title, item.Summary, item.Content, item.Status = input.Category, input.Title, input.Summary, input.Content, input.Status
-	item.RoadmapStatus, item.TargetDate, item.Cadence = input.RoadmapStatus, input.TargetDate, input.Cadence
+	item.Category, item.Title, item.Content, item.Status = input.Category, input.Title, input.Content, input.Status
+	item.Summary = SummaryFromContent(input.Content)
+	item.RoadmapStatus, item.TargetDate = input.RoadmapStatus, input.TargetDate
 	item.RoadmapOrder = input.RoadmapOrder
 	item.AuthorAccountID, item.AuthorName, item.UpdatedAt = author.ID, author.DisplayName, now
 	if item.Status == "published" && item.PublishedAt == "" {
@@ -102,6 +98,31 @@ func (service *Service) Save(actorID string, input Input) (Post, error) {
 		return Post{}, err
 	}
 	return item, nil
+}
+
+func SlugFromTitle(title string) string {
+	var slug strings.Builder
+	separator := false
+	for _, character := range strings.ToLower(strings.TrimSpace(title)) {
+		if character >= 'a' && character <= 'z' || character >= '0' && character <= '9' || character == '.' {
+			if separator && slug.Len() > 0 {
+				slug.WriteByte('-')
+			}
+			separator = false
+			slug.WriteRune(character)
+			continue
+		}
+		separator = true
+	}
+	return strings.Trim(slug.String(), ".-")
+}
+
+func SummaryFromContent(content string) string {
+	characters := []rune(strings.Join(strings.Fields(content), " "))
+	if len(characters) > 48 {
+		characters = characters[:48]
+	}
+	return string(characters)
 }
 
 func NormalizeCategory(value string) string {

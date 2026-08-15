@@ -35,6 +35,7 @@ func (repository *Repository) Post(slug string, includeDrafts bool) (Post, error
 		return Post{}, storage.ErrNotFound
 	}
 	item.Category = NormalizeCategory(item.Category)
+	item.Summary = SummaryFromContent(item.Content)
 	return item, nil
 }
 
@@ -51,6 +52,7 @@ func (repository *Repository) PostsByCategory(category string, includeDrafts boo
 			return fmt.Errorf("decode blog post: %w", err)
 		}
 		item.Category = NormalizeCategory(item.Category)
+		item.Summary = SummaryFromContent(item.Content)
 		if (!includeDrafts && item.Status != "published") || (category != "" && item.Category != category) {
 			return nil
 		}
@@ -87,6 +89,6 @@ func SummaryOf(item Post, includeStatus bool) Summary {
 		status = item.Status
 	}
 	return Summary{Slug: item.Slug, Category: NormalizeCategory(item.Category), RoadmapStatus: item.RoadmapStatus,
-		RoadmapOrder: item.RoadmapOrder, TargetDate: item.TargetDate, Cadence: item.Cadence, Title: item.Title, Summary: item.Summary,
+		RoadmapOrder: item.RoadmapOrder, TargetDate: item.TargetDate, Title: item.Title, Summary: SummaryFromContent(item.Content),
 		Status: status, AuthorName: item.AuthorName, PublishedAt: item.PublishedAt, UpdatedAt: item.UpdatedAt.Format(timeLayout)}
 }

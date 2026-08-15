@@ -85,13 +85,13 @@ watchEffect(() => {
 			<RouterLink v-for="item in posts" :key="item.slug" :to="`/blog/${encodeURIComponent(item.slug)}`" class="blog-row" :class="{ 'roadmap-row': category === 'roadmap' }">
 				<div v-if="category === 'roadmap'" class="roadmap-issue-state"><span :class="`is-${item.roadmapStatus}`">{{ roadmapStatusLabel(item.roadmapStatus) }}</span><small>#{{ item.roadmapOrder }}</small></div>
 				<time :datetime="item.category === 'roadmap' ? item.targetDate : item.publishedAt">{{ formatDate(item.category === 'roadmap' ? item.targetDate : item.publishedAt) }}</time>
-				<div><small class="blog-category">{{ t(`blog.category.${item.category}`) }}</small><h2>{{ item.title }}</h2><p>{{ item.summary }}</p><small v-if="item.category === 'roadmap'" class="roadmap-schedule">{{ item.cadence }}</small><small v-else>{{ item.authorName }}</small></div>
+				<div><small class="blog-category">{{ t(`blog.category.${item.category}`) }}</small><h2>{{ item.title }}</h2><p>{{ item.summary }}</p><small v-if="item.category !== 'roadmap'">{{ item.authorName }}</small></div>
 			</RouterLink>
 			<p v-if="posts.length === 0" class="compact-empty">{{ category === 'roadmap' ? t('blog.roadmap.empty') : t('blog.empty') }}</p>
 		</section>
 		<article v-else-if="post" class="blog-article">
 			<RouterLink class="blog-back" to="/blog">← {{ t('blog.back') }}</RouterLink>
-			<header><span>{{ t(`blog.category.${post.category}`) }}</span><h1>{{ post.title }}</h1><div><template v-if="post.category === 'roadmap'"><span class="roadmap-detail-status" :class="`is-${post.roadmapStatus}`">{{ roadmapStatusLabel(post.roadmapStatus) }}</span><time :datetime="post.targetDate">{{ t('blog.roadmap.target') }} {{ formatDate(post.targetDate) }}</time><span>{{ post.cadence }}</span></template><template v-else><time :datetime="post.publishedAt">{{ formatDate(post.publishedAt) }}</time><span>{{ post.authorName }}</span></template></div><p>{{ post.summary }}</p></header>
+			<header><span>{{ t(`blog.category.${post.category}`) }}</span><h1>{{ post.title }}</h1><div><template v-if="post.category === 'roadmap'"><span class="roadmap-detail-status" :class="`is-${post.roadmapStatus}`">{{ roadmapStatusLabel(post.roadmapStatus) }}</span><time :datetime="post.targetDate">{{ t('blog.roadmap.target') }} {{ formatDate(post.targetDate) }}</time></template><template v-else><time :datetime="post.publishedAt">{{ formatDate(post.publishedAt) }}</time><span>{{ post.authorName }}</span></template></div><p>{{ post.summary }}</p></header>
 			<MarkdownContent :source="post.content" />
 		</article>
 	</main>
