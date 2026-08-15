@@ -52,11 +52,12 @@ const replyEditor = ref<InstanceType<typeof CommunityReplyEditor> | null>(null)
 const activeSpace = computed(() => String(route.query.space ?? ''))
 const threadID = computed(() => String(route.params.thread ?? ''))
 const personalMode = computed(() => route.meta.personalSpace === true)
-const isComposer = computed(() => route.name === 'community-new' || route.name === 'personal-space-new')
-const rootRouteName = computed(() => personalMode.value ? 'personal-space' : 'community')
-const composerRouteName = computed(() => personalMode.value ? 'personal-space-new' : 'community-new')
-const threadRouteName = computed(() => personalMode.value ? 'personal-space-thread' : 'community-thread')
-const rootPath = computed(() => personalMode.value ? '/lunastev' : '/community')
+const showcaseMode = computed(() => route.meta.showcase === true)
+const isComposer = computed(() => ['community-new', 'community-showcase-new', 'personal-space-new'].includes(String(route.name)))
+const rootRouteName = computed(() => personalMode.value ? 'personal-space' : showcaseMode.value ? 'community-showcase' : 'community')
+const composerRouteName = computed(() => personalMode.value ? 'personal-space-new' : showcaseMode.value ? 'community-showcase-new' : 'community-new')
+const threadRouteName = computed(() => personalMode.value ? 'personal-space-thread' : showcaseMode.value ? 'community-showcase-thread' : 'community-thread')
+const rootPath = computed(() => personalMode.value ? '/lunastev' : showcaseMode.value ? '/community/showcase' : '/community')
 const activeSort = computed(() => ['latest', 'active', 'top'].includes(String(route.query.sort)) ? String(route.query.sort) : 'latest')
 const activeQuery = computed(() => String(route.query.q ?? ''))
 const postableSpaces = computed(() => spaces.value.filter((space) =>
@@ -66,9 +67,14 @@ const personalSpaces = computed(() => {
   return spaces.value.filter((space) => space.postingPolicy === 'owner')
     .sort((left, right) => (order.get(left.id) ?? 99) - (order.get(right.id) ?? 99))
 })
-const memberSpaces = computed(() => spaces.value.filter((space) => space.postingPolicy !== 'owner'))
-const modeSpaces = computed(() => personalMode.value ? personalSpaces.value : memberSpaces.value)
-const selectedSpaceID = computed(() => modeSpaces.value.some((space) => space.id === activeSpace.value) ? activeSpace.value : '')
+const memberSpaces = computed(() => {
+	const order = new Map(['general', 'development', 'operating-systems', 'web', 'compiler', 'audio', 'gui', 'help'].map((id, index) => [id, index]))
+	return spaces.value.filter((space) => space.postingPolicy !== 'owner' && space.id !== 'showcase')
+		.sort((left, right) => (order.get(left.id) ?? 99) - (order.get(right.id) ?? 99))
+})
+const showcaseSpaces = computed(() => spaces.value.filter((space) => space.id === 'showcase'))
+const modeSpaces = computed(() => personalMode.value ? personalSpaces.value : showcaseMode.value ? showcaseSpaces.value : memberSpaces.value)
+const selectedSpaceID = computed(() => showcaseMode.value ? (showcaseSpaces.value[0]?.id ?? '') : modeSpaces.value.some((space) => space.id === activeSpace.value) ? activeSpace.value : '')
 const currentSpaceID = computed(() => selectedSpaceID.value || thread.value?.spaceId || '')
 const activeSpacePolicy = computed(() => spaces.value.find((space) => space.id === currentSpaceID.value)?.postingPolicy ?? 'members')
 const canOpenComposer = computed(() => {
@@ -78,11 +84,13 @@ const canOpenComposer = computed(() => {
 })
 const visibleThreads = computed(() => {
   const personalIDs = new Set(personalSpaces.value.map((space) => space.id))
-  return threads.value.filter((item) => personalIDs.has(item.spaceId) === personalMode.value)
+	if (personalMode.value) return threads.value.filter((item) => personalIDs.has(item.spaceId))
+	if (showcaseMode.value) return threads.value.filter((item) => item.spaceId === 'showcase')
+	return threads.value.filter((item) => !personalIDs.has(item.spaceId) && item.spaceId !== 'showcase')
 })
 const composerSpaces = computed(() => postableSpaces.value.filter((space) =>
-  (space.postingPolicy === 'owner') === personalMode.value))
-const showTopics = computed(() => !personalMode.value && topicCounts.value.length > 0)
+	personalMode.value ? space.postingPolicy === 'owner' : showcaseMode.value ? space.id === 'showcase' : space.postingPolicy !== 'owner' && space.id !== 'showcase'))
+const showTopics = computed(() => !personalMode.value && !showcaseMode.value && topicCounts.value.length > 0)
 const topicCounts = computed(() => {
   const counts = new Map<string, number>()
   for (const item of visibleThreads.value) for (const tag of item.tags) counts.set(tag, (counts.get(tag) ?? 0) + 1)
@@ -217,7 +225,10 @@ async function load() {
     if (threadID.value) {
       const [selected, latest] = await Promise.all([getCommunityThread(threadID.value), getCommunityThreads('', { sort: 'active', limit: 30 })])
       const selectedSpace = spaces.value.find((space) => space.id === selected.spaceId)
-      if (!selectedSpace || (selectedSpace.postingPolicy === 'owner') !== personalMode.value) throw new Error('thread belongs to another space')
+		const belongsToMode = selectedSpace && (personalMode.value
+			? selectedSpace.postingPolicy === 'owner'
+			: showcaseMode.value ? selectedSpace.id === 'showcase' : selectedSpace.postingPolicy !== 'owner' && selectedSpace.id !== 'showcase')
+		if (!belongsToMode) throw new Error('thread belongs to another space')
       thread.value = selected
       threads.value = latest
     } else {
@@ -352,7 +363,13 @@ async function uploadPostImage(event: Event) {
 
 watch(() => route.fullPath, load, { immediate: true })
 watchEffect(() => {
-  if (!thread.value) return
+	if (!thread.value) {
+		if (showcaseMode.value) applyPageSEO({
+			title: `${t('community.showcaseTitle')} · Wave`, description: t('community.showcaseLead'),
+			locale: locale.value, path: route.path, schema: { '@type': 'CollectionPage', name: t('community.showcaseHeading') },
+		})
+		return
+	}
   const root = thread.value.root
   const author = { '@type': 'Person', name: authorName(root.author) }
   const comments = thread.value.replies.map((reply) => ({
@@ -362,12 +379,12 @@ watchEffect(() => {
     author: { '@type': 'Person', name: authorName(reply.author) },
   }))
   applyPageSEO({
-    title: `${thread.value.title} · ${personalMode.value ? 'LunaStev' : 'Wave Community'}`,
+    title: `${thread.value.title} · ${personalMode.value ? 'LunaStev' : showcaseMode.value ? 'Wave Showcase' : 'Wave Community'}`,
     description: plainTextDescription(root.body, thread.value.title),
     locale: locale.value,
     path: route.path,
     schema: {
-      '@type': personalMode.value ? 'BlogPosting' : 'DiscussionForumPosting',
+		'@type': personalMode.value ? 'BlogPosting' : showcaseMode.value ? 'CreativeWork' : 'DiscussionForumPosting',
       headline: thread.value.title,
       text: plainText(root.body),
       datePublished: root.createdAt,
@@ -385,29 +402,36 @@ watchEffect(() => {
 </script>
 
 <template>
-  <main class="community-hub">
-    <header class="community-bar">
+  <main class="community-hub" :class="{ 'showcase-hub': showcaseMode }">
+    <header class="community-bar" :class="{ 'showcase-bar': showcaseMode }">
       <div class="community-width community-bar-inner">
-        <h1>{{ personalMode ? t('community.personalTitle') : t('community.title') }}</h1>
+		<h1>{{ personalMode ? t('community.personalTitle') : showcaseMode ? t('community.showcaseTitle') : t('community.title') }}</h1>
         <form class="community-search" role="search" @submit.prevent="search">
           <Search :size="16" aria-hidden="true" />
           <input v-model="searchText" :placeholder="t('community.search')" :aria-label="t('community.search')" />
         </form>
-        <button v-if="canOpenComposer" class="community-write" type="button" @click="openComposer">{{ t('community.write') }}</button>
+		<button v-if="canOpenComposer" class="community-write" type="button" @click="openComposer">{{ showcaseMode ? t('community.showcaseShare') : t('community.write') }}</button>
       </div>
     </header>
 
-    <div class="community-width community-workspace" :class="{ 'has-topics': showTopics, 'personal-section': personalMode }">
-      <aside v-if="!personalMode" class="community-spaces" :aria-label="t('community.spaces')">
+    <div class="community-width community-workspace" :class="{ 'has-topics': showTopics, 'personal-section': personalMode, 'showcase-section': showcaseMode }">
+      <aside v-if="!personalMode && !showcaseMode" class="community-spaces" :aria-label="t('community.spaces')">
         <strong>{{ t('community.spaces') }}</strong>
         <button type="button" :class="{ active: !activeSpace && !threadID }" @click="selectSpace('')">{{ t('community.all') }}</button>
         <button v-for="space in memberSpaces" :key="space.id" type="button"
           :class="{ active: activeSpace === space.id || thread?.spaceId === space.id }" @click="selectSpace(space.id)">
           {{ spaceName(space) }}
         </button>
+		<RouterLink class="showcase-space-link" to="/community/showcase"><Eye :size="15" aria-hidden="true" />{{ t('community.showcaseTitle') }}</RouterLink>
       </aside>
 
       <section class="community-feed" aria-live="polite">
+		<header v-if="showcaseMode && !threadID && !isComposer" class="showcase-intro">
+		  <span>{{ t('community.showcaseEyebrow') }}</span>
+		  <h2>{{ t('community.showcaseHeading') }}</h2>
+		  <p>{{ t('community.showcaseLead') }}</p>
+		  <RouterLink to="/community">← {{ t('community.back') }}</RouterLink>
+		</header>
         <nav v-if="personalMode && !threadID && !isComposer" class="personal-category-tabs" :aria-label="t('community.personalCategories')">
           <button type="button" :class="{ active: !selectedSpaceID }" @click="selectSpace('')">{{ t('community.personalAll') }}</button>
           <button v-for="space in personalSpaces" :key="space.id" type="button"
@@ -423,8 +447,8 @@ watchEffect(() => {
             <RouterLink :to="rootPath">← {{ personalMode ? t('community.personalTitle') : t('community.back') }}</RouterLink>
             <h2>{{ t('community.createPost') }}</h2>
           </header>
-          <label for="post-space">{{ t('community.category') }}</label>
-          <select id="post-space" v-model="postSpace" required>
+		  <label v-if="!showcaseMode" for="post-space">{{ t('community.category') }}</label>
+		  <select v-if="!showcaseMode" id="post-space" v-model="postSpace" required>
             <option v-for="space in composerSpaces" :key="space.id" :value="space.id">{{ spaceName(space) }}</option>
           </select>
           <label for="post-title">{{ t('community.postTitle') }}</label>
@@ -516,7 +540,22 @@ watchEffect(() => {
             <button v-for="sort in ['latest', 'active', 'top']" :key="sort" type="button" :class="{ active: activeSort === sort }" @click="selectSort(sort)">{{ t(`community.sort.${sort}`) }}</button>
             <span>{{ visibleThreads.length }} {{ t('community.posts') }}</span>
           </nav>
-          <div v-if="visibleThreads.length" class="thread-list">
+		  <div v-if="showcaseMode && visibleThreads.length" class="showcase-grid">
+			<article v-for="item in visibleThreads" :key="item.id" class="showcase-card">
+			  <div class="showcase-card-meta"><span v-if="item.pinned">{{ t('community.pinned') }}</span><time :datetime="item.createdAt">{{ formatDate(item.createdAt) }}</time></div>
+			  <RouterLink :to="{ name: threadRouteName, params: { thread: item.id } }">{{ item.title }}</RouterLink>
+			  <p>{{ item.excerpt }}</p>
+			  <div class="showcase-card-tags"><span v-for="tag in item.tags" :key="tag">{{ tag }}</span></div>
+			  <footer>
+				<RouterLink v-if="authorProfile(item.author, item.authorAccountId)" :to="authorProfile(item.author, item.authorAccountId)">{{ authorName(item.author) }}</RouterLink><strong v-else>{{ authorName(item.author) }}</strong>
+				<span><ArrowBigUp :size="14" />{{ item.score }}</span><span><MessageSquare :size="14" />{{ item.replyCount }}</span><span><Eye :size="14" />{{ item.viewCount }}</span>
+			  </footer>
+			</article>
+			<button v-if="hasMore" class="community-load-more" type="button" :disabled="loadingMore" @click="loadMore">
+			  {{ loadingMore ? t('common.loading') : t('common.more') }}
+			</button>
+		  </div>
+          <div v-else-if="visibleThreads.length" class="thread-list">
             <article v-for="item in visibleThreads" :key="item.id" class="forum-post-row">
               <div class="community-vote-rail compact">
                 <button type="button" :class="{ active: item.viewerVote === 1 }" :aria-label="t('community.upvote')" @click="voteSummary(item, 1)"><ArrowBigUp :size="19" /></button>

@@ -177,6 +177,8 @@ export interface SponsorMember {
 	imageUrl: string
 	website: string
 	type: string
+	amount: number
+	currency: string
 }
 
 export interface SponsorTier {
@@ -516,7 +518,8 @@ export async function getSponsors(): Promise<SponsorsView> {
 			currency: childText(tier, 'currency'), interval: childText(tier, 'interval'),
 			members: Array.from(tier.querySelectorAll('members > member')).map((member) => ({
 				name: childText(member, 'name'), profile: childText(member, 'profile'), imageUrl: childText(member, 'image-url'),
-				website: childText(member, 'website'), type: childText(member, 'type'),
+				website: childText(member, 'website'), type: childText(member, 'type'), amount: Number(childText(member, 'amount')),
+				currency: childText(member, 'currency'),
 			})),
 		})),
 	}

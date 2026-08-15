@@ -80,6 +80,15 @@ func TestRouterServesAPIAndSPA(t *testing.T) {
 		}
 	}
 
+	showcaseRequest := httptest.NewRequest(http.MethodGet, "/community/showcase", nil)
+	showcaseResponse := httptest.NewRecorder()
+	router.ServeHTTP(showcaseResponse, showcaseRequest)
+	for _, expected := range []string{`<title>Showcase · Wave</title>`, `rel="canonical" href="https://wave.example/community/showcase"`} {
+		if !strings.Contains(showcaseResponse.Body.String(), expected) {
+			t.Fatalf("showcase HTML does not contain %q", expected)
+		}
+	}
+
 	request := httptest.NewRequest(http.MethodGet, "/account/security", nil)
 	response := httptest.NewRecorder()
 	router.ServeHTTP(response, request)

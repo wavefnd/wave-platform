@@ -29,11 +29,13 @@ type SponsorTierView struct {
 }
 
 type SponsorMemberView struct {
-	Name     string `xml:"name"`
-	Profile  string `xml:"profile"`
-	ImageURL string `xml:"image-url,omitempty"`
-	Website  string `xml:"website,omitempty"`
-	Type     string `xml:"type,omitempty"`
+	Name     string  `xml:"name"`
+	Profile  string  `xml:"profile"`
+	ImageURL string  `xml:"image-url,omitempty"`
+	Website  string  `xml:"website,omitempty"`
+	Type     string  `xml:"type,omitempty"`
+	Amount   float64 `xml:"amount,omitempty"`
+	Currency string  `xml:"currency,omitempty"`
 }
 
 func (handler SponsorsHandler) List(writer http.ResponseWriter, request *http.Request) {
@@ -47,7 +49,8 @@ func (handler SponsorsHandler) List(writer http.ResponseWriter, request *http.Re
 		view := SponsorTierView{Name: tier.Name, Slug: tier.Slug, Amount: tier.Amount, Currency: tier.Currency, Interval: tier.Interval}
 		for _, member := range tier.Members {
 			view.Members = append(view.Members, SponsorMemberView{Name: member.Name, Profile: member.Profile,
-				ImageURL: member.ImageURL, Website: member.Website, Type: member.Type})
+				ImageURL: member.ImageURL, Website: member.Website, Type: member.Type,
+				Amount: member.Amount, Currency: member.Currency})
 		}
 		response.Tiers = append(response.Tiers, view)
 	}

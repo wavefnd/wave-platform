@@ -74,6 +74,7 @@ func (handler SEOHandler) Sitemap(writer http.ResponseWriter, request *http.Requ
 		{Location: base + "/docs"},
 		{Location: base + "/blog"},
 		{Location: base + "/community"},
+		{Location: base + "/community/showcase"},
 		{Location: base + "/lunastev"},
 		{Location: base + "/questions"},
 		{Location: base + "/source"},
@@ -104,10 +105,14 @@ func (handler SEOHandler) Sitemap(writer http.ResponseWriter, request *http.Requ
 		if threads, err := handler.community.Threads("", 0); err == nil {
 			for _, thread := range threads {
 				section := "community"
+				pathSegments := []string{section, "thread", thread.ID}
 				if thread.SpaceID == "founder-notes" || thread.SpaceID == "development-log" {
 					section = "lunastev"
+					pathSegments = []string{section, "thread", thread.ID}
+				} else if thread.SpaceID == "showcase" {
+					pathSegments = []string{"community", "showcase", thread.ID}
 				}
-				entries = append(entries, sitemapURL{Location: handler.location(base, section, "thread", thread.ID), LastModified: dateOnly(thread.LastActivityAt)})
+				entries = append(entries, sitemapURL{Location: handler.location(base, pathSegments...), LastModified: dateOnly(thread.LastActivityAt)})
 			}
 		}
 	}
@@ -210,16 +215,25 @@ func (handler SEOHandler) metadata(requestPath, base string) pageMetadata {
 		}
 	case "community", "lunastev":
 		personal := first == "lunastev"
+		showcase := !personal && len(segments) > 1 && segments[1] == "showcase"
 		metadata.Title = map[bool]string{true: "LunaStev · Wave", false: "Community · Wave"}[personal]
 		metadata.Description = "Wave programming language community posts and technical discussions."
 		metadata.SchemaType = "CollectionPage"
-		if len(segments) == 3 && segments[1] == "thread" && handler.community != nil {
+		if showcase {
+			metadata.Title = "Showcase · Wave"
+			metadata.Description = "Tools, applications, experiments, and systems built by the Wave community."
+		}
+		if len(segments) == 3 && (segments[1] == "thread" || segments[1] == "showcase") && handler.community != nil {
 			if threads, err := handler.community.Threads("", 0); err == nil {
 				for _, thread := range threads {
 					if thread.ID != segments[2] {
 						continue
 					}
-					metadata.Title = thread.Title + map[bool]string{true: " · LunaStev", false: " · Wave Community"}[personal]
+					suffix := map[bool]string{true: " · LunaStev", false: " · Wave Community"}[personal]
+					if showcase {
+						suffix = " · Wave Showcase"
+					}
+					metadata.Title = thread.Title + suffix
 					metadata.Description = thread.Excerpt
 					metadata.OpenGraph = "article"
 					metadata.SchemaType = "WebPage"

@@ -29,6 +29,11 @@ func SeedSpaces(database *storage.Database) error {
 		{ID: "development-log", Slug: "development-log", Name: "Development Log", Visibility: "public", PostingPolicy: "owner"},
 		{ID: "general", Slug: "general", Name: "General", Visibility: "public", PostingPolicy: "members"},
 		{ID: "development", Slug: "development", Name: "Development", Visibility: "public", PostingPolicy: "members"},
+		{ID: "operating-systems", Slug: "operating-systems", Name: "Operating Systems", Visibility: "public", PostingPolicy: "members"},
+		{ID: "web", Slug: "web", Name: "Web", Visibility: "public", PostingPolicy: "members"},
+		{ID: "compiler", Slug: "compiler", Name: "Compiler", Visibility: "public", PostingPolicy: "members"},
+		{ID: "audio", Slug: "audio", Name: "Audio", Visibility: "public", PostingPolicy: "members"},
+		{ID: "gui", Slug: "gui", Name: "GUI", Visibility: "public", PostingPolicy: "members"},
 		{ID: "showcase", Slug: "showcase", Name: "Showcase", Visibility: "public", PostingPolicy: "members"},
 		{ID: "help", Slug: "help", Name: "Help", Visibility: "public", PostingPolicy: "members"},
 	}

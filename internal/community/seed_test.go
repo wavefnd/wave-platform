@@ -93,4 +93,13 @@ func TestSeedSpacesIncludesPersonalWritingCategories(t *testing.T) {
 			t.Fatalf("personal space %q = %#v", id, space)
 		}
 	}
+	for _, id := range []string{"general", "development", "operating-systems", "web", "compiler", "audio", "gui", "showcase", "help"} {
+		space, err := repository.Space(id)
+		if err != nil {
+			t.Fatalf("member space %q: %v", id, err)
+		}
+		if space.PostingPolicy != "members" || space.Visibility != "public" {
+			t.Fatalf("member space %q = %#v", id, space)
+		}
+	}
 }

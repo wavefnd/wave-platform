@@ -51,6 +51,13 @@ function formatDate(value: string) {
   }).format(new Date(value))
 }
 
+function sponsorAmount(amount: number, currency: string) {
+	if (!amount || !currency) return ''
+	return new Intl.NumberFormat(locale.value === 'ko' ? 'ko-KR' : 'en-US', {
+		style: 'currency', currency, maximumFractionDigits: 2,
+	}).format(amount)
+}
+
 async function copyInstall() {
   await navigator.clipboard.writeText(installCommand.value)
   copied.value = true
@@ -73,7 +80,7 @@ onMounted(async () => {
   ])
   if (releaseResult.status === 'fulfilled') releases.value = releaseResult.value
   if (discussionResult.status === 'fulfilled' && spaceResult.status === 'fulfilled') {
-    const communitySpaceIDs = new Set(spaceResult.value.filter((space) => space.postingPolicy !== 'owner').map((space) => space.id))
+    const communitySpaceIDs = new Set(spaceResult.value.filter((space) => space.postingPolicy !== 'owner' && space.id !== 'showcase').map((space) => space.id))
     discussions.value = discussionResult.value.filter((thread) => communitySpaceIDs.has(thread.spaceId)).slice(0, 5)
   }
   if (questionResult.status === 'fulfilled') unansweredQuestions.value = questionResult.value.slice(0, 5)
@@ -187,8 +194,8 @@ onMounted(async () => {
 		<header><h2>{{ t('home.sponsors') }}</h2><a :href="sponsors.url" target="_blank" rel="noopener noreferrer">{{ t('home.sponsorProject') }}</a></header>
 		<div v-if="sponsors.tiers.some((tier) => tier.members.length)" class="sponsor-tiers">
 		  <section v-for="tier in sponsors.tiers.filter((item) => item.members.length)" :key="tier.slug" class="sponsor-tier">
-			<h3>{{ tier.name }}</h3>
-			<ul><li v-for="member in tier.members" :key="member.profile"><a :href="member.profile" target="_blank" rel="noopener noreferrer">{{ member.name }}</a></li></ul>
+			<h3>{{ tier.slug === 'one-time' ? t('home.oneTimeSupporters') : tier.name }}</h3>
+			<ul><li v-for="member in tier.members" :key="member.profile"><a :href="member.profile" target="_blank" rel="noopener noreferrer">{{ member.name }}</a><small v-if="tier.interval === 'one-time' && member.amount">{{ sponsorAmount(member.amount, member.currency) }}</small></li></ul>
 		  </section>
 		</div>
 		<p v-else class="sponsor-empty"><a :href="sponsors.url" target="_blank" rel="noopener noreferrer">{{ t('home.noSponsors') }}</a></p>

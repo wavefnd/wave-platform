@@ -22,6 +22,8 @@ type Member struct {
 	ImageURL string
 	Website  string
 	Type     string
+	Amount   float64
+	Currency string
 }
 
 type Tier struct {
@@ -78,7 +80,7 @@ func (service *Service) Collective(ctx context.Context) (Collective, error) {
 }
 
 func (service *Service) fetch(ctx context.Context) (Collective, error) {
-	const query = `query($slug:String!){account(slug:$slug){name slug ... on AccountWithContributions {tiers(limit:50){nodes{name slug amount{value currency} interval}}} members(role:BACKER,limit:100){nodes{isActive tier{name slug} account{name slug imageUrl website type}}}}}`
+	const query = `query($slug:String!){account(slug:$slug){name slug ... on AccountWithContributions {tiers(limit:50){nodes{name slug amount{value currency} interval}} contributors(limit:100,roles:[BACKER]){nodes{id isBacker hasPublicProfile totalAmountContributed{value currency} account{name slug imageUrl website type}}} activeContributors(limit:100,includeActiveRecurringContributions:false){nodes{name slug}}} members(role:BACKER,limit:100){nodes{isActive tier{name slug} account{name slug imageUrl website type}}}}}`
 	payload, _ := json.Marshal(map[string]any{"query": query, "variables": map[string]string{"slug": "wave-lang"}})
 	request, err := http.NewRequestWithContext(ctx, http.MethodPost, service.endpoint, bytes.NewReader(payload))
 	if err != nil {
@@ -124,6 +126,30 @@ func (service *Service) fetch(ctx context.Context) (Collective, error) {
 						} `json:"account"`
 					} `json:"nodes"`
 				} `json:"members"`
+				Contributors struct {
+					Nodes []struct {
+						ID               string `json:"id"`
+						Backer           bool   `json:"isBacker"`
+						HasPublicProfile bool   `json:"hasPublicProfile"`
+						TotalAmount      struct {
+							Value    float64 `json:"value"`
+							Currency string  `json:"currency"`
+						} `json:"totalAmountContributed"`
+						Account struct {
+							Name     string `json:"name"`
+							Slug     string `json:"slug"`
+							ImageURL string `json:"imageUrl"`
+							Website  string `json:"website"`
+							Type     string `json:"type"`
+						} `json:"account"`
+					} `json:"nodes"`
+				} `json:"contributors"`
+				ActiveContributors struct {
+					Nodes []struct {
+						Name string `json:"name"`
+						Slug string `json:"slug"`
+					} `json:"nodes"`
+				} `json:"activeContributors"`
 			} `json:"account"`
 		} `json:"data"`
 		Errors []json.RawMessage `json:"errors"`
@@ -138,14 +164,36 @@ func (service *Service) fetch(ctx context.Context) (Collective, error) {
 		tiers = append(tiers, Tier{Name: source.Name, Slug: source.Slug, Amount: source.Amount.Value,
 			Currency: source.Amount.Currency, Interval: source.Interval})
 	}
+	recurringAccounts := make(map[string]bool)
 	for _, source := range document.Data.Account.Members.Nodes {
 		index, exists := bySlug[source.Tier.Slug]
 		if !source.Active || !exists || source.Account.Name == "" {
 			continue
 		}
+		recurringAccounts[source.Account.Slug] = true
 		tiers[index].Members = append(tiers[index].Members, Member{Name: source.Account.Name,
 			Profile: "https://opencollective.com/" + source.Account.Slug, ImageURL: source.Account.ImageURL,
 			Website: source.Account.Website, Type: source.Account.Type})
+	}
+	oneTime := Tier{Name: "One-time supporters", Slug: "one-time", Interval: "one-time"}
+	activeOneTime := make(map[string]bool, len(document.Data.Account.ActiveContributors.Nodes))
+	for _, source := range document.Data.Account.ActiveContributors.Nodes {
+		activeOneTime[source.Slug] = true
+	}
+	for _, source := range document.Data.Account.Contributors.Nodes {
+		if !source.Backer || !source.HasPublicProfile || source.Account.Name == "" || !activeOneTime[source.Account.Slug] || recurringAccounts[source.Account.Slug] {
+			continue
+		}
+		profile := DefaultCollectiveURL
+		if source.Account.Slug != "" {
+			profile = "https://opencollective.com/" + source.Account.Slug
+		}
+		oneTime.Members = append(oneTime.Members, Member{Name: source.Account.Name, Profile: profile,
+			ImageURL: source.Account.ImageURL, Website: source.Account.Website, Type: source.Account.Type,
+			Amount: source.TotalAmount.Value, Currency: source.TotalAmount.Currency})
+	}
+	if len(oneTime.Members) > 0 {
+		tiers = append(tiers, oneTime)
 	}
 	sort.SliceStable(tiers, func(left, right int) bool { return tiers[left].Amount > tiers[right].Amount })
 	for index := range tiers {
