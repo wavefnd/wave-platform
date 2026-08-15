@@ -74,6 +74,43 @@ func TestRegisterCreatesAddressAuthenticatorMailboxAndSession(t *testing.T) {
 	}
 }
 
+func TestCompletedRegistrationReceivesFounderWelcomeMail(t *testing.T) {
+	database, err := storage.Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer database.Close()
+	service := newTestIdentity(t, database)
+	founder, created, err := service.BootstrapTOTPAdmin("LunaStev", "lunastev", "founder@example.net", testTOTPSecret)
+	if err != nil || !created {
+		t.Fatalf("bootstrap founder: created=%v err=%v", created, err)
+	}
+	enrollment, err := service.BeginTOTPRegistration("New Member", "", "member@example.net")
+	if err != nil {
+		t.Fatal(err)
+	}
+	code, err := totp.GenerateCode(enrollment.Secret, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	member, _, _, err := service.CompleteTOTPRegistration(enrollment.Token, code, "registration-test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	inbox, err := service.MailboxItems(member.ID, "Inbox")
+	if err != nil || len(inbox) != 1 {
+		t.Fatalf("welcome inbox=%#v err=%v", inbox, err)
+	}
+	welcome := inbox[0]
+	if welcome.Message.Subject != "Welcome to the Wave community" || welcome.Message.AuthorAccountID != founder.ID ||
+		!strings.Contains(welcome.Body, "https://opencollective.com/wave-lang") || !strings.Contains(welcome.Body, "Hi New Member,") {
+		t.Fatalf("welcome message=%#v body=%q", welcome.Message, welcome.Body)
+	}
+	if welcome.DeliveryStatus != "delivered" || !containsFlag(welcome.Entry.Flags, "unread") {
+		t.Fatalf("welcome entry=%#v delivery=%q", welcome.Entry, welcome.DeliveryStatus)
+	}
+}
+
 func TestExternalMailIsQueuedWithoutCreatingARecipientMailboxEntry(t *testing.T) {
 	database, err := storage.Open(t.TempDir())
 	if err != nil {

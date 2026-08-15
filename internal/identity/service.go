@@ -352,8 +352,56 @@ func (service *Service) CompleteTOTPRegistration(token, code, userAgent string) 
 	}
 	_ = service.totp.DeleteEnrollment(token)
 	_ = service.sendRecoveryVerification(item.ID, enrollment.RecoveryEmail)
+	_ = service.sendWelcomeMail(item)
 	sessionToken, currentSession, err := service.sessions.Create(item.ID, userAgent)
 	return item, sessionToken, currentSession, err
+}
+
+func (service *Service) sendWelcomeMail(recipient account.Account) error {
+	founder, err := service.founderAccount()
+	if err != nil {
+		return err
+	}
+	body := strings.Join([]string{
+		"Hi " + recipient.DisplayName + ",",
+		"",
+		"Welcome to the Wave programming language community.",
+		"",
+		"Wave is an open-source systems programming language project built to explore safe, expressive, and practical software from applications down to the system layer. This platform is the shared home for its language, documentation, source, mail, questions, and community.",
+		"",
+		"You can exchange mail with other Wave members, meet people across the community, share what you are building, ask for help, and take part in the project. Contributions such as code, documentation, bug reports, design ideas, testing, and helping other members all support Wave and its maintainers.",
+		"",
+		"If you would also like to support ongoing development financially, you can sponsor Wave through Open Collective:",
+		"https://opencollective.com/wave-lang",
+		"",
+		"I am glad you are here.",
+		"",
+		"— " + founder.DisplayName,
+		"Founder of Wave",
+	}, "\n")
+	_, err = service.SendMail(founder, OutgoingMail{To: recipient.Email, Subject: "Welcome to the Wave community", Body: body})
+	return err
+}
+
+func (service *Service) founderAccount() (account.Account, error) {
+	items, err := service.accounts.Accounts()
+	if err != nil {
+		return account.Account{}, err
+	}
+	var founder account.Account
+	for _, item := range items {
+		owner, roleErr := service.permissions.HasRole(item.ID, "platform-owner")
+		if roleErr != nil {
+			return account.Account{}, roleErr
+		}
+		if owner && (founder.ID == "" || item.CreatedAt.Before(founder.CreatedAt)) {
+			founder = item
+		}
+	}
+	if founder.ID == "" {
+		return account.Account{}, storage.ErrNotFound
+	}
+	return founder, nil
 }
 
 func (service *Service) AuthenticateTOTP(identifier, code, userAgent string) (account.Account, string, session.Session, error) {
