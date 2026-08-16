@@ -70,6 +70,7 @@ func (handler SEOHandler) Sitemap(writer http.ResponseWriter, request *http.Requ
 		{Location: base + "/"},
 		{Location: base + "/docs"},
 		{Location: base + "/blog"},
+		{Location: base + "/releases"},
 		{Location: base + "/community"},
 		{Location: base + "/community/showcase"},
 		{Location: base + "/lunastev"},
@@ -87,7 +88,11 @@ func (handler SEOHandler) Sitemap(writer http.ResponseWriter, request *http.Requ
 	if handler.blog != nil {
 		if posts, err := handler.blog.Repository().Posts(false, 0); err == nil {
 			for _, post := range posts {
-				entries = append(entries, sitemapURL{Location: handler.location(base, "blog", post.Slug), LastModified: dateOnly(post.UpdatedAt.Format(time.RFC3339))})
+				section := "blog"
+				if post.Category == "release" {
+					section = "releases"
+				}
+				entries = append(entries, sitemapURL{Location: handler.location(base, section, post.Slug), LastModified: dateOnly(post.UpdatedAt.Format(time.RFC3339))})
 			}
 		}
 	}
@@ -190,6 +195,21 @@ func (handler SEOHandler) metadata(requestPath, base string) pageMetadata {
 				metadata.Description = post.Summary
 				metadata.OpenGraph = "article"
 				metadata.SchemaType = "Article"
+				if post.Category == "release" {
+					metadata.Canonical = handler.location(base, "releases", post.Slug)
+				}
+			}
+		}
+	case "releases":
+		metadata.Title = "Wave Releases"
+		metadata.Description = "Published Wave versions, release dates, and the changes included in each version."
+		metadata.SchemaType = "CollectionPage"
+		if len(segments) > 1 && handler.blog != nil {
+			if post, err := handler.blog.Repository().Post(segments[1], false); err == nil && post.Category == "release" {
+				metadata.Title = post.Title + " · Wave Releases"
+				metadata.Description = post.Summary
+				metadata.OpenGraph = "article"
+				metadata.SchemaType = "TechArticle"
 			}
 		}
 	case "community", "lunastev":

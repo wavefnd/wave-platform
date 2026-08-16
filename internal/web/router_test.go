@@ -91,8 +91,8 @@ func TestRouterServesAPIAndSPA(t *testing.T) {
 	releaseRequest := httptest.NewRequest(http.MethodGet, "/releases/wave-v0-2-0", nil)
 	releaseResponse := httptest.NewRecorder()
 	router.ServeHTTP(releaseResponse, releaseRequest)
-	if releaseResponse.Code != http.StatusPermanentRedirect || releaseResponse.Header().Get("Location") != "/blog/wave-v0-2-0" {
-		t.Fatalf("release redirect status=%d location=%q", releaseResponse.Code, releaseResponse.Header().Get("Location"))
+	if releaseResponse.Code != http.StatusOK || !strings.Contains(releaseResponse.Body.String(), "<main>Wave</main>") {
+		t.Fatalf("release SPA status=%d body=%q", releaseResponse.Code, releaseResponse.Body.String())
 	}
 
 	request := httptest.NewRequest(http.MethodGet, "/account/security", nil)

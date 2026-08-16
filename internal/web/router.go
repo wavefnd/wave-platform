@@ -136,9 +136,6 @@ func NewRouter(
 	mux.HandleFunc("GET /health/ready", healthHandler.Ready)
 	mux.HandleFunc("GET /robots.txt", seoHandler.Robots)
 	mux.HandleFunc("GET /sitemap.xml", seoHandler.Sitemap)
-	mux.HandleFunc("GET /releases/{slug}", func(writer http.ResponseWriter, request *http.Request) {
-		http.Redirect(writer, request, "/blog/"+request.PathValue("slug"), http.StatusPermanentRedirect)
-	})
 	mux.HandleFunc("GET /community/announcements/{slug}", func(writer http.ResponseWriter, request *http.Request) {
 		http.Redirect(writer, request, "/blog/"+request.PathValue("slug"), http.StatusPermanentRedirect)
 	})

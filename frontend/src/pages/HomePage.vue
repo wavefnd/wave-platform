@@ -101,11 +101,11 @@ onMounted(async () => {
       <section v-if="releases.length" id="releases" class="portal-module">
         <header>
           <h1>{{ t('home.latestReleases') }}</h1>
-		  <RouterLink to="/blog?category=release">{{ t('common.more') }}</RouterLink>
+		  <RouterLink to="/releases">{{ t('common.more') }}</RouterLink>
         </header>
         <ul class="portal-data-list">
           <li v-for="(release, index) in releases" :key="release.slug" :class="{ featured: index === 0 }">
-            <RouterLink :to="`/blog/${release.slug}`" :title="release.title">{{ release.title }}</RouterLink>
+			<RouterLink :to="`/releases/${release.slug}`" :title="release.title">{{ release.title }}</RouterLink>
             <time :datetime="release.publishedAt">{{ formatDate(release.publishedAt) }}</time>
           </li>
         </ul>
