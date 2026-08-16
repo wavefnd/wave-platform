@@ -49,6 +49,9 @@
 .portal-module > header a:hover,
 .portal-install-module > a:hover { color: var(--wave-accent); text-decoration: underline; }
 
+.portal-module-actions { display: flex; align-items: center; gap: 12px; }
+.portal-module-actions a { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+
 .install-platform-tabs { display: inline-flex; align-items: center; gap: 2px; }
 .install-platform-tabs button { min-height: 28px; padding: 3px 8px; border: 1px solid transparent; border-radius: var(--wave-radius-sm); background: transparent; color: var(--wave-text-muted); cursor: pointer; font-size: 11px; }
 .install-platform-tabs button:hover { border-color: var(--wave-border); color: var(--wave-text); }

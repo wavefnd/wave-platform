@@ -2,6 +2,7 @@
 import { Check, Copy } from '@lucide/vue'
 import { computed, onMounted, ref } from 'vue'
 
+import GitHubMark from '../components/icons/GitHubMark.vue'
 import { useI18n } from '../i18n'
 import {
   getCommunityThreads,
@@ -162,18 +163,22 @@ onMounted(async () => {
         <RouterLink to="/docs/getting-started/install">{{ t('home.start.docs') }} →</RouterLink>
       </section>
 
-      <div class="portal-module-pair" :class="{ single: !repositories.length }">
-        <section v-if="repositories.length" class="portal-module portal-source-module">
+      <div class="portal-module-pair">
+        <section class="portal-module portal-source-module">
           <header>
             <h2>{{ t('home.recentSource') }}</h2>
-            <RouterLink to="/source">{{ t('common.more') }}</RouterLink>
+            <div class="portal-module-actions">
+              <a href="https://github.com/wavefnd/Wave" target="_blank" rel="noopener noreferrer"><GitHubMark :size="14" />{{ t('nav.github') }}</a>
+              <RouterLink to="/source">{{ t('common.more') }}</RouterLink>
+            </div>
           </header>
-          <ul class="portal-data-list portal-discussions">
+          <ul v-if="repositories.length" class="portal-data-list portal-discussions">
             <li v-for="repository in repositories" :key="repository.id">
               <RouterLink :to="{ name: 'source-repository', params: { repository: repository.id } }">{{ repository.owner }}/{{ repository.name }}</RouterLink>
               <small>{{ repository.headCommit?.subject }} · {{ formatDate(repository.headCommit?.authoredAt ?? '') }}</small>
             </li>
           </ul>
+          <p v-else class="portal-empty-state">{{ t('home.sourceEmpty') }}</p>
         </section>
 
         <section class="portal-module portal-lunastev-module">

@@ -216,6 +216,7 @@ a:hover { color: var(--wave-link-hover); }
 
 .platform-account select { cursor: pointer; }
 .platform-account .theme-toggle { display: grid; width: 32px; flex: 0 0 auto; place-items: center; padding: 0; }
+.platform-account .github-link { display: grid; width: 32px; flex: 0 0 auto; place-items: center; padding: 0; }
 
 .platform-account a:hover {
   border-color: var(--wave-border);

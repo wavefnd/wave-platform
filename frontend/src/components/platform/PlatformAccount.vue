@@ -4,6 +4,7 @@ import { onBeforeUnmount, onMounted, ref } from 'vue'
 
 import { useI18n, type Locale } from '../../i18n'
 import { useAuthStore } from '../../stores/auth'
+import GitHubMark from '../icons/GitHubMark.vue'
 import ThemeSelector from './ThemeSelector.vue'
 
 const { locale, setLocale, t } = useI18n()
@@ -41,6 +42,9 @@ onBeforeUnmount(() => {
 <template>
   <div class="platform-account">
     <ThemeSelector />
+    <a class="github-link" href="https://github.com/wavefnd/Wave" target="_blank" rel="noopener noreferrer" :aria-label="t('nav.github')" :title="t('nav.github')">
+      <GitHubMark :size="17" />
+    </a>
     <select :value="locale" :aria-label="t('nav.language')" @change="changeLocale">
       <option value="en">English</option>
       <option value="ko">한국어</option>
