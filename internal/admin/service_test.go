@@ -112,6 +112,47 @@ func TestOnlyOwnerCanChangeAdministratorRole(t *testing.T) {
 	}
 }
 
+func TestOnlyOwnerCanAssignSourceMaintainersIndependentlyFromAdministrators(t *testing.T) {
+	database, err := storage.Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = database.Close() })
+	now := time.Now().UTC()
+	accounts := account.NewRepository(database)
+	permissions := permission.NewRepository(database)
+	for _, id := range []string{"owner", "admin", "maintainer"} {
+		if err := accounts.Create(account.Account{ID: id, Username: id, DisplayName: id, Email: id + "@wave.test", Status: "active", CreatedAt: now, UpdatedAt: now}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	_ = permissions.Assign(permission.Assignment{AccountID: "owner", RoleID: "platform-owner", Scope: "platform"})
+	_ = permissions.Assign(permission.Assignment{AccountID: "admin", RoleID: "platform-admin", Scope: "platform"})
+	service := NewService(database, nil, false, false)
+	if err := service.UpdateSourceMaintainer("admin", "maintainer", true); !errors.Is(err, ErrForbidden) {
+		t.Fatalf("administrator assigned source maintainer: %v", err)
+	}
+	if err := service.UpdateSourceMaintainer("owner", "maintainer", true); err != nil {
+		t.Fatal(err)
+	}
+	assigned, err := permissions.HasRole("maintainer", "source-maintainer")
+	admin, adminErr := permissions.HasRole("maintainer", "platform-admin")
+	if err != nil || adminErr != nil || !assigned || admin {
+		t.Fatalf("source maintainer assigned=%v administrator=%v errors=%v/%v", assigned, admin, err, adminErr)
+	}
+	if err := service.UpdateSourceMaintainer("owner", "maintainer", false); err != nil {
+		t.Fatal(err)
+	}
+	assigned, err = permissions.HasRole("maintainer", "source-maintainer")
+	if err != nil || assigned {
+		t.Fatalf("source maintainer remained assigned=%v err=%v", assigned, err)
+	}
+	events, err := audit.NewRepository(database).Events(10)
+	if err != nil || len(events) != 2 || events[0].Action != "admin.source-maintainer.remove" || events[1].Action != "admin.source-maintainer.assign" {
+		t.Fatalf("audit events=%#v err=%v", events, err)
+	}
+}
+
 func TestLunaStevTimeZoneDefaultsToSeoulAndIsAudited(t *testing.T) {
 	database, err := storage.Open(t.TempDir())
 	if err != nil {

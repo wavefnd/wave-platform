@@ -92,15 +92,16 @@ type SecurityResponse struct {
 }
 
 type AccountResponse struct {
-	XMLName       xml.Name  `xml:"https://wave-lang.dev/ns/platform/api/v1 account-session"`
-	ID            string    `xml:"id"`
-	Username      string    `xml:"username"`
-	DisplayName   string    `xml:"display-name"`
-	Email         string    `xml:"email"`
-	TimeZone      string    `xml:"time-zone"`
-	Administrator bool      `xml:"administrator"`
-	Owner         bool      `xml:"owner"`
-	ExpiresAt     time.Time `xml:"expires-at"`
+	XMLName          xml.Name  `xml:"https://wave-lang.dev/ns/platform/api/v1 account-session"`
+	ID               string    `xml:"id"`
+	Username         string    `xml:"username"`
+	DisplayName      string    `xml:"display-name"`
+	Email            string    `xml:"email"`
+	TimeZone         string    `xml:"time-zone"`
+	Administrator    bool      `xml:"administrator"`
+	Owner            bool      `xml:"owner"`
+	SourceMaintainer bool      `xml:"source-maintainer"`
+	ExpiresAt        time.Time `xml:"expires-at"`
 }
 
 type ErrorResponse struct {
@@ -386,7 +387,8 @@ func (handler AuthHandler) allowMutation(writer http.ResponseWriter, request *ht
 func (handler AuthHandler) writeAccount(writer http.ResponseWriter, status int, item account.Account, currentSession session.Session) {
 	_ = xmlcodec.Write(writer, status, AccountResponse{ID: item.ID, Username: item.Username, DisplayName: item.DisplayName,
 		Email: item.Email, TimeZone: normalizedTimeZone(item.TimeZone), Administrator: handler.Service.IsAdministrator(item.ID), Owner: handler.Service.IsOwner(item.ID),
-		ExpiresAt: currentSession.ExpiresAt})
+		SourceMaintainer: handler.Service.IsSourceMaintainer(item.ID),
+		ExpiresAt:        currentSession.ExpiresAt})
 }
 
 func normalizedTimeZone(value string) string {

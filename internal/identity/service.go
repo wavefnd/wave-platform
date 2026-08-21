@@ -718,10 +718,19 @@ func (service *Service) IsOwner(accountID string) bool {
 	return err == nil && allowed
 }
 
+func (service *Service) IsSourceMaintainer(accountID string) bool {
+	if service.IsOwner(accountID) {
+		return true
+	}
+	allowed, err := service.permissions.HasRole(accountID, "source-maintainer")
+	return err == nil && allowed
+}
+
 func (service *Service) ensureManagementRoles() error {
 	for _, role := range []permission.Role{
 		{ID: "platform-owner", Name: "Platform owner", Permissions: []string{"platform.*"}},
 		{ID: "platform-admin", Name: "Platform administrator", Permissions: []string{"platform.admin.*"}},
+		{ID: "source-maintainer", Name: "Source maintainer", Description: "Reviews and downloads submitted Git patches", Permissions: []string{"source.patches.review", "source.patches.download"}},
 	} {
 		if err := service.permissions.PutRole(role); err != nil {
 			return err

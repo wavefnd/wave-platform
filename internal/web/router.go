@@ -62,7 +62,7 @@ func NewRouter(
 	sponsorsHandler := handler.SponsorsHandler{Service: sponsor.NewService()}
 	mediaHandler := handler.MediaHandler{Service: mediaService, Auth: authHandler}
 	webhookHandler := handler.WebhookHandler{Service: webhookService, Auth: authHandler}
-	patchesHandler := handler.PatchesHandler{Service: patchService}
+	patchesHandler := handler.PatchesHandler{Service: patchService, Auth: authHandler}
 	usersHandler := handler.UsersHandler{Community: communityRepository, Questions: questionRepository, Auth: authHandler}
 	seoHandler := NewSEOHandler(publicURL, documentRepository, blogService, communityRepository, questionRepository)
 
@@ -97,6 +97,10 @@ func NewRouter(
 	mux.HandleFunc("GET /api/v1/source/repositories/{repository}/refs", sourceHandler.Refs)
 	mux.HandleFunc("GET /api/v1/patches", patchesHandler.List)
 	mux.HandleFunc("GET /api/v1/patches/{patch}", patchesHandler.Get)
+	mux.HandleFunc("GET /api/v1/patches/{patch}/download", patchesHandler.Download)
+	mux.HandleFunc("POST /api/v1/patches/{patch}/review", patchesHandler.Review)
+	mux.HandleFunc("POST /api/v1/patches/{patch}/review-comments", patchesHandler.AddReviewComment)
+	mux.HandleFunc("POST /api/v1/patches/{patch}/review-comments/{comment}/resolution", patchesHandler.ResolveReviewComment)
 	mux.HandleFunc("GET /api/v1/platform/stats", statsHandler.Get)
 	mux.HandleFunc("GET /api/v1/platform/preferences", adminHandler.PlatformPreferences)
 	mux.HandleFunc("GET /api/v1/users", usersHandler.Directory)
@@ -107,6 +111,7 @@ func NewRouter(
 	mux.HandleFunc("GET /api/v1/admin", adminHandler.Snapshot)
 	mux.HandleFunc("POST /api/v1/admin/accounts/{account}/status", adminHandler.AccountStatus)
 	mux.HandleFunc("POST /api/v1/admin/accounts/{account}/role", adminHandler.AccountRole)
+	mux.HandleFunc("POST /api/v1/admin/accounts/{account}/source-maintainer", adminHandler.SourceMaintainer)
 	mux.HandleFunc("POST /api/v1/admin/settings/lunastev-time-zone", adminHandler.LunaStevTimeZone)
 	mux.HandleFunc("GET /api/v1/admin/blog/posts", blogHandler.AdminList)
 	mux.HandleFunc("GET /api/v1/admin/blog/posts/{slug}", blogHandler.AdminGet)

@@ -103,10 +103,32 @@ export interface PatchSummary {
 	part: number
 	total: number
 	files: string[]
+	sha256: string
+	reviewStatus: 'received' | 'reviewing' | 'accepted' | 'rejected' | 'applied'
+	targetRepository: string
+	assigneeAccountId: string
+	assigneeName: string
+	reviewUpdatedAt: string
+	seriesCount: number
+	reviewCommentCount: number
+	reviewComments: PatchReviewComment[]
 	receivedAt: string
 }
 
 export interface PatchArchiveView { address: string; patches: PatchSummary[] }
+
+export interface PatchReviewComment {
+	id: string
+	authorAccountId: string
+	authorName: string
+	path: string
+	line: number
+	lineText: string
+	body: string
+	resolved: boolean
+	createdAt: string
+	updatedAt: string
+}
 
 export interface AdminAccount {
 	id: string
@@ -116,6 +138,7 @@ export interface AdminAccount {
 	status: string
 	owner: boolean
 	administrator: boolean
+	sourceMaintainer: boolean
 	totpEnabled: boolean
 	recoveryVerified: boolean
 	createdAt: string
@@ -259,6 +282,7 @@ export interface AccountSession {
 	timeZone: string
 	administrator: boolean
 	owner: boolean
+	sourceMaintainer: boolean
 	expiresAt: string
 }
 
@@ -477,6 +501,7 @@ function parseAccountSession(xml: XMLDocument): AccountSession {
 		timeZone: textOf(xml, 'time-zone') || 'UTC',
 		administrator: textOf(xml, 'administrator') === 'true',
 		owner: textOf(xml, 'owner') === 'true',
+		sourceMaintainer: textOf(xml, 'source-maintainer') === 'true',
 		expiresAt: textOf(xml, 'expires-at'),
 	}
 }
@@ -784,7 +809,23 @@ function parsePatch(element: Element): PatchSummary {
 		body: childContent(element, 'body'), preview: childContent(element, 'preview'), version: Number(childText(element, 'version')) || 1,
 		part: Number(childText(element, 'part')), total: Number(childText(element, 'total')),
 		files: Array.from(element.querySelectorAll('files > file')).map((item) => item.textContent?.trim() ?? '').filter(Boolean),
+		sha256: childText(element, 'sha256'), reviewStatus: (childText(element, 'review-status') || 'received') as PatchSummary['reviewStatus'],
+		targetRepository: childText(element, 'target-repository'), assigneeAccountId: childText(element, 'assignee-account-id'),
+		assigneeName: childText(element, 'assignee-name'), reviewUpdatedAt: childText(element, 'review-updated-at'),
+		seriesCount: Number(childText(element, 'series-count')) || 1,
+		reviewCommentCount: Number(childText(element, 'review-comment-count')) || 0,
+		reviewComments: Array.from(element.querySelectorAll('review-comments > comment')).map(parsePatchReviewComment),
 		receivedAt: childText(element, 'received-at'),
+	}
+}
+
+function parsePatchReviewComment(element: Element): PatchReviewComment {
+	return {
+		id: element.getAttribute('id') ?? '', authorAccountId: childText(element, 'author-account-id'),
+		authorName: childText(element, 'author-name'), path: childText(element, 'path'),
+		line: Number(childText(element, 'line')), lineText: childContent(element, 'line-text'),
+		body: childContent(element, 'body'), resolved: childText(element, 'resolved') === 'true',
+		createdAt: childText(element, 'created-at'), updatedAt: childText(element, 'updated-at'),
 	}
 }
 
@@ -797,6 +838,26 @@ export async function getPatches(query = ''): Promise<PatchArchiveView> {
 
 export async function getPatch(id: string): Promise<PatchSummary> {
 	return parsePatch((await getXml(`/api/v1/patches/${encodeURIComponent(id)}`)).documentElement)
+}
+
+export async function updatePatchReview(id: string, status: PatchSummary['reviewStatus'], targetRepository: string): Promise<PatchSummary> {
+	const xml = await requestXml(`/api/v1/patches/${encodeURIComponent(id)}/review`, 'POST', authDocument('patch-review', {
+		status, 'target-repository': targetRepository,
+	}))
+	if (!xml) throw new Error('The server returned an empty patch review response.')
+	return parsePatch(xml.documentElement)
+}
+
+export async function addPatchReviewComment(id: string, line: number, body: string): Promise<PatchReviewComment> {
+	const xml = await requestXml(`/api/v1/patches/${encodeURIComponent(id)}/review-comments`, 'POST', authDocument('patch-review-comment', { line: String(line), body }))
+	if (!xml) throw new Error('The server returned an empty patch review comment response.')
+	return parsePatchReviewComment(xml.documentElement)
+}
+
+export async function resolvePatchReviewComment(id: string, commentId: string, resolved: boolean): Promise<PatchReviewComment> {
+	const xml = await requestXml(`/api/v1/patches/${encodeURIComponent(id)}/review-comments/${encodeURIComponent(commentId)}/resolution`, 'POST', authDocument('patch-review-comment-resolution', { resolved: String(resolved) }))
+	if (!xml) throw new Error('The server returned an empty patch review comment response.')
+	return parsePatchReviewComment(xml.documentElement)
 }
 
 export async function getModules(): Promise<ModuleStatus[]> {
@@ -820,6 +881,7 @@ export async function getAdminSnapshot(): Promise<AdminSnapshot> {
 			displayName: childText(element, 'display-name'), email: childText(element, 'email'),
 			status: childText(element, 'status'), owner: childText(element, 'owner') === 'true',
 			administrator: childText(element, 'administrator') === 'true',
+			sourceMaintainer: childText(element, 'source-maintainer') === 'true',
 			totpEnabled: childText(element, 'totp-enabled') === 'true',
 			recoveryVerified: childText(element, 'recovery-verified') === 'true',
 			createdAt: childText(element, 'created-at'), updatedAt: childText(element, 'updated-at'),
@@ -879,6 +941,10 @@ export async function updateAdminAccountStatus(accountId: string, status: 'activ
 
 export async function updateAdminAccountRole(accountId: string, administrator: boolean): Promise<void> {
 	await requestXml(`/api/v1/admin/accounts/${encodeURIComponent(accountId)}/role`, 'POST', authDocument('account-role', { administrator: String(administrator) }))
+}
+
+export async function updateAdminSourceMaintainer(accountId: string, enabled: boolean): Promise<void> {
+	await requestXml(`/api/v1/admin/accounts/${encodeURIComponent(accountId)}/source-maintainer`, 'POST', authDocument('source-maintainer', { enabled: String(enabled) }))
 }
 
 function parseWebhook(element: Element): WebhookEndpoint {

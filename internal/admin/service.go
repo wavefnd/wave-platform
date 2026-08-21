@@ -73,6 +73,13 @@ func (service *Service) Snapshot(ctx context.Context, query string) (Snapshot, e
 		if owner {
 			administrator = true
 		}
+		sourceMaintainer, err := service.permissions.HasRole(item.ID, "source-maintainer")
+		if err != nil {
+			return Snapshot{}, err
+		}
+		if owner {
+			sourceMaintainer = true
+		}
 		if item.Status == "active" {
 			result.Security.ActiveAccounts++
 		} else {
@@ -90,7 +97,7 @@ func (service *Service) Snapshot(ctx context.Context, query string) (Snapshot, e
 		}
 		result.Accounts = append(result.Accounts, AccountView{ID: item.ID, Username: item.Username,
 			DisplayName: item.DisplayName, Email: item.Email, Status: item.Status, Owner: owner,
-			Administrator: administrator, TOTPEnabled: hasFactor, RecoveryVerified: factor.RecoveryVerified,
+			Administrator: administrator, SourceMaintainer: sourceMaintainer, TOTPEnabled: hasFactor, RecoveryVerified: factor.RecoveryVerified,
 			CreatedAt: item.CreatedAt, UpdatedAt: item.UpdatedAt})
 	}
 	result.Security.RegistrationOpen = service.registrationOpen
@@ -217,6 +224,39 @@ func (service *Service) UpdateAdministrator(actorID, accountID string, enabled b
 		action = "admin.role.assign"
 	}
 	return service.appendAudit(actorID, "account/"+accountID+"/role/platform-admin", action)
+}
+
+func (service *Service) UpdateSourceMaintainer(actorID, accountID string, enabled bool) error {
+	actorOwner, err := service.permissions.HasRole(actorID, "platform-owner")
+	if err != nil {
+		return err
+	}
+	if !actorOwner {
+		return ErrForbidden
+	}
+	if _, err := service.accounts.Account(accountID); err != nil {
+		return err
+	}
+	targetOwner, err := service.permissions.HasRole(accountID, "platform-owner")
+	if err != nil {
+		return err
+	}
+	if targetOwner {
+		return ErrForbidden
+	}
+	if enabled {
+		err = service.permissions.Assign(permission.Assignment{AccountID: accountID, RoleID: "source-maintainer", Scope: "source"})
+	} else {
+		err = service.permissions.Unassign(accountID, "source-maintainer")
+	}
+	if err != nil {
+		return err
+	}
+	action := "admin.source-maintainer.remove"
+	if enabled {
+		action = "admin.source-maintainer.assign"
+	}
+	return service.appendAudit(actorID, "account/"+accountID+"/role/source-maintainer", action)
 }
 
 func (service *Service) canManage(actorID, targetID string) error {

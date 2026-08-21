@@ -17,6 +17,7 @@ type AccountView struct {
 	Status           string    `xml:"status"`
 	Owner            bool      `xml:"owner"`
 	Administrator    bool      `xml:"administrator"`
+	SourceMaintainer bool      `xml:"source-maintainer"`
 	TOTPEnabled      bool      `xml:"totp-enabled"`
 	RecoveryVerified bool      `xml:"recovery-verified"`
 	CreatedAt        time.Time `xml:"created-at"`
@@ -67,6 +68,10 @@ type AccountStatusInput struct {
 
 type AccountRoleInput struct {
 	Administrator bool `xml:"administrator"`
+}
+
+type SourceMaintainerInput struct {
+	Enabled bool `xml:"enabled"`
 }
 
 type TimeZoneInput struct {
