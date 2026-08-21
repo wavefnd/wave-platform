@@ -126,6 +126,47 @@ export interface AdminAuditEvent {
 	occurredAt: string
 }
 
+export interface WebhookEndpoint {
+	id: string
+	name: string
+	kind: 'generic' | 'discord'
+	events: string[]
+	destination: string
+	enabled: boolean
+	createdAt: string
+	updatedAt: string
+	signingSecret: string
+}
+
+export interface WebhookDelivery {
+	id: string
+	endpointId: string
+	eventType: string
+	title: string
+	status: string
+	attempts: number
+	httpStatus: number
+	lastError: string
+	createdAt: string
+	lastAttemptAt: string
+}
+
+export interface WebhookAdminView {
+	supportedEvents: string[]
+	endpoints: WebhookEndpoint[]
+	deliveries: WebhookDelivery[]
+}
+
+export interface WebhookInput {
+	id: string
+	name: string
+	kind: 'generic' | 'discord'
+	url: string
+	events: string[]
+	enabled: boolean
+	rotateSecret: boolean
+}
+
 export interface AdminSnapshot {
 	accounts: AdminAccount[]
 	security: {
@@ -798,6 +839,54 @@ export async function updateAdminAccountStatus(accountId: string, status: 'activ
 
 export async function updateAdminAccountRole(accountId: string, administrator: boolean): Promise<void> {
 	await requestXml(`/api/v1/admin/accounts/${encodeURIComponent(accountId)}/role`, 'POST', authDocument('account-role', { administrator: String(administrator) }))
+}
+
+function parseWebhook(element: Element): WebhookEndpoint {
+	return {
+		id: element.getAttribute('id') ?? '', name: childText(element, 'name'),
+		kind: childText(element, 'kind') === 'discord' ? 'discord' : 'generic',
+		events: Array.from(element.querySelectorAll('events > event')).map((item) => item.textContent?.trim() ?? '').filter(Boolean),
+		destination: childText(element, 'destination'), enabled: childText(element, 'enabled') === 'true',
+		createdAt: childText(element, 'created-at'), updatedAt: childText(element, 'updated-at'),
+		signingSecret: childText(element, 'signing-secret'),
+	}
+}
+
+export async function getAdminWebhooks(): Promise<WebhookAdminView> {
+	const xml = await getXml('/api/v1/admin/webhooks')
+	const root = xml.documentElement
+	return {
+		supportedEvents: Array.from(root.querySelectorAll('supported-events > event')).map((item) => item.textContent?.trim() ?? '').filter(Boolean),
+		endpoints: Array.from(root.querySelectorAll('endpoints > webhook')).map(parseWebhook),
+		deliveries: Array.from(root.querySelectorAll('deliveries > delivery')).map((element) => ({
+			id: element.getAttribute('id') ?? '', endpointId: childText(element, 'endpoint-id'), eventType: childText(element, 'event-type'),
+			title: childText(element, 'title'), status: childText(element, 'status'), attempts: Number(childText(element, 'attempts')),
+			httpStatus: Number(childText(element, 'http-status')), lastError: childText(element, 'last-error'),
+			createdAt: childText(element, 'created-at'), lastAttemptAt: childText(element, 'last-attempt-at'),
+		})),
+	}
+}
+
+export async function saveAdminWebhook(input: WebhookInput): Promise<WebhookEndpoint> {
+	const document = authDocument('webhook', {
+		id: input.id, name: input.name, kind: input.kind, url: input.url,
+		enabled: String(input.enabled), 'rotate-secret': String(input.rotateSecret),
+	})
+	const namespace = document.documentElement.namespaceURI
+	const events = document.createElementNS(namespace, 'events')
+	for (const value of input.events) { const item = document.createElementNS(namespace, 'event'); item.textContent = value; events.append(item) }
+	document.documentElement.append(events)
+	const xml = await requestXml('/api/v1/admin/webhooks', 'POST', document)
+	if (!xml) throw new Error('The server returned an empty webhook response.')
+	return parseWebhook(xml.documentElement)
+}
+
+export async function deleteAdminWebhook(id: string): Promise<void> {
+	await requestXml(`/api/v1/admin/webhooks/${encodeURIComponent(id)}`, 'DELETE')
+}
+
+export async function testAdminWebhook(id: string): Promise<void> {
+	await requestXml(`/api/v1/admin/webhooks/${encodeURIComponent(id)}/test`, 'POST', authDocument('webhook-test', {}))
 }
 
 function parseBlogSummary(element: ParentNode): BlogPostSummary {

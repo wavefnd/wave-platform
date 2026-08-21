@@ -1,0 +1,104 @@
+package webhook
+
+import (
+	"context"
+	"encoding/base64"
+	"io"
+	"net/http"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/wavefnd/wave-platform/internal/storage"
+)
+
+type roundTripFunc func(*http.Request) (*http.Response, error)
+
+func (function roundTripFunc) RoundTrip(request *http.Request) (*http.Response, error) {
+	return function(request)
+}
+
+func TestServiceEncryptsEndpointAndDeliversSignedGenericEvent(t *testing.T) {
+	database, err := storage.Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer database.Close()
+	key := base64.StdEncoding.EncodeToString([]byte("0123456789abcdef0123456789abcdef"))
+	service, err := NewService(database, key, "https://wave.example")
+	if err != nil {
+		t.Fatal(err)
+	}
+	service.now = func() time.Time { return time.Date(2026, 8, 21, 4, 0, 0, 0, time.UTC) }
+
+	created, err := service.SaveEndpoint("owner", EndpointInput{Name: "Release automation", Kind: "generic",
+		URL: "https://hooks.example.test/wave", Events: []string{EventReleasePublished}, Enabled: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if created.SigningSecret == "" || created.Destination != "hooks.example.test" {
+		t.Fatalf("created = %#v", created)
+	}
+	stored, err := service.repository.Endpoint(created.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(stored.EncryptedURL, "hooks.example") || stored.EncryptedURL == "" {
+		t.Fatalf("URL was not encrypted: %q", stored.EncryptedURL)
+	}
+
+	var receivedBody string
+	service.client = &http.Client{Transport: roundTripFunc(func(request *http.Request) (*http.Response, error) {
+		body, readErr := io.ReadAll(request.Body)
+		if readErr != nil {
+			t.Fatal(readErr)
+		}
+		receivedBody = string(body)
+		if request.Header.Get("X-Wave-Signature-256") == "" || request.Header.Get("X-Wave-Event") != EventReleasePublished {
+			t.Fatalf("headers = %#v", request.Header)
+		}
+		return &http.Response{StatusCode: http.StatusNoContent, Body: io.NopCloser(strings.NewReader("")), Header: make(http.Header)}, nil
+	})}
+	if err := service.Publish(Event{Type: EventReleasePublished, Title: "Wave v0.3.0", ResourceID: "blog/wave-v0.3.0", URL: "/releases/wave-v0.3.0"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := service.ProcessPending(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	deliveries, err := service.Deliveries(10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(deliveries) != 1 || deliveries[0].Status != "delivered" || !strings.Contains(receivedBody, "Wave v0.3.0") || !strings.Contains(receivedBody, "https://wave.example/releases/") {
+		t.Fatalf("deliveries=%#v body=%q", deliveries, receivedBody)
+	}
+}
+
+func TestServiceRejectsUnsafeAndImpersonatedDiscordDestinations(t *testing.T) {
+	database, err := storage.Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer database.Close()
+	key := base64.StdEncoding.EncodeToString([]byte("0123456789abcdef0123456789abcdef"))
+	service, err := NewService(database, key, "https://wave.example")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, input := range []EndpointInput{
+		{Name: "Private", Kind: "generic", URL: "https://127.0.0.1/hook", Events: []string{EventPatchReceived}, Enabled: true},
+		{Name: "Fake Discord", Kind: "discord", URL: "https://discord.example/api/webhooks/1/token", Events: []string{EventPatchReceived}, Enabled: true},
+		{Name: "Insecure", Kind: "generic", URL: "http://hooks.example.test/hook", Events: []string{EventPatchReceived}, Enabled: true},
+	} {
+		if _, err := service.SaveEndpoint("owner", input); err == nil {
+			t.Fatalf("unsafe input was accepted: %#v", input)
+		}
+	}
+}
+
+func TestSupportedEventsIncludeCommunityAndFounderPosts(t *testing.T) {
+	events := SupportedEvents()
+	if !contains(events, EventCommunityPost) || !contains(events, EventFounderPost) {
+		t.Fatalf("supported events = %#v", events)
+	}
+}

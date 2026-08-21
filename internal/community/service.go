@@ -16,6 +16,7 @@ import (
 	maildomain "github.com/wavefnd/wave-platform/internal/mail"
 	"github.com/wavefnd/wave-platform/internal/permission"
 	"github.com/wavefnd/wave-platform/internal/storage"
+	webhookdomain "github.com/wavefnd/wave-platform/internal/webhook"
 )
 
 var (
@@ -31,6 +32,7 @@ type Service struct {
 	mail       *maildomain.Repository
 	audit      *audit.Repository
 	permission *permission.Repository
+	webhooks   *webhookdomain.Service
 	mailDomain string
 	now        func() time.Time
 }
@@ -39,6 +41,10 @@ func NewService(database *storage.Database, mailDomain string) *Service {
 	return &Service{repository: NewRepository(database), mail: maildomain.NewRepository(database),
 		audit: audit.NewRepository(database), permission: permission.NewRepository(database),
 		mailDomain: strings.ToLower(strings.TrimSpace(mailDomain)), now: time.Now}
+}
+
+func (service *Service) SetWebhookService(webhooks *webhookdomain.Service) {
+	service.webhooks = webhooks
 }
 
 func (service *Service) CreatePost(actor account.Account, input CreatePostInput) (ThreadView, error) {
@@ -92,6 +98,16 @@ func (service *Service) CreatePost(actor account.Account, input CreatePostInput)
 		return ThreadView{}, err
 	}
 	_ = service.auditEvent(actor.ID, "community/thread/"+thread.ID, "community.post")
+	if service.webhooks != nil {
+		eventType, path := webhookdomain.EventCommunityPost, "/community/thread/"+thread.ID
+		if space.PostingPolicy == "owner" {
+			eventType, path = webhookdomain.EventFounderPost, "/lunastev/thread/"+thread.ID
+		} else if space.ID == "showcase" {
+			path = "/community/showcase/" + thread.ID
+		}
+		_ = service.webhooks.Publish(webhookdomain.Event{Type: eventType, Title: input.Title,
+			ResourceID: "community/thread/" + thread.ID, URL: path, OccurredAt: now})
+	}
 	return service.repository.ViewFor(thread.ID, actor.ID)
 }
 

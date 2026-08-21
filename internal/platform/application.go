@@ -29,6 +29,7 @@ import (
 	"github.com/wavefnd/wave-platform/internal/waveruntime"
 	"github.com/wavefnd/wave-platform/internal/web"
 	"github.com/wavefnd/wave-platform/internal/web/handler"
+	webhookdomain "github.com/wavefnd/wave-platform/internal/webhook"
 )
 
 const Version = "0.1.0"
@@ -42,6 +43,7 @@ type Application struct {
 	MediaPolicy    *waveruntime.NativeMediaPolicy
 	Identity       *identity.Service
 	MailRuntime    *mailruntime.Service
+	Webhooks       *webhookdomain.Service
 }
 
 func New(configPath string) (*Application, error) {
@@ -95,10 +97,17 @@ func New(configPath string) (*Application, error) {
 	if removedCommunityEntries > 0 {
 		log.Printf("Removed %d legacy community mailbox entries", removedCommunityEntries)
 	}
+	webhookService, err := webhookdomain.NewService(database, cfg.Identity.AuthEncryptionKey, cfg.Identity.PublicURL)
+	if err != nil {
+		_ = database.Close()
+		return nil, fmt.Errorf("initialize webhooks: %w", err)
+	}
 	blogService := blogdomain.NewService(database)
+	blogService.SetWebhookService(webhookService)
 	documentRepository := document.NewRepository(database)
 	communityRepository := community.NewRepository(database)
 	communityService := community.NewService(database, cfg.Identity.MailDomain)
+	communityService.SetWebhookService(webhookService)
 	questionRepository := questiondomain.NewRepository(database)
 	questionService := questiondomain.NewService(database, cfg.Identity.MailDomain)
 	var sourceAnalyzer sourceanalysis.Analyzer
@@ -186,6 +195,7 @@ func New(configPath string) (*Application, error) {
 		mailboxHandler,
 		adminService,
 		mediaService,
+		webhookService,
 	)
 
 	server := &http.Server{
@@ -206,6 +216,7 @@ func New(configPath string) (*Application, error) {
 		MediaPolicy:    nativeMediaPolicy,
 		Identity:       identityService,
 		MailRuntime:    mailRuntime,
+		Webhooks:       webhookService,
 	}, nil
 }
 
@@ -224,10 +235,18 @@ func (application *Application) Run(ctx context.Context) error {
 			application.GitMirror.Run(runtimeContext)
 		}()
 	}
+	var webhookDone chan struct{}
+	if application.Webhooks != nil {
+		webhookDone = make(chan struct{})
+		go func() { defer close(webhookDone); application.Webhooks.Run(runtimeContext) }()
+	}
 	defer func() {
 		stopRuntime()
 		if gitMirrorDone != nil {
 			<-gitMirrorDone
+		}
+		if webhookDone != nil {
+			<-webhookDone
 		}
 	}()
 

@@ -10,13 +10,15 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   ArrowLeft, Boxes, Database, FileClock, FileText, Gauge, GitBranch, MailWarning, Menu, RefreshCw,
-  Search, ShieldCheck, Users,
+  Search, ShieldCheck, Users, Webhook,
 } from '@lucide/vue'
 
 import {
   getAdminSnapshot, getManagementMailbox, getManagementMailMessage, getModules, getPlatformStatus,
-  getAdminBlogPost, getAdminBlogPosts, saveAdminBlogPost, updateAdminAccountRole, updateAdminAccountStatus, updateLunaStevTimeZone,
+  deleteAdminWebhook, getAdminBlogPost, getAdminBlogPosts, getAdminWebhooks, saveAdminBlogPost, saveAdminWebhook, testAdminWebhook,
+  updateAdminAccountRole, updateAdminAccountStatus, updateLunaStevTimeZone,
   type AdminAccount, type AdminSnapshot, type BlogPostInput, type BlogPostSummary, type MailboxView, type MailMessageView, type ModuleStatus, type PlatformStatus,
+  type WebhookAdminView, type WebhookInput,
 } from '../services/http'
 import { useI18n } from '../i18n'
 import type { Locale } from '../i18n'
@@ -50,6 +52,9 @@ const blogSaving = ref(false)
 const blogNotice = ref('')
 const editingBlogSlug = ref('')
 const blogForm = ref<BlogPostInput>({ slug: '', category: 'article', roadmapStatus: '', roadmapOrder: 0, targetDate: '', title: '', summary: '', content: '', status: 'draft' })
+const webhookView = ref<WebhookAdminView>({ supportedEvents: [], endpoints: [], deliveries: [] })
+const webhookForm = ref<WebhookInput>({ id: '', name: '', kind: 'generic', url: '', events: [], enabled: true, rotateSecret: false })
+const webhookSecret = ref('')
 const timeZones = ['Asia/Seoul', 'UTC', 'Asia/Tokyo', 'Asia/Singapore', 'Europe/London', 'Europe/Paris', 'America/New_York', 'America/Los_Angeles']
 let stylesheet: HTMLLinkElement | null = null
 
@@ -64,7 +69,7 @@ const mailAttention = computed(() => (snapshot.value?.mail.queued ?? 0) + (snaps
 const section = computed(() => String(route.params.section ?? route.meta.adminSection ?? 'overview'))
 const sectionTitle = computed(() => t(({ overview: 'admin.overview', blog: 'admin.blog', accounts: 'admin.accounts', mailbox: 'admin.managementMailbox',
   'mail-queue': 'admin.mailQueue', 'git-mirrors': 'admin.gitMirrors', 'audit-log': 'admin.auditLog', security: 'admin.security',
-  modules: 'admin.modules', system: 'admin.system' } as Record<string, string>)[section.value] ?? 'admin.overview'))
+  webhooks: 'admin.webhooks', modules: 'admin.modules', system: 'admin.system' } as Record<string, string>)[section.value] ?? 'admin.overview'))
 
 onMounted(async () => {
   stylesheet = document.createElement('link')
@@ -122,6 +127,47 @@ async function load() {
 async function loadSection() {
 	if (section.value === 'mailbox') managementMailbox.value = await getManagementMailbox()
 	if (section.value === 'blog') blogPosts.value = await getAdminBlogPosts()
+	if (section.value === 'webhooks') webhookView.value = await getAdminWebhooks()
+}
+
+function newWebhook() {
+	webhookSecret.value = ''
+	webhookForm.value = { id: '', name: '', kind: 'generic', url: '', events: [], enabled: true, rotateSecret: false }
+}
+
+function editWebhook(id: string) {
+	const item = webhookView.value.endpoints.find((endpoint) => endpoint.id === id)
+	if (!item) return
+	webhookSecret.value = ''
+	webhookForm.value = { id: item.id, name: item.name, kind: item.kind, url: '', events: [...item.events], enabled: item.enabled, rotateSecret: false }
+}
+
+async function saveWebhook() {
+	actionLoading.value = true
+	actionError.value = ''
+	try {
+		const saved = await saveAdminWebhook(webhookForm.value)
+		webhookSecret.value = saved.signingSecret
+		webhookView.value = await getAdminWebhooks()
+		editWebhook(saved.id)
+		webhookSecret.value = saved.signingSecret
+	} catch (reason) { actionError.value = reason instanceof Error ? reason.message : t('admin.actionFailed') }
+	finally { actionLoading.value = false }
+}
+
+async function testWebhook(id: string) {
+	actionLoading.value = true; actionError.value = ''
+	try { await testAdminWebhook(id); webhookView.value = await getAdminWebhooks() }
+	catch (reason) { actionError.value = reason instanceof Error ? reason.message : t('admin.actionFailed') }
+	finally { actionLoading.value = false }
+}
+
+async function removeWebhook(id: string) {
+	if (!window.confirm(t('admin.confirmDeleteWebhook'))) return
+	actionLoading.value = true; actionError.value = ''
+	try { await deleteAdminWebhook(id); newWebhook(); webhookView.value = await getAdminWebhooks() }
+	catch (reason) { actionError.value = reason instanceof Error ? reason.message : t('admin.actionFailed') }
+	finally { actionLoading.value = false }
 }
 
 function newBlogPost() {
@@ -239,6 +285,7 @@ function changeLocale(event: Event) {
         <CNavItem><RouterLink class="nav-link" :class="{ active: section === 'overview' }" to="/admin"><Gauge class="nav-icon" :size="20" />{{ t('admin.overview') }}</RouterLink></CNavItem>
         <CNavTitle>{{ t('admin.management') }}</CNavTitle>
 		<CNavItem><RouterLink class="nav-link" :class="{ active: section === 'blog' }" to="/admin/blog"><FileText class="nav-icon" :size="20" />{{ t('admin.blog') }}</RouterLink></CNavItem>
+		<CNavItem><RouterLink class="nav-link" :class="{ active: section === 'webhooks' }" to="/admin/webhooks"><Webhook class="nav-icon" :size="20" />{{ t('admin.webhooks') }}</RouterLink></CNavItem>
         <CNavItem><RouterLink class="nav-link" :class="{ active: section === 'accounts' }" to="/admin/accounts"><Users class="nav-icon" :size="20" />{{ t('admin.accounts') }}</RouterLink></CNavItem>
         <CNavItem><RouterLink class="nav-link" :class="{ active: section === 'mailbox' }" to="/admin/mailbox"><MailWarning class="nav-icon" :size="20" />{{ t('admin.managementMailbox') }}</RouterLink></CNavItem>
         <CNavItem><RouterLink class="nav-link" :class="{ active: section === 'mail-queue' }" to="/admin/mail-queue"><MailWarning class="nav-icon" :size="20" />{{ t('admin.mailQueue') }}</RouterLink></CNavItem>
@@ -326,6 +373,27 @@ function changeLocale(event: Event) {
 				</div>
 			  </CCardBody>
 			</CCard>
+
+			<div v-if="section === 'webhooks'" class="admin-webhook-section">
+			  <CCard class="mb-4">
+				<CCardHeader class="admin-card-header"><div><strong>{{ t('admin.webhookConfiguration') }}</strong><div class="text-body-secondary small">{{ t('admin.webhookHelp') }}</div></div><CButton color="secondary" variant="outline" size="sm" @click="newWebhook">{{ t('admin.newWebhook') }}</CButton></CCardHeader>
+				<CCardBody>
+				  <form class="admin-webhook-form" @submit.prevent="saveWebhook">
+					<label>{{ t('admin.webhookName') }}<input v-model="webhookForm.name" class="form-control" required maxlength="80" /></label>
+					<label>{{ t('admin.webhookKind') }}<select v-model="webhookForm.kind" class="form-select"><option value="generic">Generic JSON</option><option value="discord">Discord</option></select></label>
+					<label class="wide">{{ t('admin.webhookUrl') }}<input v-model="webhookForm.url" class="form-control" type="url" :required="!webhookForm.id" placeholder="https://…" /><small v-if="webhookForm.id" class="text-body-secondary">{{ t('admin.webhookUrlRetained') }}</small></label>
+					<fieldset class="wide"><legend>{{ t('admin.webhookEvents') }}</legend><label v-for="event in webhookView.supportedEvents" :key="event" class="admin-webhook-event"><input v-model="webhookForm.events" type="checkbox" :value="event" /> <code>{{ event }}</code></label></fieldset>
+					<label class="admin-webhook-event"><input v-model="webhookForm.enabled" type="checkbox" /> {{ t('admin.enabled') }}</label>
+					<label v-if="webhookForm.id" class="admin-webhook-event"><input v-model="webhookForm.rotateSecret" type="checkbox" /> {{ t('admin.rotateWebhookSecret') }}</label>
+					<div class="wide d-flex align-items-center gap-3"><CButton color="primary" type="submit" :disabled="actionLoading || webhookForm.events.length === 0">{{ t('common.save') }}</CButton><span v-if="webhookForm.id" class="text-body-secondary small">{{ webhookForm.id }}</span></div>
+				  </form>
+				  <div v-if="webhookSecret" class="alert alert-warning mt-3 mb-0"><strong>{{ t('admin.webhookSecretOnce') }}</strong><code class="d-block mt-2 text-break">{{ webhookSecret }}</code></div>
+				  <div v-if="actionError" class="alert alert-danger mt-3 mb-0">{{ actionError }}</div>
+				</CCardBody>
+			  </CCard>
+			  <CCard class="mb-4"><CCardHeader><strong>{{ t('admin.webhookEndpoints') }}</strong></CCardHeader><CCardBody class="p-0"><CTable align="middle" class="mb-0 admin-table" responsive><CTableHead><CTableRow><CTableHeaderCell class="ps-4">{{ t('admin.webhookName') }}</CTableHeaderCell><CTableHeaderCell>{{ t('admin.destination') }}</CTableHeaderCell><CTableHeaderCell>{{ t('admin.webhookEvents') }}</CTableHeaderCell><CTableHeaderCell>{{ t('admin.status') }}</CTableHeaderCell><CTableHeaderCell>{{ t('admin.actions') }}</CTableHeaderCell></CTableRow></CTableHead><CTableBody><CTableRow v-for="endpoint in webhookView.endpoints" :key="endpoint.id"><CTableDataCell class="ps-4"><strong>{{ endpoint.name }}</strong><div class="text-body-secondary small">{{ endpoint.kind }}</div></CTableDataCell><CTableDataCell><code>{{ endpoint.destination }}</code></CTableDataCell><CTableDataCell><div v-for="event in endpoint.events" :key="event"><code>{{ event }}</code></div></CTableDataCell><CTableDataCell><CBadge :color="endpoint.enabled ? 'success' : 'secondary'">{{ endpoint.enabled ? t('admin.enabled') : t('admin.disabled') }}</CBadge></CTableDataCell><CTableDataCell class="admin-actions"><CButton color="secondary" variant="outline" size="sm" @click="editWebhook(endpoint.id)">{{ t('common.edit') }}</CButton><CButton color="secondary" variant="outline" size="sm" :disabled="actionLoading" @click="testWebhook(endpoint.id)">{{ t('admin.testWebhook') }}</CButton><CButton color="danger" variant="outline" size="sm" :disabled="actionLoading" @click="removeWebhook(endpoint.id)">{{ t('common.delete') }}</CButton></CTableDataCell></CTableRow><CTableRow v-if="webhookView.endpoints.length === 0"><CTableDataCell colspan="5" class="py-4 text-center text-body-secondary">{{ t('admin.noWebhooks') }}</CTableDataCell></CTableRow></CTableBody></CTable></CCardBody></CCard>
+			  <CCard class="mb-4"><CCardHeader><strong>{{ t('admin.webhookDeliveries') }}</strong></CCardHeader><CCardBody class="p-0"><CTable align="middle" class="mb-0 admin-table" responsive><CTableHead><CTableRow><CTableHeaderCell class="ps-4">{{ t('admin.webhookEvents') }}</CTableHeaderCell><CTableHeaderCell>{{ t('admin.status') }}</CTableHeaderCell><CTableHeaderCell>HTTP</CTableHeaderCell><CTableHeaderCell>{{ t('admin.attempts') }}</CTableHeaderCell><CTableHeaderCell>{{ t('admin.updated') }}</CTableHeaderCell></CTableRow></CTableHead><CTableBody><CTableRow v-for="delivery in webhookView.deliveries" :key="delivery.id"><CTableDataCell class="ps-4"><code>{{ delivery.eventType }}</code><div class="text-body-secondary small">{{ delivery.title }}</div><div v-if="delivery.lastError" class="admin-error-detail">{{ delivery.lastError }}</div></CTableDataCell><CTableDataCell><CBadge :color="badgeColor(delivery.status)">{{ delivery.status }}</CBadge></CTableDataCell><CTableDataCell>{{ delivery.httpStatus || '—' }}</CTableDataCell><CTableDataCell>{{ delivery.attempts }}</CTableDataCell><CTableDataCell>{{ formatDate(delivery.lastAttemptAt || delivery.createdAt) }}</CTableDataCell></CTableRow><CTableRow v-if="webhookView.deliveries.length === 0"><CTableDataCell colspan="5" class="py-4 text-center text-body-secondary">{{ t('admin.noWebhookDeliveries') }}</CTableDataCell></CTableRow></CTableBody></CTable></CCardBody></CCard>
+			</div>
 
             <CCard v-if="section === 'accounts'" class="mb-4">
               <CCardHeader class="admin-card-header">
@@ -449,7 +517,13 @@ body.coreui-admin-active { background-color: var(--cui-tertiary-bg); }
 .admin-blog-content { min-height: 340px; font: 13px/1.55 ui-monospace, SFMono-Regular, Consolas, monospace; resize: vertical; }
 .admin-blog-preview { margin-top: 28px; padding-top: 20px; border-top: 1px solid var(--cui-border-color); }
 .admin-blog-preview .markdown-content { max-width: 820px; }
+.admin-webhook-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 18px; }
+.admin-webhook-form > label { display: grid; gap: 6px; font-size: .84rem; font-weight: 600; }
+.admin-webhook-form .wide { grid-column: 1 / -1; }
+.admin-webhook-form fieldset { display: flex; flex-wrap: wrap; gap: 8px 18px; margin: 0; padding: 12px 0 0; border: 0; border-top: 1px solid var(--cui-border-color); }
+.admin-webhook-form legend { width: 100%; margin: 0; font-size: .84rem; font-weight: 600; }
+.admin-webhook-event { display: inline-flex !important; align-items: center; gap: 6px !important; font-size: .82rem !important; font-weight: 500 !important; }
 @media (max-width: 991.98px) { .coreui-admin-template .wrapper { padding-inline-start: 0; }.coreui-admin-template .admin-mobile-sidebar { --cui-is-mobile: 1; } }
-@media (max-width: 767.98px) { .admin-card-header { align-items: stretch; flex-direction: column; }.admin-search { width: 100%; }.admin-heading { align-items: flex-start; }.coreui-admin-template .container-fluid { padding-right: 16px !important; padding-left: 16px !important; }.admin-preference-select { max-width: 96px; }.coreui-admin-template .header .gap-3 { gap: .4rem !important; }.admin-blog-layout { grid-template-columns: 1fr; }.admin-blog-list { max-height: 260px; overflow-y: auto; border-right: 0; border-bottom: 1px solid var(--cui-border-color); }.admin-blog-fields { grid-template-columns: 1fr; }.admin-blog-fields .wide { grid-column: auto; }.admin-blog-editor { padding: 18px 16px 26px; } }
+@media (max-width: 767.98px) { .admin-card-header { align-items: stretch; flex-direction: column; }.admin-search { width: 100%; }.admin-heading { align-items: flex-start; }.coreui-admin-template .container-fluid { padding-right: 16px !important; padding-left: 16px !important; }.admin-preference-select { max-width: 96px; }.coreui-admin-template .header .gap-3 { gap: .4rem !important; }.admin-blog-layout { grid-template-columns: 1fr; }.admin-blog-list { max-height: 260px; overflow-y: auto; border-right: 0; border-bottom: 1px solid var(--cui-border-color); }.admin-blog-fields, .admin-webhook-form { grid-template-columns: 1fr; }.admin-blog-fields .wide, .admin-webhook-form .wide { grid-column: auto; }.admin-blog-editor { padding: 18px 16px 26px; } }
 @media (max-width: 480px) { .coreui-admin-template .header strong { display: none; }.admin-preference-select { max-width: 88px; } }
 </style>

@@ -17,6 +17,7 @@ import (
 	questiondomain "github.com/wavefnd/wave-platform/internal/question"
 	"github.com/wavefnd/wave-platform/internal/sponsor"
 	"github.com/wavefnd/wave-platform/internal/web/handler"
+	webhookdomain "github.com/wavefnd/wave-platform/internal/webhook"
 )
 
 func NewRouter(
@@ -38,6 +39,7 @@ func NewRouter(
 	mailboxHandler *handler.MailboxHandler,
 	adminService *admindomain.Service,
 	mediaService *mediadomain.Service,
+	webhookService *webhookdomain.Service,
 ) http.Handler {
 	mux := http.NewServeMux()
 
@@ -57,6 +59,7 @@ func NewRouter(
 	adminHandler := handler.AdministrationHandler{Service: adminService, Auth: authHandler}
 	sponsorsHandler := handler.SponsorsHandler{Service: sponsor.NewService()}
 	mediaHandler := handler.MediaHandler{Service: mediaService, Auth: authHandler}
+	webhookHandler := handler.WebhookHandler{Service: webhookService, Auth: authHandler}
 	usersHandler := handler.UsersHandler{Community: communityRepository, Questions: questionRepository, Auth: authHandler}
 	seoHandler := NewSEOHandler(publicURL, documentRepository, blogService, communityRepository, questionRepository)
 
@@ -103,6 +106,10 @@ func NewRouter(
 	mux.HandleFunc("GET /api/v1/admin/blog/posts", blogHandler.AdminList)
 	mux.HandleFunc("GET /api/v1/admin/blog/posts/{slug}", blogHandler.AdminGet)
 	mux.HandleFunc("POST /api/v1/admin/blog/posts", blogHandler.Save)
+	mux.HandleFunc("GET /api/v1/admin/webhooks", webhookHandler.List)
+	mux.HandleFunc("POST /api/v1/admin/webhooks", webhookHandler.Save)
+	mux.HandleFunc("DELETE /api/v1/admin/webhooks/{webhook}", webhookHandler.Delete)
+	mux.HandleFunc("POST /api/v1/admin/webhooks/{webhook}/test", webhookHandler.Test)
 	mux.HandleFunc("POST /api/v1/media/lunastev/images", mediaHandler.UploadLunaStevImage)
 	mux.HandleFunc("GET /media/lunastev/{image}", mediaHandler.LunaStevImage)
 	if authHandler != nil {

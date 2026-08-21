@@ -1,6 +1,7 @@
 package community_test
 
 import (
+	"encoding/base64"
 	"errors"
 	"strings"
 	"testing"
@@ -10,6 +11,7 @@ import (
 	"github.com/wavefnd/wave-platform/internal/mailbox"
 	"github.com/wavefnd/wave-platform/internal/storage"
 	"github.com/wavefnd/wave-platform/internal/testsupport"
+	webhookdomain "github.com/wavefnd/wave-platform/internal/webhook"
 )
 
 func TestMailBackedPostReplyStayOutOfPersonalMailbox(t *testing.T) {
@@ -121,6 +123,53 @@ func TestMailBackedPostReplyStayOutOfPersonalMailbox(t *testing.T) {
 	}
 	if strings.Contains(string(stored), "mail-backed community post") {
 		t.Fatal("community metadata duplicated the mail body")
+	}
+}
+
+func TestCommunityAndFounderPostsQueueDistinctWebhookEvents(t *testing.T) {
+	database, err := storage.Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = database.Close() })
+	if err := community.SeedSpaces(database); err != nil {
+		t.Fatal(err)
+	}
+	identities, err := testsupport.NewIdentity(database)
+	if err != nil {
+		t.Fatal(err)
+	}
+	owner, _, err := identities.BootstrapTOTPAdmin("Wave Owner", "wave-owner", "owner@example.net", testsupport.TOTPSecret)
+	if err != nil {
+		t.Fatal(err)
+	}
+	member, err := testsupport.Register(identities, "Community Writer")
+	if err != nil {
+		t.Fatal(err)
+	}
+	key := base64.StdEncoding.EncodeToString([]byte("0123456789abcdef0123456789abcdef"))
+	webhooks, err := webhookdomain.NewService(database, key, "https://wave-lang.dev")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := webhooks.SaveEndpoint(owner.ID, webhookdomain.EndpointInput{Name: "Discord feed", Kind: "generic", URL: "https://hooks.example.test/wave",
+		Events: []string{webhookdomain.EventCommunityPost, webhookdomain.EventFounderPost}, Enabled: true}); err != nil {
+		t.Fatal(err)
+	}
+	service := community.NewService(database, "wave-lang.dev")
+	service.SetWebhookService(webhooks)
+	if _, err := service.CreatePost(member, community.CreatePostInput{SpaceID: "development", Title: "Community compiler update", Body: "A public community update."}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := service.CreatePost(owner, community.CreatePostInput{SpaceID: "founder-notes", Title: "A note from the Wave founder", Body: "A public founder update."}); err != nil {
+		t.Fatal(err)
+	}
+	deliveries, err := webhooks.Deliveries(10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(deliveries) != 2 || deliveries[0].EventType != webhookdomain.EventFounderPost || deliveries[1].EventType != webhookdomain.EventCommunityPost {
+		t.Fatalf("deliveries = %#v", deliveries)
 	}
 }
 

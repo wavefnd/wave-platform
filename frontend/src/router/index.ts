@@ -53,7 +53,7 @@ const router = createRouter({
 		{ path: 'account/verify-recovery', name: 'verify-recovery', component: () => import('../pages/VerifyRecoveryEmailPage.vue') },
 		{ path: 'account/security', name: 'account-security', component: () => import('../pages/SecuritySettingsPage.vue'), meta: { requiresAuth: true } },
         { path: 'admin', name: 'admin', component: () => import('../pages/AdminPage.vue'), meta: { adminSection: 'overview' } },
-		{ path: 'admin/:section(blog|accounts|mailbox|mail-queue|git-mirrors|audit-log|security|modules|system)', name: 'admin-section', component: () => import('../pages/AdminPage.vue') },
+		{ path: 'admin/:section(blog|webhooks|accounts|mailbox|mail-queue|git-mirrors|audit-log|security|modules|system)', name: 'admin-section', component: () => import('../pages/AdminPage.vue') },
         { path: ':pathMatch(.*)*', name: 'not-found', component: NotFoundPage },
       ],
     },

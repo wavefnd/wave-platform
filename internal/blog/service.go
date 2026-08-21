@@ -11,6 +11,7 @@ import (
 	"github.com/wavefnd/wave-platform/internal/audit"
 	"github.com/wavefnd/wave-platform/internal/identifier"
 	"github.com/wavefnd/wave-platform/internal/storage"
+	webhookdomain "github.com/wavefnd/wave-platform/internal/webhook"
 )
 
 var (
@@ -22,6 +23,7 @@ type Service struct {
 	repository *Repository
 	accounts   *account.Repository
 	audit      *audit.Repository
+	webhooks   *webhookdomain.Service
 	now        func() time.Time
 }
 
@@ -31,6 +33,10 @@ func NewService(database *storage.Database) *Service {
 }
 
 func (service *Service) Repository() *Repository { return service.repository }
+
+func (service *Service) SetWebhookService(webhooks *webhookdomain.Service) {
+	service.webhooks = webhooks
+}
 
 func (service *Service) Save(actorID string, input Input) (Post, error) {
 	input.Category = NormalizeCategory(input.Category)
@@ -82,10 +88,13 @@ func (service *Service) Save(actorID string, input Input) (Post, error) {
 	}
 	now := service.now().UTC()
 	item, err := service.repository.Post(input.Slug, true)
+	previouslyPublished := false
 	if errors.Is(err, storage.ErrNotFound) {
 		item = Post{Slug: input.Slug, CreatedAt: now}
 	} else if err != nil {
 		return Post{}, err
+	} else {
+		previouslyPublished = item.PublishedAt != ""
 	}
 	item.Category, item.Title, item.Content, item.Status = input.Category, input.Title, input.Content, input.Status
 	item.Summary = input.Summary
@@ -103,6 +112,13 @@ func (service *Service) Save(actorID string, input Input) (Post, error) {
 	}
 	if err := service.appendAudit(actorID, item.Slug, "admin.blog.save"); err != nil {
 		return Post{}, err
+	}
+	if service.webhooks != nil && item.Status == "published" && !previouslyPublished {
+		eventType, path := webhookdomain.EventBlogPublished, "/blog/"+item.Slug
+		if item.Category == "release" {
+			eventType, path = webhookdomain.EventReleasePublished, "/releases/"+item.Slug
+		}
+		_ = service.webhooks.Publish(webhookdomain.Event{Type: eventType, Title: item.Title, ResourceID: "blog/" + item.Slug, URL: path, OccurredAt: now})
 	}
 	return item, nil
 }
