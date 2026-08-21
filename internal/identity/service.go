@@ -726,11 +726,20 @@ func (service *Service) IsSourceMaintainer(accountID string) bool {
 	return err == nil && allowed
 }
 
+func (service *Service) IsRFCMaintainer(accountID string) bool {
+	if service.IsOwner(accountID) {
+		return true
+	}
+	allowed, err := service.permissions.HasRole(accountID, "rfc-maintainer")
+	return err == nil && allowed
+}
+
 func (service *Service) ensureManagementRoles() error {
 	for _, role := range []permission.Role{
 		{ID: "platform-owner", Name: "Platform owner", Permissions: []string{"platform.*"}},
 		{ID: "platform-admin", Name: "Platform administrator", Permissions: []string{"platform.admin.*"}},
 		{ID: "source-maintainer", Name: "Source maintainer", Description: "Reviews and downloads submitted Git patches", Permissions: []string{"source.patches.review", "source.patches.download"}},
+		{ID: "rfc-maintainer", Name: "RFC maintainer", Description: "Moderates official proposals and records project decisions", Permissions: []string{"rfc.status.update"}},
 	} {
 		if err := service.permissions.PutRole(role); err != nil {
 			return err

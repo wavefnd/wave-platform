@@ -26,6 +26,7 @@ const service = computed(() => {
   if (path.startsWith('/lunastev')) return 'personal'
   if (path.startsWith('/docs')) return 'docs'
   if (path.startsWith('/questions')) return 'questions'
+	if (path.startsWith('/rfcs')) return 'rfc'
   if (path.startsWith('/source')) return 'source'
   if (path.startsWith('/patches')) return 'source'
   if (path.startsWith('/admin')) return 'admin'

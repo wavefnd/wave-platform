@@ -95,6 +95,23 @@ func (handler AdministrationHandler) SourceMaintainer(writer http.ResponseWriter
 	writer.WriteHeader(http.StatusNoContent)
 }
 
+func (handler AdministrationHandler) RFCMaintainer(writer http.ResponseWriter, request *http.Request) {
+	actor, ok := handler.authorize(writer, request, true)
+	if !ok {
+		return
+	}
+	var input admindomain.RFCMaintainerInput
+	if xmlcodec.Decode(request.Body, &input) != nil {
+		writeAPIError(writer, http.StatusBadRequest, "invalid-xml", "The RFC maintainer request is not valid XML.")
+		return
+	}
+	if err := handler.Service.UpdateRFCMaintainer(actor.ID, request.PathValue("account"), input.Enabled); err != nil {
+		handler.writeManagementError(writer, err)
+		return
+	}
+	writer.WriteHeader(http.StatusNoContent)
+}
+
 func (handler AdministrationHandler) PlatformPreferences(writer http.ResponseWriter, _ *http.Request) {
 	if handler.Service == nil {
 		writeAPIError(writer, http.StatusServiceUnavailable, "preferences-unavailable", "Platform preferences are unavailable.")

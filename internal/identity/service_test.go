@@ -336,7 +336,7 @@ func TestBootstrapTOTPAdminIsIdempotent(t *testing.T) {
 	if err != nil || created || first.ID != second.ID {
 		t.Fatalf("second bootstrap: created=%v err=%v", created, err)
 	}
-	if !service.IsOwner(first.ID) || !service.IsAdministrator(first.ID) || !service.IsSourceMaintainer(first.ID) {
+	if !service.IsOwner(first.ID) || !service.IsAdministrator(first.ID) || !service.IsSourceMaintainer(first.ID) || !service.IsRFCMaintainer(first.ID) {
 		t.Fatal("owner role was not assigned")
 	}
 }
@@ -359,7 +359,7 @@ func TestPlatformAdministratorCanManageWithoutBecomingOwner(t *testing.T) {
 	if err := permissions.Assign(permission.Assignment{AccountID: item.ID, RoleID: "platform-admin", Scope: "platform"}); err != nil {
 		t.Fatal(err)
 	}
-	if !service.IsAdministrator(item.ID) || service.IsOwner(item.ID) || service.IsSourceMaintainer(item.ID) {
+	if !service.IsAdministrator(item.ID) || service.IsOwner(item.ID) || service.IsSourceMaintainer(item.ID) || service.IsRFCMaintainer(item.ID) {
 		t.Fatal("administrator and owner roles were not kept separate")
 	}
 }

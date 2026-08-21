@@ -9,6 +9,7 @@ const descriptions = {
     docs: 'Official Wave programming language guides and reference documentation.',
     community: 'Wave programming language community posts and technical discussions.',
     questions: 'Technical questions and answers about the Wave programming language.',
+	rfc: 'Public design proposals and decisions for significant changes to the Wave language and platform.',
     source: 'Read-only source browser for official Wave Git mirrors.',
     mail: 'Wave Mail.', account: 'Wave account security and authentication.', admin: 'Wave Platform administration.',
   },
@@ -18,17 +19,19 @@ const descriptions = {
     docs: 'Wave 프로그래밍 언어의 공식 안내서와 레퍼런스 문서입니다.',
     community: 'Wave 프로그래밍 언어 커뮤니티 글과 기술 토론입니다.',
     questions: 'Wave 프로그래밍 언어에 관한 기술 질문과 답변입니다.',
+	rfc: 'Wave 언어와 플랫폼의 중요한 변경을 검토하고 결정하는 공개 제안서입니다.',
     source: 'Wave 공식 Git 미러를 탐색하는 읽기 전용 소스 브라우저입니다.',
     mail: 'Wave Mail입니다.', account: 'Wave 계정 보안과 인증입니다.', admin: 'Wave Platform 관리입니다.',
   },
 } as const
 
-const labels = { portal: 'Wave', blog: 'Blog', docs: 'Documentation', community: 'Community', questions: 'Questions', source: 'Source', mail: 'Mail', account: 'Account', admin: 'Administration', personal: 'LunaStev' } as const
+const labels = { portal: 'Wave', blog: 'Blog', docs: 'Documentation', community: 'Community', questions: 'Questions', rfc: 'RFC', source: 'Source', mail: 'Mail', account: 'Account', admin: 'Administration', personal: 'LunaStev' } as const
 type Service = keyof typeof labels
 
 const nonIndexableRoutes = new Set([
   'login', 'register', 'account-recover', 'verify-recovery', 'account-security', 'admin',
   'search', 'not-found', 'community-new', 'personal-space-new', 'question-new',
+	'rfc-new', 'rfc-edit',
 ])
 
 interface PageSEO {
@@ -56,7 +59,7 @@ function schemaType(service: Service, detail: boolean): string {
   if (service === 'docs') return detail ? 'TechArticle' : 'CollectionPage'
 	if (service === 'source') return detail ? 'SoftwareSourceCode' : 'CollectionPage'
 	if (service === 'blog') return detail ? 'BlogPosting' : 'CollectionPage'
-  if (['community', 'questions', 'personal'].includes(service)) return detail ? 'WebPage' : 'CollectionPage'
+  if (['community', 'questions', 'rfc', 'personal'].includes(service)) return detail ? 'WebPage' : 'CollectionPage'
   return 'WebPage'
 }
 
@@ -116,7 +119,7 @@ export function updateSEO(route: RouteLocationNormalizedLoaded, locale: Locale, 
   const title = service === 'portal' && route.name === 'home' ? 'Wave Programming Language' : `${suffix} · Wave`
   const privateService = ['mail', 'account', 'admin'].includes(service)
   const noIndex = privateService || nonIndexableRoutes.has(String(route.name ?? ''))
-  const detail = Boolean(route.params.pathMatch || route.params.thread || route.params.question || route.params.repository || route.params.slug)
+  const detail = Boolean(route.params.pathMatch || route.params.thread || route.params.question || route.params.number || route.params.repository || route.params.slug)
   applyPageSEO({ title, description, locale, path: route.path, noIndex, schema: { '@type': schemaType(service, detail) } })
 }
 

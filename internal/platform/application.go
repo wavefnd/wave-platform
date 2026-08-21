@@ -25,6 +25,7 @@ import (
 	patchdomain "github.com/wavefnd/wave-platform/internal/patcharchive"
 	"github.com/wavefnd/wave-platform/internal/platformstats"
 	questiondomain "github.com/wavefnd/wave-platform/internal/question"
+	rfcdomain "github.com/wavefnd/wave-platform/internal/rfc"
 	"github.com/wavefnd/wave-platform/internal/sourceanalysis"
 	"github.com/wavefnd/wave-platform/internal/storage"
 	"github.com/wavefnd/wave-platform/internal/waveruntime"
@@ -46,6 +47,7 @@ type Application struct {
 	MailRuntime    *mailruntime.Service
 	Webhooks       *webhookdomain.Service
 	Patches        *patchdomain.Service
+	RFCs           *rfcdomain.Service
 }
 
 func New(configPath string) (*Application, error) {
@@ -110,6 +112,7 @@ func New(configPath string) (*Application, error) {
 	}
 	identityService.SetWebhookService(webhookService)
 	patchService := patchdomain.NewService(database, identity.PatchMailboxAccountID, identityService.PatchAddress())
+	rfcService := rfcdomain.NewService(database)
 	blogService := blogdomain.NewService(database)
 	blogService.SetWebhookService(webhookService)
 	documentRepository := document.NewRepository(database)
@@ -205,6 +208,7 @@ func New(configPath string) (*Application, error) {
 		mediaService,
 		webhookService,
 		patchService,
+		rfcService,
 	)
 
 	server := &http.Server{
@@ -227,6 +231,7 @@ func New(configPath string) (*Application, error) {
 		MailRuntime:    mailRuntime,
 		Webhooks:       webhookService,
 		Patches:        patchService,
+		RFCs:           rfcService,
 	}, nil
 }
 

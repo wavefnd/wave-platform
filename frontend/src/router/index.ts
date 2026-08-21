@@ -8,6 +8,7 @@ import BlogPage from '../pages/BlogPage.vue'
 import MailPage from '../pages/MailPage.vue'
 import NotFoundPage from '../pages/NotFoundPage.vue'
 import QuestionsPage from '../pages/QuestionsPage.vue'
+import RFCPage from '../pages/RFCPage.vue'
 import PatchesPage from '../pages/PatchesPage.vue'
 import SearchPage from '../pages/SearchPage.vue'
 import SourcePage from '../pages/SourcePage.vue'
@@ -42,6 +43,10 @@ const router = createRouter({
         { path: 'questions', name: 'questions', component: QuestionsPage },
         { path: 'questions/new', name: 'question-new', component: QuestionsPage },
         { path: 'questions/:question', name: 'question-detail', component: QuestionsPage },
+		{ path: 'rfcs', name: 'rfcs', component: RFCPage },
+		{ path: 'rfcs/new', name: 'rfc-new', component: RFCPage, meta: { requiresAuth: true } },
+		{ path: 'rfcs/:number', name: 'rfc-detail', component: RFCPage },
+		{ path: 'rfcs/:number/edit', name: 'rfc-edit', component: RFCPage, meta: { requiresAuth: true } },
         { path: 'source', name: 'source', component: SourcePage },
         { path: 'source/:repository', name: 'source-repository', component: SourcePage },
         { path: 'patches', name: 'patches', component: PatchesPage },

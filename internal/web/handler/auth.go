@@ -101,6 +101,7 @@ type AccountResponse struct {
 	Administrator    bool      `xml:"administrator"`
 	Owner            bool      `xml:"owner"`
 	SourceMaintainer bool      `xml:"source-maintainer"`
+	RFCMaintainer    bool      `xml:"rfc-maintainer"`
 	ExpiresAt        time.Time `xml:"expires-at"`
 }
 
@@ -388,6 +389,7 @@ func (handler AuthHandler) writeAccount(writer http.ResponseWriter, status int, 
 	_ = xmlcodec.Write(writer, status, AccountResponse{ID: item.ID, Username: item.Username, DisplayName: item.DisplayName,
 		Email: item.Email, TimeZone: normalizedTimeZone(item.TimeZone), Administrator: handler.Service.IsAdministrator(item.ID), Owner: handler.Service.IsOwner(item.ID),
 		SourceMaintainer: handler.Service.IsSourceMaintainer(item.ID),
+		RFCMaintainer:    handler.Service.IsRFCMaintainer(item.ID),
 		ExpiresAt:        currentSession.ExpiresAt})
 }
 

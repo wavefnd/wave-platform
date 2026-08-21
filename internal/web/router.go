@@ -16,6 +16,7 @@ import (
 	patchdomain "github.com/wavefnd/wave-platform/internal/patcharchive"
 	"github.com/wavefnd/wave-platform/internal/platformstats"
 	questiondomain "github.com/wavefnd/wave-platform/internal/question"
+	rfcdomain "github.com/wavefnd/wave-platform/internal/rfc"
 	"github.com/wavefnd/wave-platform/internal/sponsor"
 	"github.com/wavefnd/wave-platform/internal/web/handler"
 	webhookdomain "github.com/wavefnd/wave-platform/internal/webhook"
@@ -42,6 +43,7 @@ func NewRouter(
 	mediaService *mediadomain.Service,
 	webhookService *webhookdomain.Service,
 	patchService *patchdomain.Service,
+	rfcService *rfcdomain.Service,
 ) http.Handler {
 	mux := http.NewServeMux()
 
@@ -63,8 +65,9 @@ func NewRouter(
 	mediaHandler := handler.MediaHandler{Service: mediaService, Auth: authHandler}
 	webhookHandler := handler.WebhookHandler{Service: webhookService, Auth: authHandler}
 	patchesHandler := handler.PatchesHandler{Service: patchService, Auth: authHandler}
+	rfcHandler := handler.RFCHandler{Service: rfcService, Auth: authHandler}
 	usersHandler := handler.UsersHandler{Community: communityRepository, Questions: questionRepository, Auth: authHandler}
-	seoHandler := NewSEOHandler(publicURL, documentRepository, blogService, communityRepository, questionRepository)
+	seoHandler := NewSEOHandler(publicURL, documentRepository, blogService, communityRepository, questionRepository, rfcService)
 
 	mux.HandleFunc("GET /api/v1/platform", platformHandler.Status)
 	mux.HandleFunc("GET /api/v1/modules", modulesHandler.Status)
@@ -101,6 +104,12 @@ func NewRouter(
 	mux.HandleFunc("POST /api/v1/patches/{patch}/review", patchesHandler.Review)
 	mux.HandleFunc("POST /api/v1/patches/{patch}/review-comments", patchesHandler.AddReviewComment)
 	mux.HandleFunc("POST /api/v1/patches/{patch}/review-comments/{comment}/resolution", patchesHandler.ResolveReviewComment)
+	mux.HandleFunc("GET /api/v1/rfcs", rfcHandler.List)
+	mux.HandleFunc("POST /api/v1/rfcs", rfcHandler.Create)
+	mux.HandleFunc("GET /api/v1/rfcs/{number}", rfcHandler.Get)
+	mux.HandleFunc("POST /api/v1/rfcs/{number}", rfcHandler.Update)
+	mux.HandleFunc("POST /api/v1/rfcs/{number}/status", rfcHandler.UpdateStatus)
+	mux.HandleFunc("POST /api/v1/rfcs/{number}/comments", rfcHandler.Comment)
 	mux.HandleFunc("GET /api/v1/platform/stats", statsHandler.Get)
 	mux.HandleFunc("GET /api/v1/platform/preferences", adminHandler.PlatformPreferences)
 	mux.HandleFunc("GET /api/v1/users", usersHandler.Directory)
@@ -112,6 +121,7 @@ func NewRouter(
 	mux.HandleFunc("POST /api/v1/admin/accounts/{account}/status", adminHandler.AccountStatus)
 	mux.HandleFunc("POST /api/v1/admin/accounts/{account}/role", adminHandler.AccountRole)
 	mux.HandleFunc("POST /api/v1/admin/accounts/{account}/source-maintainer", adminHandler.SourceMaintainer)
+	mux.HandleFunc("POST /api/v1/admin/accounts/{account}/rfc-maintainer", adminHandler.RFCMaintainer)
 	mux.HandleFunc("POST /api/v1/admin/settings/lunastev-time-zone", adminHandler.LunaStevTimeZone)
 	mux.HandleFunc("GET /api/v1/admin/blog/posts", blogHandler.AdminList)
 	mux.HandleFunc("GET /api/v1/admin/blog/posts/{slug}", blogHandler.AdminGet)

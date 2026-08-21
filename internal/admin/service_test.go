@@ -153,6 +153,36 @@ func TestOnlyOwnerCanAssignSourceMaintainersIndependentlyFromAdministrators(t *t
 	}
 }
 
+func TestOnlyOwnerCanAssignRFCMaintainersIndependentlyFromAdministrators(t *testing.T) {
+	database, err := storage.Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = database.Close() })
+	now := time.Now().UTC()
+	accounts := account.NewRepository(database)
+	permissions := permission.NewRepository(database)
+	for _, id := range []string{"owner", "admin", "maintainer"} {
+		if err := accounts.Create(account.Account{ID: id, Username: id, DisplayName: id, Email: id + "@wave.test", Status: "active", CreatedAt: now, UpdatedAt: now}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	_ = permissions.Assign(permission.Assignment{AccountID: "owner", RoleID: "platform-owner", Scope: "platform"})
+	_ = permissions.Assign(permission.Assignment{AccountID: "admin", RoleID: "platform-admin", Scope: "platform"})
+	service := NewService(database, nil, false, false)
+	if err := service.UpdateRFCMaintainer("admin", "maintainer", true); !errors.Is(err, ErrForbidden) {
+		t.Fatalf("administrator assigned RFC maintainer: %v", err)
+	}
+	if err := service.UpdateRFCMaintainer("owner", "maintainer", true); err != nil {
+		t.Fatal(err)
+	}
+	assigned, err := permissions.HasRole("maintainer", "rfc-maintainer")
+	admin, adminErr := permissions.HasRole("maintainer", "platform-admin")
+	if err != nil || adminErr != nil || !assigned || admin {
+		t.Fatalf("RFC maintainer assigned=%v administrator=%v errors=%v/%v", assigned, admin, err, adminErr)
+	}
+}
+
 func TestLunaStevTimeZoneDefaultsToSeoulAndIsAudited(t *testing.T) {
 	database, err := storage.Open(t.TempDir())
 	if err != nil {

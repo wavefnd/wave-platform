@@ -117,6 +117,30 @@ export interface PatchSummary {
 
 export interface PatchArchiveView { address: string; patches: PatchSummary[] }
 
+export type RFCStatus = 'draft' | 'discussion' | 'accepted' | 'rejected' | 'implementing' | 'completed' | 'withdrawn'
+
+export interface RFCComment {
+	id: string
+	authorAccountId: string
+	authorName: string
+	body: string
+	createdAt: string
+}
+
+export interface RFCProposal {
+	number: number
+	title: string
+	summary: string
+	content: string
+	status: RFCStatus
+	authorAccountId: string
+	authorName: string
+	commentCount: number
+	comments: RFCComment[]
+	createdAt: string
+	updatedAt: string
+}
+
 export interface PatchReviewComment {
 	id: string
 	authorAccountId: string
@@ -139,6 +163,7 @@ export interface AdminAccount {
 	owner: boolean
 	administrator: boolean
 	sourceMaintainer: boolean
+	rfcMaintainer: boolean
 	totpEnabled: boolean
 	recoveryVerified: boolean
 	createdAt: string
@@ -283,6 +308,7 @@ export interface AccountSession {
 	administrator: boolean
 	owner: boolean
 	sourceMaintainer: boolean
+	rfcMaintainer: boolean
 	expiresAt: string
 }
 
@@ -502,6 +528,7 @@ function parseAccountSession(xml: XMLDocument): AccountSession {
 		administrator: textOf(xml, 'administrator') === 'true',
 		owner: textOf(xml, 'owner') === 'true',
 		sourceMaintainer: textOf(xml, 'source-maintainer') === 'true',
+		rfcMaintainer: textOf(xml, 'rfc-maintainer') === 'true',
 		expiresAt: textOf(xml, 'expires-at'),
 	}
 }
@@ -860,6 +887,59 @@ export async function resolvePatchReviewComment(id: string, commentId: string, r
 	return parsePatchReviewComment(xml.documentElement)
 }
 
+function parseRFCComment(element: Element): RFCComment {
+	return {
+		id: element.getAttribute('id') ?? '', authorAccountId: childText(element, 'author-account-id'),
+		authorName: childText(element, 'author-name'), body: childContent(element, 'body'), createdAt: childText(element, 'created-at'),
+	}
+}
+
+function parseRFC(element: Element): RFCProposal {
+	return {
+		number: Number(element.getAttribute('number')), title: childText(element, 'title'), summary: childContent(element, 'summary'),
+		content: childContent(element, 'content'), status: (childText(element, 'status') || 'draft') as RFCStatus,
+		authorAccountId: childText(element, 'author-account-id'), authorName: childText(element, 'author-name'),
+		commentCount: Number(childText(element, 'comment-count')), comments: Array.from(element.querySelectorAll('comments > comment')).map(parseRFCComment),
+		createdAt: childText(element, 'created-at'), updatedAt: childText(element, 'updated-at'),
+	}
+}
+
+export async function getRFCs(query = '', status = ''): Promise<RFCProposal[]> {
+	const parameters = new URLSearchParams()
+	if (query.trim()) parameters.set('q', query.trim())
+	if (status) parameters.set('status', status)
+	const xml = await getXml(`/api/v1/rfcs${parameters.size ? `?${parameters}` : ''}`)
+	return Array.from(xml.documentElement.children).filter((item) => item.localName === 'rfc').map(parseRFC)
+}
+
+export async function getRFC(number: number): Promise<RFCProposal> {
+	return parseRFC((await getXml(`/api/v1/rfcs/${number}`)).documentElement)
+}
+
+export async function createRFC(title: string, content: string): Promise<RFCProposal> {
+	const xml = await requestXml('/api/v1/rfcs', 'POST', authDocument('rfc', { title, content }))
+	if (!xml) throw new Error('The server returned an empty RFC response.')
+	return parseRFC(xml.documentElement)
+}
+
+export async function updateRFC(number: number, title: string, content: string): Promise<RFCProposal> {
+	const xml = await requestXml(`/api/v1/rfcs/${number}`, 'POST', authDocument('rfc', { title, content }))
+	if (!xml) throw new Error('The server returned an empty RFC response.')
+	return parseRFC(xml.documentElement)
+}
+
+export async function updateRFCStatus(number: number, status: RFCStatus): Promise<RFCProposal> {
+	const xml = await requestXml(`/api/v1/rfcs/${number}/status`, 'POST', authDocument('rfc-status', { status }))
+	if (!xml) throw new Error('The server returned an empty RFC response.')
+	return parseRFC(xml.documentElement)
+}
+
+export async function addRFCComment(number: number, body: string): Promise<RFCComment> {
+	const xml = await requestXml(`/api/v1/rfcs/${number}/comments`, 'POST', authDocument('rfc-comment', { body }))
+	if (!xml) throw new Error('The server returned an empty RFC comment response.')
+	return parseRFCComment(xml.documentElement)
+}
+
 export async function getModules(): Promise<ModuleStatus[]> {
   const xml = await getXml('/api/v1/modules')
   return Array.from(xml.querySelectorAll('module')).map((element) => ({
@@ -882,6 +962,7 @@ export async function getAdminSnapshot(): Promise<AdminSnapshot> {
 			status: childText(element, 'status'), owner: childText(element, 'owner') === 'true',
 			administrator: childText(element, 'administrator') === 'true',
 			sourceMaintainer: childText(element, 'source-maintainer') === 'true',
+			rfcMaintainer: childText(element, 'rfc-maintainer') === 'true',
 			totpEnabled: childText(element, 'totp-enabled') === 'true',
 			recoveryVerified: childText(element, 'recovery-verified') === 'true',
 			createdAt: childText(element, 'created-at'), updatedAt: childText(element, 'updated-at'),
@@ -945,6 +1026,10 @@ export async function updateAdminAccountRole(accountId: string, administrator: b
 
 export async function updateAdminSourceMaintainer(accountId: string, enabled: boolean): Promise<void> {
 	await requestXml(`/api/v1/admin/accounts/${encodeURIComponent(accountId)}/source-maintainer`, 'POST', authDocument('source-maintainer', { enabled: String(enabled) }))
+}
+
+export async function updateAdminRFCMaintainer(accountId: string, enabled: boolean): Promise<void> {
+	await requestXml(`/api/v1/admin/accounts/${encodeURIComponent(accountId)}/rfc-maintainer`, 'POST', authDocument('rfc-maintainer', { enabled: String(enabled) }))
 }
 
 function parseWebhook(element: Element): WebhookEndpoint {

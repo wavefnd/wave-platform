@@ -16,7 +16,7 @@ import {
 import {
   getAdminSnapshot, getManagementMailbox, getManagementMailMessage, getModules, getPlatformStatus,
   deleteAdminWebhook, getAdminBlogPost, getAdminBlogPosts, getAdminWebhooks, saveAdminBlogPost, saveAdminWebhook, testAdminWebhook,
-  updateAdminAccountRole, updateAdminAccountStatus, updateAdminSourceMaintainer, updateLunaStevTimeZone,
+  updateAdminAccountRole, updateAdminAccountStatus, updateAdminRFCMaintainer, updateAdminSourceMaintainer, updateLunaStevTimeZone,
   type AdminAccount, type AdminSnapshot, type BlogPostInput, type BlogPostSummary, type MailboxView, type MailMessageView, type ModuleStatus, type PlatformStatus,
   type WebhookAdminView, type WebhookInput,
 } from '../services/http'
@@ -28,7 +28,8 @@ import MarkdownContent from '../components/MarkdownContent.vue'
 
 type PendingAction = { kind: 'status'; account: AdminAccount; status: 'active' | 'suspended' }
   | { kind: 'role'; account: AdminAccount; administrator: boolean }
-  | { kind: 'maintainer'; account: AdminAccount; enabled: boolean }
+  | { kind: 'source-maintainer'; account: AdminAccount; enabled: boolean }
+  | { kind: 'rfc-maintainer'; account: AdminAccount; enabled: boolean }
 
 const router = useRouter()
 const route = useRoute()
@@ -257,7 +258,8 @@ async function confirmAction() {
   try {
     if (action.kind === 'status') await updateAdminAccountStatus(action.account.id, action.status)
     else if (action.kind === 'role') await updateAdminAccountRole(action.account.id, action.administrator)
-    else await updateAdminSourceMaintainer(action.account.id, action.enabled)
+    else if (action.kind === 'source-maintainer') await updateAdminSourceMaintainer(action.account.id, action.enabled)
+    else await updateAdminRFCMaintainer(action.account.id, action.enabled)
     pendingAction.value = null
     await load()
   } catch (reason) {
@@ -408,12 +410,13 @@ function changeLocale(event: Event) {
                   <CTableBody>
                     <CTableRow v-for="account in accounts" :key="account.id">
                       <CTableDataCell class="ps-4"><strong>{{ account.displayName }}</strong><div class="text-body-secondary small">{{ account.email }} · @{{ account.username }}</div></CTableDataCell>
-                      <CTableDataCell><div class="d-flex flex-wrap gap-1"><CBadge v-if="account.owner" color="primary">{{ t('admin.owner') }}</CBadge><CBadge v-if="!account.owner && account.administrator" color="info">{{ t('admin.administrator') }}</CBadge><CBadge v-if="account.sourceMaintainer" color="warning">{{ t('admin.sourceMaintainer') }}</CBadge><span v-if="!account.owner && !account.administrator && !account.sourceMaintainer" class="text-body-secondary">{{ t('admin.member') }}</span></div></CTableDataCell>
+                      <CTableDataCell><div class="d-flex flex-wrap gap-1"><CBadge v-if="account.owner" color="primary">{{ t('admin.owner') }}</CBadge><CBadge v-if="!account.owner && account.administrator" color="info">{{ t('admin.administrator') }}</CBadge><CBadge v-if="account.sourceMaintainer" color="warning">{{ t('admin.sourceMaintainer') }}</CBadge><CBadge v-if="account.rfcMaintainer" color="dark">{{ t('admin.rfcMaintainer') }}</CBadge><span v-if="!account.owner && !account.administrator && !account.sourceMaintainer && !account.rfcMaintainer" class="text-body-secondary">{{ t('admin.member') }}</span></div></CTableDataCell>
                       <CTableDataCell><span :class="account.totpEnabled ? 'text-success' : 'text-danger'">TOTP</span><div class="text-body-secondary small">{{ account.recoveryVerified ? t('admin.recoveryVerified') : t('admin.recoveryUnverified') }}</div></CTableDataCell>
                       <CTableDataCell><CBadge :color="badgeColor(account.status)">{{ account.status }}</CBadge></CTableDataCell>
                       <CTableDataCell class="text-end pe-4 admin-actions">
                         <CButton v-if="auth.account?.owner && !account.owner && account.id !== auth.account.id" color="secondary" variant="ghost" size="sm" @click="ask({ kind: 'role', account, administrator: !account.administrator })">{{ account.administrator ? t('admin.removeAdmin') : t('admin.makeAdmin') }}</CButton>
-                        <CButton v-if="auth.account?.owner && !account.owner" color="warning" variant="ghost" size="sm" @click="ask({ kind: 'maintainer', account, enabled: !account.sourceMaintainer })">{{ account.sourceMaintainer ? t('admin.removeSourceMaintainer') : t('admin.makeSourceMaintainer') }}</CButton>
+                        <CButton v-if="auth.account?.owner && !account.owner" color="warning" variant="ghost" size="sm" @click="ask({ kind: 'source-maintainer', account, enabled: !account.sourceMaintainer })">{{ account.sourceMaintainer ? t('admin.removeSourceMaintainer') : t('admin.makeSourceMaintainer') }}</CButton>
+                        <CButton v-if="auth.account?.owner && !account.owner" color="dark" variant="ghost" size="sm" @click="ask({ kind: 'rfc-maintainer', account, enabled: !account.rfcMaintainer })">{{ account.rfcMaintainer ? t('admin.removeRFCMaintainer') : t('admin.makeRFCMaintainer') }}</CButton>
                         <CButton v-if="account.id !== auth.account?.id && (auth.account?.owner || !account.owner)" :color="account.status === 'active' ? 'danger' : 'success'" variant="outline" size="sm" @click="ask({ kind: 'status', account, status: account.status === 'active' ? 'suspended' : 'active' })">{{ account.status === 'active' ? t('admin.suspend') : t('admin.restore') }}</CButton>
                       </CTableDataCell>
                     </CTableRow>
@@ -462,7 +465,7 @@ function changeLocale(event: Event) {
 
     <CModal :visible="Boolean(pendingAction)" alignment="center" @close="pendingAction = null">
       <CModalHeader><CModalTitle>{{ t('admin.confirmAction') }}</CModalTitle></CModalHeader>
-      <CModalBody v-if="pendingAction"><p>{{ pendingAction.kind === 'status' ? (pendingAction.status === 'suspended' ? t('admin.confirmSuspend') : t('admin.confirmRestore')) : pendingAction.kind === 'role' ? (pendingAction.administrator ? t('admin.confirmMakeAdmin') : t('admin.confirmRemoveAdmin')) : (pendingAction.enabled ? t('admin.confirmMakeSourceMaintainer') : t('admin.confirmRemoveSourceMaintainer')) }}</p><strong>{{ pendingAction.account.displayName }}</strong><div class="text-body-secondary small">{{ pendingAction.account.email }}</div><div v-if="actionError" class="alert alert-danger mt-3 mb-0" role="alert">{{ actionError }}</div></CModalBody>
+      <CModalBody v-if="pendingAction"><p>{{ pendingAction.kind === 'status' ? (pendingAction.status === 'suspended' ? t('admin.confirmSuspend') : t('admin.confirmRestore')) : pendingAction.kind === 'role' ? (pendingAction.administrator ? t('admin.confirmMakeAdmin') : t('admin.confirmRemoveAdmin')) : pendingAction.kind === 'source-maintainer' ? (pendingAction.enabled ? t('admin.confirmMakeSourceMaintainer') : t('admin.confirmRemoveSourceMaintainer')) : (pendingAction.enabled ? t('admin.confirmMakeRFCMaintainer') : t('admin.confirmRemoveRFCMaintainer')) }}</p><strong>{{ pendingAction.account.displayName }}</strong><div class="text-body-secondary small">{{ pendingAction.account.email }}</div><div v-if="actionError" class="alert alert-danger mt-3 mb-0" role="alert">{{ actionError }}</div></CModalBody>
       <CModalFooter><CButton color="secondary" variant="outline" :disabled="actionLoading" @click="pendingAction = null">{{ t('common.cancel') }}</CButton><CButton :color="pendingAction?.kind === 'status' && pendingAction.status === 'suspended' ? 'danger' : 'primary'" :disabled="actionLoading" @click="confirmAction">{{ t('admin.confirm') }}</CButton></CModalFooter>
     </CModal>
 

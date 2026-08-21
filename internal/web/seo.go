@@ -3,10 +3,12 @@ package web
 import (
 	"encoding/json"
 	"encoding/xml"
+	"fmt"
 	"html"
 	"net/http"
 	"net/url"
 	"path"
+	"strconv"
 	"strings"
 	"time"
 
@@ -14,6 +16,7 @@ import (
 	communitydomain "github.com/wavefnd/wave-platform/internal/community"
 	documentdomain "github.com/wavefnd/wave-platform/internal/document"
 	questiondomain "github.com/wavefnd/wave-platform/internal/question"
+	rfcdomain "github.com/wavefnd/wave-platform/internal/rfc"
 )
 
 type sitemapURL struct {
@@ -33,6 +36,7 @@ type SEOHandler struct {
 	blog      *blogdomain.Service
 	community *communitydomain.Repository
 	questions *questiondomain.Repository
+	rfcs      *rfcdomain.Service
 }
 
 type pageMetadata struct {
@@ -50,10 +54,11 @@ func NewSEOHandler(
 	blog *blogdomain.Service,
 	community *communitydomain.Repository,
 	questions *questiondomain.Repository,
+	rfcs *rfcdomain.Service,
 ) SEOHandler {
 	return SEOHandler{
 		publicURL: strings.TrimRight(publicURL, "/"), documents: documents,
-		blog: blog, community: community, questions: questions,
+		blog: blog, community: community, questions: questions, rfcs: rfcs,
 	}
 }
 
@@ -75,6 +80,7 @@ func (handler SEOHandler) Sitemap(writer http.ResponseWriter, request *http.Requ
 		{Location: base + "/community/showcase"},
 		{Location: base + "/lunastev"},
 		{Location: base + "/questions"},
+		{Location: base + "/rfcs"},
 		{Location: base + "/source"},
 		{Location: base + "/patches"},
 	}
@@ -116,6 +122,13 @@ func (handler SEOHandler) Sitemap(writer http.ResponseWriter, request *http.Requ
 		if questions, err := handler.questions.Query("", "latest", "", 0, 0, ""); err == nil {
 			for _, question := range questions {
 				entries = append(entries, sitemapURL{Location: handler.location(base, "questions", question.ID), LastModified: dateOnly(question.LastActivityAt)})
+			}
+		}
+	}
+	if handler.rfcs != nil {
+		if proposals, err := handler.rfcs.Repository().Proposals("", ""); err == nil {
+			for _, proposal := range proposals {
+				entries = append(entries, sitemapURL{Location: handler.location(base, "rfcs", strconv.FormatUint(proposal.Number, 10)), LastModified: dateOnly(proposal.UpdatedAt.Format(time.RFC3339))})
 			}
 		}
 	}
@@ -258,6 +271,20 @@ func (handler SEOHandler) metadata(requestPath, base string) pageMetadata {
 				}
 			}
 		}
+	case "rfcs":
+		metadata.Title = "Request for Comments · Wave"
+		metadata.Description = "Public design proposals and decisions for significant changes to the Wave language and platform."
+		metadata.SchemaType = "CollectionPage"
+		if len(segments) == 2 && handler.rfcs != nil {
+			if number, err := strconv.ParseUint(segments[1], 10, 64); err == nil {
+				if proposal, proposalErr := handler.rfcs.Repository().Proposal(number); proposalErr == nil {
+					metadata.Title = fmt.Sprintf("RFC-%04d: %s · Wave", proposal.Number, proposal.Title)
+					metadata.Description = proposal.Summary
+					metadata.OpenGraph = "article"
+					metadata.SchemaType = "TechArticle"
+				}
+			}
+		}
 	case "source":
 		metadata.Title = "Source · Wave"
 		metadata.Description = "Read-only source browser for official Wave Git mirrors."
@@ -276,7 +303,7 @@ func (handler SEOHandler) metadata(requestPath, base string) pageMetadata {
 		metadata.Description = "The requested Wave page was not found."
 		metadata.Robots = "noindex, nofollow, noarchive"
 	}
-	if strings.HasSuffix(requestPath, "/new") {
+	if strings.HasSuffix(requestPath, "/new") || strings.HasSuffix(requestPath, "/edit") {
 		metadata.Robots = "noindex, nofollow, noarchive"
 	}
 	return metadata

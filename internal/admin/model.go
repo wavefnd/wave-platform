@@ -18,6 +18,7 @@ type AccountView struct {
 	Owner            bool      `xml:"owner"`
 	Administrator    bool      `xml:"administrator"`
 	SourceMaintainer bool      `xml:"source-maintainer"`
+	RFCMaintainer    bool      `xml:"rfc-maintainer"`
 	TOTPEnabled      bool      `xml:"totp-enabled"`
 	RecoveryVerified bool      `xml:"recovery-verified"`
 	CreatedAt        time.Time `xml:"created-at"`
@@ -71,6 +72,10 @@ type AccountRoleInput struct {
 }
 
 type SourceMaintainerInput struct {
+	Enabled bool `xml:"enabled"`
+}
+
+type RFCMaintainerInput struct {
 	Enabled bool `xml:"enabled"`
 }
 

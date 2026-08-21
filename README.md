@@ -1,6 +1,6 @@
 # Wave Platform
 
-Wave Platform is the official website and community platform for the Wave programming language. It includes the language documentation, email, community posts, questions, release notes, and read-only Git mirrors.
+Wave Platform is the official website and community platform for the Wave programming language. It includes the language documentation, email, community posts, questions, RFC design proposals, release notes, and read-only Git mirrors.
 
 ## Run with Docker
 

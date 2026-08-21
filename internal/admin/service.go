@@ -80,6 +80,13 @@ func (service *Service) Snapshot(ctx context.Context, query string) (Snapshot, e
 		if owner {
 			sourceMaintainer = true
 		}
+		rfcMaintainer, err := service.permissions.HasRole(item.ID, "rfc-maintainer")
+		if err != nil {
+			return Snapshot{}, err
+		}
+		if owner {
+			rfcMaintainer = true
+		}
 		if item.Status == "active" {
 			result.Security.ActiveAccounts++
 		} else {
@@ -97,7 +104,7 @@ func (service *Service) Snapshot(ctx context.Context, query string) (Snapshot, e
 		}
 		result.Accounts = append(result.Accounts, AccountView{ID: item.ID, Username: item.Username,
 			DisplayName: item.DisplayName, Email: item.Email, Status: item.Status, Owner: owner,
-			Administrator: administrator, SourceMaintainer: sourceMaintainer, TOTPEnabled: hasFactor, RecoveryVerified: factor.RecoveryVerified,
+			Administrator: administrator, SourceMaintainer: sourceMaintainer, RFCMaintainer: rfcMaintainer, TOTPEnabled: hasFactor, RecoveryVerified: factor.RecoveryVerified,
 			CreatedAt: item.CreatedAt, UpdatedAt: item.UpdatedAt})
 	}
 	result.Security.RegistrationOpen = service.registrationOpen
@@ -257,6 +264,39 @@ func (service *Service) UpdateSourceMaintainer(actorID, accountID string, enable
 		action = "admin.source-maintainer.assign"
 	}
 	return service.appendAudit(actorID, "account/"+accountID+"/role/source-maintainer", action)
+}
+
+func (service *Service) UpdateRFCMaintainer(actorID, accountID string, enabled bool) error {
+	actorOwner, err := service.permissions.HasRole(actorID, "platform-owner")
+	if err != nil {
+		return err
+	}
+	if !actorOwner {
+		return ErrForbidden
+	}
+	if _, err := service.accounts.Account(accountID); err != nil {
+		return err
+	}
+	targetOwner, err := service.permissions.HasRole(accountID, "platform-owner")
+	if err != nil {
+		return err
+	}
+	if targetOwner {
+		return ErrForbidden
+	}
+	if enabled {
+		err = service.permissions.Assign(permission.Assignment{AccountID: accountID, RoleID: "rfc-maintainer", Scope: "rfc"})
+	} else {
+		err = service.permissions.Unassign(accountID, "rfc-maintainer")
+	}
+	if err != nil {
+		return err
+	}
+	action := "admin.rfc-maintainer.remove"
+	if enabled {
+		action = "admin.rfc-maintainer.assign"
+	}
+	return service.appendAudit(actorID, "account/"+accountID+"/role/rfc-maintainer", action)
 }
 
 func (service *Service) canManage(actorID, targetID string) error {
