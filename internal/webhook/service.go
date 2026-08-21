@@ -17,6 +17,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -36,6 +37,11 @@ var supportedEvents = map[string]bool{
 	EventBlogPublished: true, EventCommunityPost: true, EventFounderPost: true,
 	EventReleasePublished: true, EventPatchReceived: true,
 }
+
+var (
+	lunaStevImagePathPattern = regexp.MustCompile(`^/media/lunastev/image-[0-9]+-[0-9a-f]{32}\.webp$`)
+	markdownImagePattern     = regexp.MustCompile(`!\[([^\]\r\n]*)\]\([^\)\r\n]+\)`)
+)
 
 type Service struct {
 	repository *Repository
@@ -233,6 +239,7 @@ func (service *Service) Publish(event Event) error {
 	event.Title = truncateRunes(strings.Join(strings.Fields(event.Title), " "), 256)
 	event.Summary = discordPreview(event.Summary, 1000)
 	event.AuthorName = truncateRunes(strings.Join(strings.Fields(event.AuthorName), " "), 256)
+	event.ImageURL = service.discordImageURL(event.ImageURL)
 	if event.ID == "" {
 		var err error
 		event.ID, err = identifier.New("event")
@@ -259,7 +266,7 @@ func (service *Service) Publish(event Event) error {
 			return idErr
 		}
 		delivery := Delivery{ID: id, EndpointID: endpoint.ID, EventID: event.ID, EventType: event.Type, Title: event.Title,
-			Summary: event.Summary, AuthorName: event.AuthorName,
+			Summary: event.Summary, AuthorName: event.AuthorName, ImageURL: event.ImageURL,
 			ResourceID: event.ResourceID, ResourceURL: event.URL, Status: "queued", NextAttemptAt: event.OccurredAt, CreatedAt: event.OccurredAt}
 		if err := service.repository.PutDelivery(delivery); err != nil {
 			return err
@@ -342,7 +349,7 @@ func (service *Service) deliver(ctx context.Context, delivery Delivery) (Deliver
 		return delivery, err
 	}
 	event := Event{ID: delivery.EventID, Type: delivery.EventType, Title: delivery.Title, Summary: delivery.Summary,
-		AuthorName: delivery.AuthorName, ResourceID: delivery.ResourceID, URL: delivery.ResourceURL, OccurredAt: delivery.CreatedAt}
+		AuthorName: delivery.AuthorName, ImageURL: delivery.ImageURL, ResourceID: delivery.ResourceID, URL: delivery.ResourceURL, OccurredAt: delivery.CreatedAt}
 	payload, err := eventPayload(endpoint.Kind, event)
 	if err != nil {
 		return delivery, err
@@ -400,6 +407,9 @@ func eventPayload(kind string, event Event) ([]byte, error) {
 		if strings.TrimSpace(event.AuthorName) != "" {
 			embed["author"] = map[string]string{"name": truncateRunes(strings.TrimSpace(event.AuthorName), 256)}
 		}
+		if event.ImageURL != "" {
+			embed["image"] = map[string]string{"url": event.ImageURL}
+		}
 		if embed["description"] == "" {
 			delete(embed, "description")
 		}
@@ -413,9 +423,18 @@ func eventPayload(kind string, event Event) ([]byte, error) {
 }
 
 func discordPreview(value string, limit int) string {
+	value = markdownImagePattern.ReplaceAllString(value, "$1")
 	value = strings.NewReplacer("\r", " ", "\n", " ", "\t", " ").Replace(value)
 	value = strings.Join(strings.Fields(value), " ")
 	return truncateRunes(value, limit)
+}
+
+func (service *Service) discordImageURL(value string) string {
+	value = strings.TrimSpace(value)
+	if !lunaStevImagePathPattern.MatchString(value) || service.publicURL == "" {
+		return ""
+	}
+	return service.publicURL + value
 }
 
 func truncateRunes(value string, limit int) string {

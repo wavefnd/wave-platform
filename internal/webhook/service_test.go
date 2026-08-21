@@ -62,6 +62,7 @@ func TestServiceEncryptsEndpointAndDeliversSignedGenericEvent(t *testing.T) {
 		return &http.Response{StatusCode: http.StatusNoContent, Body: io.NopCloser(strings.NewReader("")), Header: make(http.Header)}, nil
 	})}
 	if err := service.Publish(Event{Type: EventReleasePublished, Title: "Wave v0.3.0", Summary: "Release notes preview", AuthorName: "LunaStev",
+		ImageURL:   "/media/lunastev/image-1787312400000-0123456789abcdef0123456789abcdef.webp",
 		ResourceID: "blog/wave-v0.3.0", URL: "/releases/wave-v0.3.0"}); err != nil {
 		t.Fatal(err)
 	}
@@ -73,7 +74,8 @@ func TestServiceEncryptsEndpointAndDeliversSignedGenericEvent(t *testing.T) {
 		t.Fatal(err)
 	}
 	if len(deliveries) != 1 || deliveries[0].Status != "delivered" || deliveries[0].Summary != "Release notes preview" || deliveries[0].AuthorName != "LunaStev" ||
-		!strings.Contains(receivedBody, "Wave v0.3.0") || !strings.Contains(receivedBody, "Release notes preview") || !strings.Contains(receivedBody, "https://wave.example/releases/") {
+		deliveries[0].ImageURL != "https://wave.example/media/lunastev/image-1787312400000-0123456789abcdef0123456789abcdef.webp" ||
+		!strings.Contains(receivedBody, "Wave v0.3.0") || !strings.Contains(receivedBody, "Release notes preview") || !strings.Contains(receivedBody, "https://wave.example/releases/") || !strings.Contains(receivedBody, `"image_url":"https://wave.example/media/lunastev/`) {
 		t.Fatalf("deliveries=%#v body=%q", deliveries, receivedBody)
 	}
 }
@@ -142,7 +144,8 @@ func TestDiscordPayloadUsesLinkedEmbedAndTruncatedPreview(t *testing.T) {
 	eventTime := time.Date(2026, 8, 21, 12, 30, 0, 0, time.UTC)
 	event := Event{Type: EventFounderPost, Title: "Wave compiler work log",
 		Summary: "First line.\n" + strings.Repeat("가", 180), AuthorName: "LunaStev",
-		URL: "https://wave-lang.dev/lunastev/thread/example", OccurredAt: eventTime}
+		ImageURL: "https://wave-lang.dev/media/lunastev/image-1787312400000-0123456789abcdef0123456789abcdef.webp",
+		URL:      "https://wave-lang.dev/lunastev/thread/example", OccurredAt: eventTime}
 	payload, err := eventPayload("discord", event)
 	if err != nil {
 		t.Fatal(err)
@@ -162,6 +165,9 @@ func TestDiscordPayloadUsesLinkedEmbedAndTruncatedPreview(t *testing.T) {
 			Author      struct {
 				Name string `json:"name"`
 			} `json:"author"`
+			Image struct {
+				URL string `json:"url"`
+			} `json:"image"`
 			Footer struct {
 				Text string `json:"text"`
 			} `json:"footer"`
@@ -170,14 +176,49 @@ func TestDiscordPayloadUsesLinkedEmbedAndTruncatedPreview(t *testing.T) {
 	if err := json.Unmarshal(payload, &value); err != nil {
 		t.Fatal(err)
 	}
-	if value.Username != "Wave" || value.Content != "" || len(value.AllowedMentions.Parse) != 0 || len(value.Embeds) != 1 {
+	if value.Username != "Wave" || value.Content != "" || len(value.AllowedMentions.Parse) != 0 || len(value.Embeds) != 1 || strings.Contains(string(payload), `"attachments"`) {
 		t.Fatalf("discord payload = %s", payload)
 	}
 	embed := value.Embeds[0]
-	if embed.Title != event.Title || embed.URL != event.URL || embed.Author.Name != "LunaStev" || embed.Color != 0x6654F1 || embed.Timestamp != eventTime.Format(time.RFC3339) || embed.Footer.Text != "Wave · LunaStev post" {
+	if embed.Title != event.Title || embed.URL != event.URL || embed.Author.Name != "LunaStev" || embed.Image.URL != event.ImageURL || embed.Color != 0x6654F1 || embed.Timestamp != eventTime.Format(time.RFC3339) || embed.Footer.Text != "Wave · LunaStev post" {
 		t.Fatalf("discord embed = %#v", embed)
 	}
 	if characters := []rune(embed.Description); len(characters) != 121 || characters[len(characters)-1] != '…' || strings.Contains(embed.Description, "\n") {
 		t.Fatalf("discord description = %q (%d runes)", embed.Description, len(characters))
+	}
+}
+
+func TestPublishDropsExternalAndMalformedDiscordImageURLs(t *testing.T) {
+	database, err := storage.Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer database.Close()
+	key := base64.StdEncoding.EncodeToString([]byte("0123456789abcdef0123456789abcdef"))
+	service, err := NewService(database, key, "https://wave-lang.dev")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := service.SaveEndpoint("owner", EndpointInput{Name: "Discord", Kind: "generic", URL: "https://hooks.example.test/wave",
+		Events: []string{EventFounderPost}, Enabled: true}); err != nil {
+		t.Fatal(err)
+	}
+	for _, imageURL := range []string{
+		"https://example.net/tracker.webp",
+		"/media/lunastev/not-an-upload.webp",
+		"/media/lunastev/image-1787312400000-0123456789abcdef0123456789abcdef.webp?tracking=1",
+	} {
+		if err := service.Publish(Event{Type: EventFounderPost, Title: "Founder note", ImageURL: imageURL, URL: "/lunastev/thread/example"}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	deliveries, err := service.Deliveries(10)
+	if err != nil || len(deliveries) != 3 {
+		t.Fatalf("deliveries=%#v err=%v", deliveries, err)
+	}
+	for _, delivery := range deliveries {
+		if delivery.ImageURL != "" {
+			t.Fatalf("unsafe image URL was retained: %#v", delivery)
+		}
 	}
 }

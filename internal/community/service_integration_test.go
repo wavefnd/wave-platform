@@ -158,18 +158,22 @@ func TestCommunityAndFounderPostsQueueDistinctWebhookEvents(t *testing.T) {
 	}
 	service := community.NewService(database, "wave-lang.dev")
 	service.SetWebhookService(webhooks)
-	if _, err := service.CreatePost(member, community.CreatePostInput{SpaceID: "development", Title: "Community compiler update", Body: "A public community update."}); err != nil {
+	imagePath := "/media/lunastev/image-1787312400000-0123456789abcdef0123456789abcdef.webp"
+	if _, err := service.CreatePost(member, community.CreatePostInput{SpaceID: "development", Title: "Community compiler update",
+		Body: "A public community update.\n\n![Ignored community image](" + imagePath + ")"}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := service.CreatePost(owner, community.CreatePostInput{SpaceID: "founder-notes", Title: "A note from the Wave founder", Body: "A public founder update."}); err != nil {
+	if _, err := service.CreatePost(owner, community.CreatePostInput{SpaceID: "founder-notes", Title: "A note from the Wave founder",
+		Body: "A public founder update.\n\n![External image](https://example.net/tracker.png)\n![Compiler graph](" + imagePath + ")"}); err != nil {
 		t.Fatal(err)
 	}
 	deliveries, err := webhooks.Deliveries(10)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(deliveries) != 2 || deliveries[0].EventType != webhookdomain.EventFounderPost || deliveries[0].Summary != "A public founder update." || deliveries[0].AuthorName != owner.DisplayName ||
-		deliveries[1].EventType != webhookdomain.EventCommunityPost || deliveries[1].Summary != "A public community update." || deliveries[1].AuthorName != member.DisplayName {
+	if len(deliveries) != 2 || deliveries[0].EventType != webhookdomain.EventFounderPost || !strings.Contains(deliveries[0].Summary, "A public founder update.") || strings.Contains(deliveries[0].Summary, "![") ||
+		deliveries[0].AuthorName != owner.DisplayName || deliveries[0].ImageURL != "https://wave-lang.dev"+imagePath ||
+		deliveries[1].EventType != webhookdomain.EventCommunityPost || !strings.Contains(deliveries[1].Summary, "A public community update.") || deliveries[1].AuthorName != member.DisplayName || deliveries[1].ImageURL != "" {
 		t.Fatalf("deliveries = %#v", deliveries)
 	}
 }

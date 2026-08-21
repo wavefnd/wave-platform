@@ -25,7 +25,10 @@ var (
 	ErrPostingRestricted = errors.New("only the platform owner can publish in this space")
 )
 
-var tagPattern = regexp.MustCompile(`^[\p{L}\p{N}][\p{L}\p{N}-]{0,29}$`)
+var (
+	tagPattern                   = regexp.MustCompile(`^[\p{L}\p{N}][\p{L}\p{N}-]{0,29}$`)
+	lunaStevMarkdownImagePattern = regexp.MustCompile(`!\[[^\]\r\n]*\]\((/media/lunastev/image-[0-9]+-[0-9a-f]{32}\.webp)[ \t]*\)`)
+)
 
 type Service struct {
 	repository *Repository
@@ -100,15 +103,25 @@ func (service *Service) CreatePost(actor account.Account, input CreatePostInput)
 	_ = service.auditEvent(actor.ID, "community/thread/"+thread.ID, "community.post")
 	if service.webhooks != nil {
 		eventType, path := webhookdomain.EventCommunityPost, "/community/thread/"+thread.ID
+		imageURL := ""
 		if space.PostingPolicy == "owner" {
 			eventType, path = webhookdomain.EventFounderPost, "/lunastev/thread/"+thread.ID
+			imageURL = firstLunaStevImage(input.Body)
 		} else if space.ID == "showcase" {
 			path = "/community/showcase/" + thread.ID
 		}
 		_ = service.webhooks.Publish(webhookdomain.Event{Type: eventType, Title: input.Title, Summary: input.Body, AuthorName: actor.DisplayName,
-			ResourceID: "community/thread/" + thread.ID, URL: path, OccurredAt: now})
+			ImageURL: imageURL, ResourceID: "community/thread/" + thread.ID, URL: path, OccurredAt: now})
 	}
 	return service.repository.ViewFor(thread.ID, actor.ID)
+}
+
+func firstLunaStevImage(markdown string) string {
+	match := lunaStevMarkdownImagePattern.FindStringSubmatch(markdown)
+	if len(match) == 2 {
+		return match[1]
+	}
+	return ""
 }
 
 func (service *Service) AddReply(actor account.Account, input CreateReplyInput) (ThreadView, error) {
