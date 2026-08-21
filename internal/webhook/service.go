@@ -29,6 +29,7 @@ import (
 var (
 	ErrInvalidEndpoint = errors.New("invalid webhook endpoint")
 	ErrDeliveryFailed  = errors.New("webhook delivery failed")
+	ErrForbidden       = errors.New("webhook access is forbidden")
 )
 
 var supportedEvents = map[string]bool{
@@ -83,11 +84,56 @@ func (service *Service) Endpoints() ([]EndpointView, error) {
 	return views, nil
 }
 
+func (service *Service) EndpointsFor(accountID string) ([]EndpointView, error) {
+	items, err := service.repository.Endpoints()
+	if err != nil {
+		return nil, err
+	}
+	views := make([]EndpointView, 0)
+	for _, item := range items {
+		if item.OwnerAccountID == accountID {
+			views = append(views, viewOf(item, ""))
+		}
+	}
+	return views, nil
+}
+
 func (service *Service) Deliveries(limit int) ([]Delivery, error) {
 	return service.repository.Deliveries(limit)
 }
 
+func (service *Service) DeliveriesFor(accountID string, limit int) ([]Delivery, error) {
+	endpoints, err := service.repository.Endpoints()
+	if err != nil {
+		return nil, err
+	}
+	owned := map[string]bool{}
+	for _, endpoint := range endpoints {
+		if endpoint.OwnerAccountID == accountID {
+			owned[endpoint.ID] = true
+		}
+	}
+	items, err := service.repository.Deliveries(0)
+	if err != nil {
+		return nil, err
+	}
+	result := make([]Delivery, 0)
+	for _, item := range items {
+		if owned[item.EndpointID] {
+			result = append(result, item)
+			if limit > 0 && len(result) >= limit {
+				break
+			}
+		}
+	}
+	return result, nil
+}
+
 func (service *Service) SaveEndpoint(actorID string, input EndpointInput) (EndpointView, error) {
+	return service.SaveEndpointScoped(actorID, input, true)
+}
+
+func (service *Service) SaveEndpointScoped(actorID string, input EndpointInput, allowAll bool) (EndpointView, error) {
 	input.ID, input.Name, input.Kind, input.URL = strings.TrimSpace(input.ID), strings.TrimSpace(input.Name), strings.ToLower(strings.TrimSpace(input.Kind)), strings.TrimSpace(input.URL)
 	if len([]rune(input.Name)) < 2 || len([]rune(input.Name)) > 80 {
 		return EndpointView{}, fmt.Errorf("%w: name must contain between 2 and 80 characters", ErrInvalidEndpoint)
@@ -106,11 +152,26 @@ func (service *Service) SaveEndpoint(actorID string, input EndpointInput) (Endpo
 		if err != nil {
 			return EndpointView{}, err
 		}
+		if !allowAll && item.OwnerAccountID != actorID {
+			return EndpointView{}, ErrForbidden
+		}
 	} else {
+		if !allowAll {
+			owned, listErr := service.EndpointsFor(actorID)
+			if listErr != nil {
+				return EndpointView{}, listErr
+			}
+			if len(owned) >= 10 {
+				return EndpointView{}, fmt.Errorf("%w: at most 10 endpoints are allowed per account", ErrInvalidEndpoint)
+			}
+		}
 		item.ID, err = identifier.New("webhook")
 		if err != nil {
 			return EndpointView{}, err
 		}
+	}
+	if item.OwnerAccountID == "" {
+		item.OwnerAccountID = actorID
 	}
 	if input.URL != "" {
 		destination, parseErr := validateURL(input.URL, input.Kind)
@@ -148,8 +209,16 @@ func (service *Service) SaveEndpoint(actorID string, input EndpointInput) (Endpo
 }
 
 func (service *Service) DeleteEndpoint(actorID, id string) error {
-	if _, err := service.repository.Endpoint(id); err != nil {
+	return service.DeleteEndpointScoped(actorID, id, true)
+}
+
+func (service *Service) DeleteEndpointScoped(actorID, id string, allowAll bool) error {
+	item, err := service.repository.Endpoint(id)
+	if err != nil {
 		return err
+	}
+	if !allowAll && item.OwnerAccountID != actorID {
+		return ErrForbidden
 	}
 	if err := service.repository.DeleteEndpoint(id); err != nil {
 		return err
@@ -196,6 +265,17 @@ func (service *Service) Publish(event Event) error {
 }
 
 func (service *Service) TestEndpoint(ctx context.Context, actorID, id string) (Delivery, error) {
+	return service.TestEndpointScoped(ctx, actorID, id, true)
+}
+
+func (service *Service) TestEndpointScoped(ctx context.Context, actorID, id string, allowAll bool) (Delivery, error) {
+	endpoint, endpointErr := service.repository.Endpoint(id)
+	if endpointErr != nil {
+		return Delivery{}, endpointErr
+	}
+	if !allowAll && endpoint.OwnerAccountID != actorID {
+		return Delivery{}, ErrForbidden
+	}
 	now := service.now().UTC()
 	eventID, err := identifier.New("event")
 	if err != nil {
@@ -403,7 +483,7 @@ func (service *Service) decrypt(value string) (string, error) {
 	return string(plain), err
 }
 func viewOf(item Endpoint, secret string) EndpointView {
-	return EndpointView{ID: item.ID, Name: item.Name, Kind: item.Kind, Events: item.Events, Destination: item.Destination, Enabled: item.Enabled, CreatedAt: item.CreatedAt, UpdatedAt: item.UpdatedAt, SigningSecret: secret}
+	return EndpointView{ID: item.ID, OwnerAccountID: item.OwnerAccountID, Name: item.Name, Kind: item.Kind, Events: item.Events, Destination: item.Destination, Enabled: item.Enabled, CreatedAt: item.CreatedAt, UpdatedAt: item.UpdatedAt, SigningSecret: secret}
 }
 func (service *Service) auditEvent(actorID, resourceID, action, result string) error {
 	id, err := identifier.New("audit")

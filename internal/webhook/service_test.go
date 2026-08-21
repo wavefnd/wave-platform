@@ -3,6 +3,7 @@ package webhook
 import (
 	"context"
 	"encoding/base64"
+	"errors"
 	"io"
 	"net/http"
 	"strings"
@@ -100,5 +101,36 @@ func TestSupportedEventsIncludeCommunityAndFounderPosts(t *testing.T) {
 	events := SupportedEvents()
 	if !contains(events, EventCommunityPost) || !contains(events, EventFounderPost) {
 		t.Fatalf("supported events = %#v", events)
+	}
+}
+
+func TestAccountScopedEndpointsEnforceOwnership(t *testing.T) {
+	database, err := storage.Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer database.Close()
+	key := base64.StdEncoding.EncodeToString([]byte("0123456789abcdef0123456789abcdef"))
+	service, err := NewService(database, key, "https://wave.example")
+	if err != nil {
+		t.Fatal(err)
+	}
+	created, err := service.SaveEndpointScoped("account-a", EndpointInput{Name: "Community feed", Kind: "generic", URL: "https://hooks.example.test/community", Events: []string{EventCommunityPost}, Enabled: true}, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	other, err := service.EndpointsFor("account-b")
+	if err != nil || len(other) != 0 {
+		t.Fatalf("other endpoints=%#v err=%v", other, err)
+	}
+	_, err = service.SaveEndpointScoped("account-b", EndpointInput{ID: created.ID, Name: "Stolen", Kind: "generic", Events: []string{EventCommunityPost}, Enabled: true}, false)
+	if !errors.Is(err, ErrForbidden) {
+		t.Fatalf("update error = %v", err)
+	}
+	if err := service.DeleteEndpointScoped("account-b", created.ID, false); !errors.Is(err, ErrForbidden) {
+		t.Fatalf("delete error = %v", err)
+	}
+	if _, err := service.TestEndpointScoped(context.Background(), "account-b", created.ID, false); !errors.Is(err, ErrForbidden) {
+		t.Fatalf("test error = %v", err)
 	}
 }

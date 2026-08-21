@@ -76,6 +76,7 @@ func (handler SEOHandler) Sitemap(writer http.ResponseWriter, request *http.Requ
 		{Location: base + "/lunastev"},
 		{Location: base + "/questions"},
 		{Location: base + "/source"},
+		{Location: base + "/patches"},
 	}
 
 	if handler.documents != nil {

@@ -90,6 +90,24 @@ export interface PlatformStats {
   gitMirrors: number
 }
 
+export interface PatchSummary {
+	id: string
+	messageId: string
+	subject: string
+	title: string
+	authorName: string
+	authorEmail: string
+	body: string
+	preview: string
+	version: number
+	part: number
+	total: number
+	files: string[]
+	receivedAt: string
+}
+
+export interface PatchArchiveView { address: string; patches: PatchSummary[] }
+
 export interface AdminAccount {
 	id: string
 	username: string
@@ -759,6 +777,28 @@ export async function getPlatformStats(): Promise<PlatformStats> {
   }
 }
 
+function parsePatch(element: Element): PatchSummary {
+	return {
+		id: element.getAttribute('id') ?? '', messageId: childText(element, 'message-id'), subject: childText(element, 'subject'),
+		title: childText(element, 'title'), authorName: childText(element, 'author-name'), authorEmail: childText(element, 'author-email'),
+		body: childContent(element, 'body'), preview: childContent(element, 'preview'), version: Number(childText(element, 'version')) || 1,
+		part: Number(childText(element, 'part')), total: Number(childText(element, 'total')),
+		files: Array.from(element.querySelectorAll('files > file')).map((item) => item.textContent?.trim() ?? '').filter(Boolean),
+		receivedAt: childText(element, 'received-at'),
+	}
+}
+
+export async function getPatches(query = ''): Promise<PatchArchiveView> {
+	const parameters = new URLSearchParams()
+	if (query.trim()) parameters.set('q', query.trim())
+	const xml = await getXml(`/api/v1/patches${parameters.size ? `?${parameters}` : ''}`)
+	return { address: childText(xml.documentElement, 'address'), patches: Array.from(xml.documentElement.children).filter((item) => item.localName === 'patch').map(parsePatch) }
+}
+
+export async function getPatch(id: string): Promise<PatchSummary> {
+	return parsePatch((await getXml(`/api/v1/patches/${encodeURIComponent(id)}`)).documentElement)
+}
+
 export async function getModules(): Promise<ModuleStatus[]> {
   const xml = await getXml('/api/v1/modules')
   return Array.from(xml.querySelectorAll('module')).map((element) => ({
@@ -853,7 +893,10 @@ function parseWebhook(element: Element): WebhookEndpoint {
 }
 
 export async function getAdminWebhooks(): Promise<WebhookAdminView> {
-	const xml = await getXml('/api/v1/admin/webhooks')
+	return parseWebhookAdminView(await getXml('/api/v1/admin/webhooks'))
+}
+
+function parseWebhookAdminView(xml: XMLDocument): WebhookAdminView {
 	const root = xml.documentElement
 	return {
 		supportedEvents: Array.from(root.querySelectorAll('supported-events > event')).map((item) => item.textContent?.trim() ?? '').filter(Boolean),
@@ -867,7 +910,15 @@ export async function getAdminWebhooks(): Promise<WebhookAdminView> {
 	}
 }
 
+export async function getAccountWebhooks(): Promise<WebhookAdminView> {
+	return parseWebhookAdminView(await getXml('/api/v1/webhooks'))
+}
+
 export async function saveAdminWebhook(input: WebhookInput): Promise<WebhookEndpoint> {
+	return saveWebhookAt('/api/v1/admin/webhooks', input)
+}
+
+async function saveWebhookAt(path: string, input: WebhookInput): Promise<WebhookEndpoint> {
 	const document = authDocument('webhook', {
 		id: input.id, name: input.name, kind: input.kind, url: input.url,
 		enabled: String(input.enabled), 'rotate-secret': String(input.rotateSecret),
@@ -876,9 +927,13 @@ export async function saveAdminWebhook(input: WebhookInput): Promise<WebhookEndp
 	const events = document.createElementNS(namespace, 'events')
 	for (const value of input.events) { const item = document.createElementNS(namespace, 'event'); item.textContent = value; events.append(item) }
 	document.documentElement.append(events)
-	const xml = await requestXml('/api/v1/admin/webhooks', 'POST', document)
+	const xml = await requestXml(path, 'POST', document)
 	if (!xml) throw new Error('The server returned an empty webhook response.')
 	return parseWebhook(xml.documentElement)
+}
+
+export async function saveAccountWebhook(input: WebhookInput): Promise<WebhookEndpoint> {
+	return saveWebhookAt('/api/v1/webhooks', input)
 }
 
 export async function deleteAdminWebhook(id: string): Promise<void> {
@@ -887,6 +942,14 @@ export async function deleteAdminWebhook(id: string): Promise<void> {
 
 export async function testAdminWebhook(id: string): Promise<void> {
 	await requestXml(`/api/v1/admin/webhooks/${encodeURIComponent(id)}/test`, 'POST', authDocument('webhook-test', {}))
+}
+
+export async function deleteAccountWebhook(id: string): Promise<void> {
+	await requestXml(`/api/v1/webhooks/${encodeURIComponent(id)}`, 'DELETE')
+}
+
+export async function testAccountWebhook(id: string): Promise<void> {
+	await requestXml(`/api/v1/webhooks/${encodeURIComponent(id)}/test`, 'POST', authDocument('webhook-test', {}))
 }
 
 function parseBlogSummary(element: ParentNode): BlogPostSummary {

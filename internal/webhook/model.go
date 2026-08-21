@@ -16,6 +16,7 @@ const (
 type Endpoint struct {
 	XMLName                xml.Name  `xml:"https://wave-lang.dev/ns/platform/webhook/v1 endpoint"`
 	ID                     string    `xml:"id,attr"`
+	OwnerAccountID         string    `xml:"owner-account-id"`
 	Name                   string    `xml:"name"`
 	Kind                   string    `xml:"kind"`
 	Events                 []string  `xml:"events>event"`
@@ -28,16 +29,17 @@ type Endpoint struct {
 }
 
 type EndpointView struct {
-	XMLName       xml.Name  `xml:"https://wave-lang.dev/ns/platform/api/v1 webhook"`
-	ID            string    `xml:"id,attr"`
-	Name          string    `xml:"name"`
-	Kind          string    `xml:"kind"`
-	Events        []string  `xml:"events>event"`
-	Destination   string    `xml:"destination"`
-	Enabled       bool      `xml:"enabled"`
-	CreatedAt     time.Time `xml:"created-at"`
-	UpdatedAt     time.Time `xml:"updated-at"`
-	SigningSecret string    `xml:"signing-secret,omitempty"`
+	XMLName        xml.Name  `xml:"https://wave-lang.dev/ns/platform/api/v1 webhook"`
+	ID             string    `xml:"id,attr"`
+	OwnerAccountID string    `xml:"owner-account-id,omitempty"`
+	Name           string    `xml:"name"`
+	Kind           string    `xml:"kind"`
+	Events         []string  `xml:"events>event"`
+	Destination    string    `xml:"destination"`
+	Enabled        bool      `xml:"enabled"`
+	CreatedAt      time.Time `xml:"created-at"`
+	UpdatedAt      time.Time `xml:"updated-at"`
+	SigningSecret  string    `xml:"signing-secret,omitempty"`
 }
 
 type EndpointInput struct {

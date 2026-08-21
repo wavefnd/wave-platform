@@ -550,6 +550,40 @@
 .source-org-row nav a.active { border-bottom: 2px solid var(--service-accent); color: var(--wave-text); font-weight: 650; }
 .source-org-row nav span { padding: 1px 5px; border-radius: 10px; background: var(--wave-border); font-size: 11px; }
 
+.patch-index, .patch-detail { padding-top: 30px; padding-bottom: 58px; }
+.patch-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; padding-bottom: 22px; border-bottom: 1px solid var(--wave-border-strong); }
+.patch-heading h1 { margin: 0 0 6px; font-size: 26px; letter-spacing: -.025em; }
+.patch-heading p { margin: 0; color: var(--wave-text-secondary); }
+.patch-address { display: inline-flex; align-items: center; gap: 7px; padding: 7px 10px; border: 1px solid var(--wave-border-strong); border-radius: var(--wave-radius-sm); color: var(--wave-text); font: 13px ui-monospace, SFMono-Regular, Consolas, monospace; text-decoration: none; white-space: nowrap; }
+.patch-address:hover { border-color: var(--wave-accent); color: var(--wave-accent); }
+.patch-submit-help { display: grid; gap: 8px; margin: 20px 0; padding: 15px 17px; border-left: 3px solid var(--wave-accent); background: var(--wave-bg-subtle); }
+.patch-submit-help code { width: fit-content; max-width: 100%; overflow-x: auto; padding: 7px 9px; background: var(--wave-code-bg); color: var(--wave-code-text); }
+.patch-submit-help p { margin: 0; color: var(--wave-text-muted); font-size: 12px; }
+.patch-list { margin-top: 12px; border-top: 1px solid var(--wave-border-strong); }
+.patch-list article { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 22px; padding: 14px 2px; border-bottom: 1px solid var(--wave-border); }
+.patch-list-main { min-width: 0; }
+.patch-list-main > a { display: block; overflow: hidden; color: var(--wave-text); font-weight: 650; text-decoration: none; text-overflow: ellipsis; white-space: nowrap; }
+.patch-list-main > a:hover { color: var(--wave-accent); text-decoration: underline; }
+.patch-list-main p { margin: 5px 0; color: var(--wave-text-secondary); font-size: 13px; }
+.patch-list-main small { color: var(--wave-text-muted); }
+.patch-list-meta { display: flex; align-items: flex-start; gap: 5px; }
+.patch-list-meta span { padding: 2px 6px; border: 1px solid var(--wave-border); border-radius: 9px; color: var(--wave-text-secondary); font-size: 11px; }
+.patch-list-meta small { padding-top: 3px; color: var(--wave-text-muted); white-space: nowrap; }
+.patch-back { display: inline-flex; align-items: center; gap: 6px; margin-bottom: 22px; color: var(--wave-text-secondary); text-decoration: none; }
+.patch-detail > header { position: relative; padding: 0 0 20px; border-bottom: 1px solid var(--wave-border-strong); }
+.patch-detail > header h1 { max-width: 960px; margin: 0 0 10px; font-size: 24px; }
+.patch-detail > header p { margin: 0 0 4px; color: var(--wave-text-secondary); }
+.patch-detail > header time { color: var(--wave-text-muted); font-size: 12px; }
+.patch-files { display: flex; flex-wrap: wrap; gap: 7px; padding: 14px 0; border-bottom: 1px solid var(--wave-border); }
+.patch-files strong { width: 100%; font-size: 12px; }
+.patch-files code { padding: 3px 6px; background: var(--wave-bg-subtle); color: var(--wave-text-secondary); }
+.patch-body { overflow: auto; margin: 20px 0 0; padding: 16px 0; border: 1px solid var(--wave-border-strong); background: var(--wave-code-bg); color: var(--wave-code-text); font: 12.5px/1.55 ui-monospace, SFMono-Regular, Consolas, monospace; tab-size: 4; }
+.patch-body code { display: block; min-width: max-content; }
+.patch-body span { display: block; min-height: 1.55em; padding: 0 16px; white-space: pre; }
+.patch-line-meta, .patch-line-file { color: var(--wave-accent); }
+.patch-line-add { background: var(--wave-success-soft); color: var(--wave-success); }
+.patch-line-delete { background: var(--wave-danger-soft); color: var(--wave-danger-text); }
+
 .source-index { padding-top: 28px; padding-bottom: 48px; }
 .source-index-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; margin-bottom: 18px; }
 .source-index-head h1 { margin: 0 0 5px; font-size: 25px; }
@@ -735,6 +769,11 @@
 }
 
 @media (max-width: 600px) {
+	.patch-heading { align-items: stretch; flex-direction: column; }
+	.patch-address { width: fit-content; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+	.patch-list article { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+	.patch-list-meta { justify-content: flex-start; }
+	.patch-detail > header h1 { font-size: 20px; overflow-wrap: anywhere; }
 	.user-profile-meta { align-items: flex-start; flex-direction: column; gap: 5px; }
 	.user-profile-meta small { padding-left: 0; border-left: 0; }
   .portal-home { padding-top: 24px; }

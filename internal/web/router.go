@@ -13,6 +13,7 @@ import (
 	documentdomain "github.com/wavefnd/wave-platform/internal/document"
 	"github.com/wavefnd/wave-platform/internal/gitmirror"
 	mediadomain "github.com/wavefnd/wave-platform/internal/media"
+	patchdomain "github.com/wavefnd/wave-platform/internal/patcharchive"
 	"github.com/wavefnd/wave-platform/internal/platformstats"
 	questiondomain "github.com/wavefnd/wave-platform/internal/question"
 	"github.com/wavefnd/wave-platform/internal/sponsor"
@@ -40,6 +41,7 @@ func NewRouter(
 	adminService *admindomain.Service,
 	mediaService *mediadomain.Service,
 	webhookService *webhookdomain.Service,
+	patchService *patchdomain.Service,
 ) http.Handler {
 	mux := http.NewServeMux()
 
@@ -60,6 +62,7 @@ func NewRouter(
 	sponsorsHandler := handler.SponsorsHandler{Service: sponsor.NewService()}
 	mediaHandler := handler.MediaHandler{Service: mediaService, Auth: authHandler}
 	webhookHandler := handler.WebhookHandler{Service: webhookService, Auth: authHandler}
+	patchesHandler := handler.PatchesHandler{Service: patchService}
 	usersHandler := handler.UsersHandler{Community: communityRepository, Questions: questionRepository, Auth: authHandler}
 	seoHandler := NewSEOHandler(publicURL, documentRepository, blogService, communityRepository, questionRepository)
 
@@ -92,6 +95,8 @@ func NewRouter(
 	mux.HandleFunc("GET /api/v1/source/repositories/{repository}/commits", sourceHandler.Commits)
 	mux.HandleFunc("GET /api/v1/source/repositories/{repository}/commits/{oid}", sourceHandler.CommitDetail)
 	mux.HandleFunc("GET /api/v1/source/repositories/{repository}/refs", sourceHandler.Refs)
+	mux.HandleFunc("GET /api/v1/patches", patchesHandler.List)
+	mux.HandleFunc("GET /api/v1/patches/{patch}", patchesHandler.Get)
 	mux.HandleFunc("GET /api/v1/platform/stats", statsHandler.Get)
 	mux.HandleFunc("GET /api/v1/platform/preferences", adminHandler.PlatformPreferences)
 	mux.HandleFunc("GET /api/v1/users", usersHandler.Directory)
@@ -110,6 +115,10 @@ func NewRouter(
 	mux.HandleFunc("POST /api/v1/admin/webhooks", webhookHandler.Save)
 	mux.HandleFunc("DELETE /api/v1/admin/webhooks/{webhook}", webhookHandler.Delete)
 	mux.HandleFunc("POST /api/v1/admin/webhooks/{webhook}/test", webhookHandler.Test)
+	mux.HandleFunc("GET /api/v1/webhooks", webhookHandler.UserList)
+	mux.HandleFunc("POST /api/v1/webhooks", webhookHandler.UserSave)
+	mux.HandleFunc("DELETE /api/v1/webhooks/{webhook}", webhookHandler.UserDelete)
+	mux.HandleFunc("POST /api/v1/webhooks/{webhook}/test", webhookHandler.UserTest)
 	mux.HandleFunc("POST /api/v1/media/lunastev/images", mediaHandler.UploadLunaStevImage)
 	mux.HandleFunc("GET /media/lunastev/{image}", mediaHandler.LunaStevImage)
 	if authHandler != nil {

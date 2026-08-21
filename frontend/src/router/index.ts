@@ -8,6 +8,7 @@ import BlogPage from '../pages/BlogPage.vue'
 import MailPage from '../pages/MailPage.vue'
 import NotFoundPage from '../pages/NotFoundPage.vue'
 import QuestionsPage from '../pages/QuestionsPage.vue'
+import PatchesPage from '../pages/PatchesPage.vue'
 import SearchPage from '../pages/SearchPage.vue'
 import SourcePage from '../pages/SourcePage.vue'
 import { useAuthStore } from '../stores/auth'
@@ -43,6 +44,8 @@ const router = createRouter({
         { path: 'questions/:question', name: 'question-detail', component: QuestionsPage },
         { path: 'source', name: 'source', component: SourcePage },
         { path: 'source/:repository', name: 'source-repository', component: SourcePage },
+        { path: 'patches', name: 'patches', component: PatchesPage },
+        { path: 'patches/:patch', name: 'patch-detail', component: PatchesPage },
         { path: 'search', name: 'search', component: SearchPage },
 		{ path: 'user', name: 'user-directory', component: () => import('../pages/UserPage.vue') },
 		{ path: 'user/id/:account', name: 'user-id-profile', component: () => import('../pages/UserPage.vue') },

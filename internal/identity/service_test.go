@@ -14,8 +14,10 @@ import (
 
 	"github.com/pquerna/otp/totp"
 	maildomain "github.com/wavefnd/wave-platform/internal/mail"
+	patchdomain "github.com/wavefnd/wave-platform/internal/patcharchive"
 	"github.com/wavefnd/wave-platform/internal/permission"
 	"github.com/wavefnd/wave-platform/internal/storage"
+	webhookdomain "github.com/wavefnd/wave-platform/internal/webhook"
 )
 
 const testTOTPSecret = "JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP"
@@ -264,6 +266,58 @@ func TestManagementAddressesShareOneMailbox(t *testing.T) {
 	items, err := service.ManagementMailboxItems("Inbox")
 	if err != nil || len(items) != 1 || items[0].Message.Subject != "Need help" {
 		t.Fatalf("management items=%#v err=%v", items, err)
+	}
+}
+
+func TestPatchAddressIsReservedAndBackedByDedicatedMailbox(t *testing.T) {
+	database, err := storage.Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer database.Close()
+	service := newTestIdentity(t, database)
+	box, err := service.EnsurePatchMailbox()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if box.AccountID != PatchMailboxAccountID || service.PatchAddress() != "patchs@wave-lang.dev" || !service.HasLocalRecipient(service.PatchAddress()) {
+		t.Fatalf("patch mailbox=%#v address=%q", box, service.PatchAddress())
+	}
+	if _, err := service.BeginTOTPRegistration("Patchs", "patchs", "patch@example.net"); !errors.Is(err, ErrInvalidRegistration) {
+		t.Fatalf("reserved patch address error = %v", err)
+	}
+}
+
+func TestIncomingPatchQueuesPatchWebhookEvent(t *testing.T) {
+	database, err := storage.Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer database.Close()
+	service := newTestIdentity(t, database)
+	if _, err := service.EnsurePatchMailbox(); err != nil {
+		t.Fatal(err)
+	}
+	webhooks, err := webhookdomain.NewService(database, "MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=", "https://wave-lang.dev")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := webhooks.SaveEndpoint("owner", webhookdomain.EndpointInput{Name: "Patch feed", Kind: "generic", URL: "https://hooks.example.test/patches", Events: []string{webhookdomain.EventPatchReceived}, Enabled: true}); err != nil {
+		t.Fatal(err)
+	}
+	service.SetWebhookService(webhooks)
+	raw := "From: Contributor <dev@example.net>\r\nTo: patchs@wave-lang.dev\r\nSubject: [PATCH] parser: keep ranges\r\nMessage-ID: <patch-1@example.net>\r\nContent-Type: text/plain; charset=utf-8\r\n\r\nCommit message.\n\ndiff --git a/parser.go b/parser.go\n--- a/parser.go\n+++ b/parser.go\n"
+	item, err := service.AcceptSMTP(nil, "dev@example.net", []string{service.PatchAddress()}, []byte(raw))
+	if err != nil {
+		t.Fatal(err)
+	}
+	storedBody, err := service.mail.Body(item.Message)
+	if err != nil || !patchdomain.Valid(item.Message.Subject, storedBody) {
+		t.Fatalf("stored patch body was not recognized: subject=%q body=%q err=%v", item.Message.Subject, storedBody, err)
+	}
+	deliveries, err := webhooks.Deliveries(10)
+	if err != nil || len(deliveries) != 1 || deliveries[0].EventType != webhookdomain.EventPatchReceived || !strings.Contains(deliveries[0].ResourceURL, item.Message.ID) {
+		t.Fatalf("deliveries=%#v err=%v", deliveries, err)
 	}
 }
 

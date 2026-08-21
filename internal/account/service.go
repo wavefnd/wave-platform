@@ -16,7 +16,7 @@ var reservedLocalParts = map[string]bool{
 	"abuse": true, "admin": true, "administrator": true, "contact": true,
 	"help": true, "hostmaster": true, "info": true, "mailer-daemon": true,
 	"no-reply": true, "noreply": true, "postmaster": true, "root": true,
-	"security": true, "support": true, "webmaster": true,
+	"patchs": true, "security": true, "support": true, "webmaster": true,
 }
 
 func LocalPart(displayName string) (string, error) {

@@ -7,7 +7,10 @@ import AuthenticatorEnrollmentDialog from '../components/auth/AuthenticatorEnrol
 import GmailDeliveryWarning from '../components/GmailDeliveryWarning.vue'
 import { useI18n } from '../i18n'
 import { containsGmailAddress } from '../services/email-address'
-import { beginTOTPRotation, changeRecoveryEmail, finishTOTPRotation, getAccountSecurity, type AccountSecurity, type TOTPEnrollment } from '../services/http'
+import {
+  beginTOTPRotation, changeRecoveryEmail, deleteAccountWebhook, finishTOTPRotation, getAccountSecurity, getAccountWebhooks,
+  saveAccountWebhook, testAccountWebhook, type AccountSecurity, type TOTPEnrollment, type WebhookAdminView, type WebhookInput,
+} from '../services/http'
 import { useAuthStore } from '../stores/auth'
 
 const { t } = useI18n()
@@ -22,8 +25,12 @@ const qrCode = ref('')
 const notice = ref('')
 const error = ref('')
 const gmailRecovery = computed(() => containsGmailAddress(recoveryEmail.value || security.value?.recoveryEmail || ''))
+const webhooks = ref<WebhookAdminView>({ supportedEvents: [], endpoints: [], deliveries: [] })
+const webhookForm = ref<WebhookInput>({ id: '', name: '', kind: 'generic', url: '', events: [], enabled: true, rotateSecret: false })
+const webhookSecret = ref('')
+const webhookBusy = ref(false)
 
-async function load() { security.value = await getAccountSecurity() }
+async function load() { [security.value, webhooks.value] = await Promise.all([getAccountSecurity(), getAccountWebhooks()]) }
 onMounted(async () => { try { await load() } catch (reason) { error.value = reason instanceof Error ? reason.message : t('auth.failed') } })
 
 async function beginRotation() {
@@ -51,6 +58,31 @@ async function updateRecovery() {
   catch (reason) { error.value = reason instanceof Error ? reason.message : t('auth.failed') }
 }
 
+function newWebhook() { webhookSecret.value = ''; webhookForm.value = { id: '', name: '', kind: 'generic', url: '', events: [], enabled: true, rotateSecret: false } }
+function editWebhook(id: string) {
+  const item = webhooks.value.endpoints.find((endpoint) => endpoint.id === id); if (!item) return
+  webhookSecret.value = ''; webhookForm.value = { id, name: item.name, kind: item.kind, url: '', events: [...item.events], enabled: item.enabled, rotateSecret: false }
+}
+async function saveWebhook() {
+  webhookBusy.value = true; error.value = ''; notice.value = ''
+  try { const saved = await saveAccountWebhook(webhookForm.value); webhooks.value = await getAccountWebhooks(); editWebhook(saved.id); webhookSecret.value = saved.signingSecret; notice.value = t('auth.webhookSaved') }
+  catch (reason) { error.value = reason instanceof Error ? reason.message : t('auth.failed') }
+  finally { webhookBusy.value = false }
+}
+async function sendWebhookTest(id: string) {
+  webhookBusy.value = true; error.value = ''; notice.value = ''
+  try { await testAccountWebhook(id); webhooks.value = await getAccountWebhooks(); notice.value = t('auth.webhookTestSent') }
+  catch (reason) { error.value = reason instanceof Error ? reason.message : t('auth.failed') }
+  finally { webhookBusy.value = false }
+}
+async function removeWebhook(id: string) {
+  if (!window.confirm(t('admin.confirmDeleteWebhook'))) return
+  webhookBusy.value = true; error.value = ''
+  try { await deleteAccountWebhook(id); newWebhook(); webhooks.value = await getAccountWebhooks() }
+  catch (reason) { error.value = reason instanceof Error ? reason.message : t('auth.failed') }
+  finally { webhookBusy.value = false }
+}
+
 </script>
 
 <template>
@@ -63,6 +95,26 @@ async function updateRecovery() {
         <label for="rotate-current">{{ t('auth.currentCode') }}</label><input id="rotate-current" v-model="currentCode" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" required />
         <button class="portal-button" type="submit">{{ t('auth.replaceAuthenticator') }}</button>
       </form>
+    </section>
+    <section class="settings-section account-webhooks">
+      <header><div><h2>{{ t('admin.webhooks') }}</h2><p>{{ t('auth.webhookHelp') }}</p></div><button class="text-button" type="button" @click="newWebhook">{{ t('admin.newWebhook') }}</button></header>
+      <form class="settings-form webhook-settings-form" @submit.prevent="saveWebhook">
+        <label for="webhook-name">{{ t('admin.webhookName') }}</label><input id="webhook-name" v-model="webhookForm.name" required maxlength="80" />
+        <label for="webhook-kind">{{ t('admin.webhookKind') }}</label><select id="webhook-kind" v-model="webhookForm.kind"><option value="generic">Generic JSON</option><option value="discord">Discord</option></select>
+        <label for="webhook-url">{{ t('admin.webhookUrl') }}</label><input id="webhook-url" v-model="webhookForm.url" type="url" :required="!webhookForm.id" placeholder="https://…" /><small v-if="webhookForm.id">{{ t('admin.webhookUrlRetained') }}</small>
+        <fieldset><legend>{{ t('admin.webhookEvents') }}</legend><label v-for="event in webhooks.supportedEvents" :key="event"><input v-model="webhookForm.events" type="checkbox" :value="event" /> <code>{{ event }}</code></label></fieldset>
+        <label class="checkbox-label"><input v-model="webhookForm.enabled" type="checkbox" /> {{ t('admin.enabled') }}</label>
+        <label v-if="webhookForm.id" class="checkbox-label"><input v-model="webhookForm.rotateSecret" type="checkbox" /> {{ t('admin.rotateWebhookSecret') }}</label>
+        <button class="portal-button" type="submit" :disabled="webhookBusy || webhookForm.events.length === 0">{{ t('common.save') }}</button>
+      </form>
+      <div v-if="webhookSecret" class="form-notice"><strong>{{ t('admin.webhookSecretOnce') }}</strong><code class="webhook-secret">{{ webhookSecret }}</code></div>
+      <div class="account-webhook-list">
+        <article v-for="endpoint in webhooks.endpoints" :key="endpoint.id">
+          <div><strong>{{ endpoint.name }}</strong><small>{{ endpoint.kind }} · {{ endpoint.destination }}</small><code v-for="event in endpoint.events" :key="event">{{ event }}</code></div>
+          <div><button type="button" @click="editWebhook(endpoint.id)">{{ t('common.edit') }}</button><button type="button" :disabled="webhookBusy" @click="sendWebhookTest(endpoint.id)">{{ t('admin.testWebhook') }}</button><button type="button" :disabled="webhookBusy" @click="removeWebhook(endpoint.id)">{{ t('common.delete') }}</button></div>
+        </article>
+        <p v-if="webhooks.endpoints.length === 0">{{ t('admin.noWebhooks') }}</p>
+      </div>
     </section>
     <section class="settings-section">
       <h2>{{ t('auth.recoveryEmail') }}</h2>

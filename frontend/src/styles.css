@@ -395,8 +395,30 @@ a:hover { color: var(--wave-link-hover); }
 .settings-section p { color: var(--wave-text-secondary); }
 .settings-form { display: grid; max-width: 420px; gap: 8px; margin-top: 16px; }
 .settings-form label { margin-top: 4px; color: var(--wave-text-secondary); font-size: 12px; font-weight: 650; }
-.settings-form input { min-height: 38px; padding: 7px 9px; border: 1px solid var(--wave-border-strong); border-radius: 4px; background: var(--wave-surface-raised); color: var(--wave-text); }
+.settings-form input, .settings-form select { min-height: 38px; padding: 7px 9px; border: 1px solid var(--wave-border-strong); border-radius: 4px; background: var(--wave-surface-raised); color: var(--wave-text); }
 .settings-form button { justify-self: start; margin-top: 8px; }
+.account-webhooks { max-width: 760px; }
+.account-webhooks > header { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; }
+.account-webhooks > header p { margin: 6px 0 0; }
+.account-webhooks .text-button { border: 0; background: transparent; color: var(--wave-accent); cursor: pointer; white-space: nowrap; }
+.webhook-settings-form { max-width: 620px; }
+.webhook-settings-form fieldset { display: flex; flex-wrap: wrap; gap: 8px 16px; margin: 8px 0 0; padding: 12px 0; border: 0; border-top: 1px solid var(--wave-border); }
+.webhook-settings-form legend { width: 100%; color: var(--wave-text-secondary); font-size: 12px; font-weight: 650; }
+.webhook-settings-form fieldset label, .webhook-settings-form .checkbox-label { display: inline-flex; align-items: center; gap: 6px; margin: 0; }
+.webhook-settings-form input[type="checkbox"] { min-height: auto; padding: 0; }
+.webhook-secret { display: block; margin-top: 8px; overflow-wrap: anywhere; }
+.account-webhook-list { margin-top: 22px; border-top: 1px solid var(--wave-border-strong); }
+.account-webhook-list article { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; padding: 14px 0; border-bottom: 1px solid var(--wave-border); }
+.account-webhook-list article > div:first-child { display: grid; min-width: 0; gap: 4px; }
+.account-webhook-list article small { color: var(--wave-text-muted); overflow-wrap: anywhere; }
+.account-webhook-list article > div:last-child { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 5px; }
+.account-webhook-list button { padding: 4px 7px; border: 1px solid var(--wave-border); border-radius: var(--wave-radius-sm); background: transparent; color: var(--wave-text-secondary); cursor: pointer; }
+.account-webhook-list button:hover { background: var(--wave-surface-hover); color: var(--wave-text); }
+
+@media (max-width: 600px) {
+  .account-webhooks > header, .account-webhook-list article { align-items: stretch; flex-direction: column; }
+  .account-webhook-list article > div:last-child { justify-content: flex-start; }
+}
 
 /* Blog */
 .blog-page { min-height: 70vh; padding-top: 44px; padding-bottom: 72px; }

@@ -22,6 +22,7 @@ import (
 	"github.com/wavefnd/wave-platform/internal/mailruntime"
 	mediadomain "github.com/wavefnd/wave-platform/internal/media"
 	"github.com/wavefnd/wave-platform/internal/mediapolicy"
+	patchdomain "github.com/wavefnd/wave-platform/internal/patcharchive"
 	"github.com/wavefnd/wave-platform/internal/platformstats"
 	questiondomain "github.com/wavefnd/wave-platform/internal/question"
 	"github.com/wavefnd/wave-platform/internal/sourceanalysis"
@@ -44,6 +45,7 @@ type Application struct {
 	Identity       *identity.Service
 	MailRuntime    *mailruntime.Service
 	Webhooks       *webhookdomain.Service
+	Patches        *patchdomain.Service
 }
 
 func New(configPath string) (*Application, error) {
@@ -75,6 +77,10 @@ func New(configPath string) (*Application, error) {
 		_ = database.Close()
 		return nil, fmt.Errorf("initialize management mailbox: %w", err)
 	}
+	if _, err := identityService.EnsurePatchMailbox(); err != nil {
+		_ = database.Close()
+		return nil, fmt.Errorf("initialize patch mailbox: %w", err)
+	}
 	if _, err := community.SeedReleaseBlogPosts(database); err != nil {
 		_ = database.Close()
 		return nil, fmt.Errorf("seed release blog posts: %w", err)
@@ -102,6 +108,8 @@ func New(configPath string) (*Application, error) {
 		_ = database.Close()
 		return nil, fmt.Errorf("initialize webhooks: %w", err)
 	}
+	identityService.SetWebhookService(webhookService)
+	patchService := patchdomain.NewService(database, identity.PatchMailboxAccountID, identityService.PatchAddress())
 	blogService := blogdomain.NewService(database)
 	blogService.SetWebhookService(webhookService)
 	documentRepository := document.NewRepository(database)
@@ -196,6 +204,7 @@ func New(configPath string) (*Application, error) {
 		adminService,
 		mediaService,
 		webhookService,
+		patchService,
 	)
 
 	server := &http.Server{
@@ -217,6 +226,7 @@ func New(configPath string) (*Application, error) {
 		Identity:       identityService,
 		MailRuntime:    mailRuntime,
 		Webhooks:       webhookService,
+		Patches:        patchService,
 	}, nil
 }
 

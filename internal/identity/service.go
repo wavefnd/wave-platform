@@ -21,9 +21,11 @@ import (
 	"github.com/wavefnd/wave-platform/internal/identifier"
 	maildomain "github.com/wavefnd/wave-platform/internal/mail"
 	"github.com/wavefnd/wave-platform/internal/mailbox"
+	patchdomain "github.com/wavefnd/wave-platform/internal/patcharchive"
 	"github.com/wavefnd/wave-platform/internal/permission"
 	"github.com/wavefnd/wave-platform/internal/session"
 	"github.com/wavefnd/wave-platform/internal/storage"
+	webhookdomain "github.com/wavefnd/wave-platform/internal/webhook"
 )
 
 var (
@@ -38,6 +40,7 @@ var (
 )
 
 const ManagementMailboxAccountID = "role/platform-management"
+const PatchMailboxAccountID = "service/patchs"
 
 var managementLocalParts = []string{"admin", "help", "info", "support"}
 
@@ -82,8 +85,13 @@ type Service struct {
 	audit            *audit.Repository
 	mailDomain       string
 	registrationOpen bool
+	webhooks         *webhookdomain.Service
 	publicURL        string
 	now              func() time.Time
+}
+
+func (service *Service) SetWebhookService(webhooks *webhookdomain.Service) {
+	service.webhooks = webhooks
 }
 
 func NewServiceWithTOTP(database *storage.Database, mailDomain string, registrationOpen bool, sessionDuration time.Duration,
@@ -760,6 +768,29 @@ func (service *Service) ManagementAddresses() []string {
 	return addresses
 }
 
+func (service *Service) PatchAddress() string { return "patchs@" + service.mailDomain }
+
+func (service *Service) EnsurePatchMailbox() (mailbox.Mailbox, error) {
+	address := service.PatchAddress()
+	box, err := service.mailboxes.MailboxByAccount(PatchMailboxAccountID)
+	if errors.Is(err, storage.ErrNotFound) {
+		id, idErr := identifier.New("mailbox")
+		if idErr != nil {
+			return mailbox.Mailbox{}, idErr
+		}
+		box = mailbox.Mailbox{ID: id, AccountID: PatchMailboxAccountID, Address: address, CreatedAt: service.now().UTC()}
+		if err := service.mailboxes.UpsertMailbox(box); err != nil {
+			return mailbox.Mailbox{}, err
+		}
+	} else if err != nil {
+		return mailbox.Mailbox{}, err
+	}
+	if err := service.mailboxes.AddAddress(box.ID, address); err != nil {
+		return mailbox.Mailbox{}, err
+	}
+	return box, nil
+}
+
 func (service *Service) ManagementMailboxItems(folder string) ([]MailboxItem, error) {
 	box, err := service.EnsureManagementMailbox()
 	if err != nil {
@@ -997,6 +1028,10 @@ func (service *Service) AcceptSMTP(actor *account.Account, envelopeFrom string, 
 	if err := service.mail.UpsertMessage(message, raw); err != nil {
 		return MailboxItem{}, err
 	}
+	message, err = service.mail.Message(message.ID)
+	if err != nil {
+		return MailboxItem{}, err
+	}
 	var sentEntry mailbox.Entry
 	if actor != nil {
 		box, err := service.Mailbox(actor.ID)
@@ -1011,9 +1046,25 @@ func (service *Service) AcceptSMTP(actor *account.Account, envelopeFrom string, 
 	if err := service.routeMessage(strings.ToLower(strings.TrimSpace(envelopeFrom)), message, normalized, actor != nil); err != nil {
 		return MailboxItem{}, err
 	}
-	body, _ := service.mail.Body(message)
+	body, err := service.mail.Body(message)
+	if err != nil {
+		return MailboxItem{}, err
+	}
+	if actor == nil && service.webhooks != nil && containsAddress(normalized, service.PatchAddress()) && patchdomain.Valid(message.Subject, body) {
+		_ = service.webhooks.Publish(webhookdomain.Event{Type: webhookdomain.EventPatchReceived, Title: message.Subject,
+			ResourceID: "patch/" + message.ID, URL: "/patches/" + message.ID, OccurredAt: now})
+	}
 	return MailboxItem{Entry: sentEntry, Message: message, Body: body,
 		DeliveryStatus: service.deliveryStatus(message.ID)}, nil
+}
+
+func containsAddress(values []string, target string) bool {
+	for _, value := range values {
+		if strings.EqualFold(value, target) {
+			return true
+		}
+	}
+	return false
 }
 
 func (service *Service) HasLocalRecipient(address string) bool {
