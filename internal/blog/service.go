@@ -118,7 +118,8 @@ func (service *Service) Save(actorID string, input Input) (Post, error) {
 		if item.Category == "release" {
 			eventType, path = webhookdomain.EventReleasePublished, "/releases/"+item.Slug
 		}
-		_ = service.webhooks.Publish(webhookdomain.Event{Type: eventType, Title: item.Title, ResourceID: "blog/" + item.Slug, URL: path, OccurredAt: now})
+		_ = service.webhooks.Publish(webhookdomain.Event{Type: eventType, Title: item.Title, Summary: item.Summary,
+			AuthorName: item.AuthorName, ResourceID: "blog/" + item.Slug, URL: path, OccurredAt: now})
 	}
 	return item, nil
 }

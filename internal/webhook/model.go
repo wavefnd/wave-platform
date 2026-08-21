@@ -56,6 +56,8 @@ type Event struct {
 	ID         string    `json:"id"`
 	Type       string    `json:"type"`
 	Title      string    `json:"title"`
+	Summary    string    `json:"summary,omitempty"`
+	AuthorName string    `json:"author_name,omitempty"`
 	ResourceID string    `json:"resource_id"`
 	URL        string    `json:"url"`
 	OccurredAt time.Time `json:"occurred_at"`
@@ -68,6 +70,8 @@ type Delivery struct {
 	EventID       string    `xml:"event-id"`
 	EventType     string    `xml:"event-type"`
 	Title         string    `xml:"title"`
+	Summary       string    `xml:"summary,omitempty"`
+	AuthorName    string    `xml:"author-name,omitempty"`
 	ResourceID    string    `xml:"resource-id"`
 	ResourceURL   string    `xml:"resource-url"`
 	Status        string    `xml:"status"`

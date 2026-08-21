@@ -168,7 +168,8 @@ func TestCommunityAndFounderPostsQueueDistinctWebhookEvents(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(deliveries) != 2 || deliveries[0].EventType != webhookdomain.EventFounderPost || deliveries[1].EventType != webhookdomain.EventCommunityPost {
+	if len(deliveries) != 2 || deliveries[0].EventType != webhookdomain.EventFounderPost || deliveries[0].Summary != "A public founder update." || deliveries[0].AuthorName != owner.DisplayName ||
+		deliveries[1].EventType != webhookdomain.EventCommunityPost || deliveries[1].Summary != "A public community update." || deliveries[1].AuthorName != member.DisplayName {
 		t.Fatalf("deliveries = %#v", deliveries)
 	}
 }

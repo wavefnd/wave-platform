@@ -230,6 +230,9 @@ func (service *Service) Publish(event Event) error {
 	if !supportedEvents[event.Type] {
 		return fmt.Errorf("unsupported webhook event %q", event.Type)
 	}
+	event.Title = truncateRunes(strings.Join(strings.Fields(event.Title), " "), 256)
+	event.Summary = discordPreview(event.Summary, 1000)
+	event.AuthorName = truncateRunes(strings.Join(strings.Fields(event.AuthorName), " "), 256)
 	if event.ID == "" {
 		var err error
 		event.ID, err = identifier.New("event")
@@ -256,6 +259,7 @@ func (service *Service) Publish(event Event) error {
 			return idErr
 		}
 		delivery := Delivery{ID: id, EndpointID: endpoint.ID, EventID: event.ID, EventType: event.Type, Title: event.Title,
+			Summary: event.Summary, AuthorName: event.AuthorName,
 			ResourceID: event.ResourceID, ResourceURL: event.URL, Status: "queued", NextAttemptAt: event.OccurredAt, CreatedAt: event.OccurredAt}
 		if err := service.repository.PutDelivery(delivery); err != nil {
 			return err
@@ -286,6 +290,7 @@ func (service *Service) TestEndpointScoped(ctx context.Context, actorID, id stri
 		return Delivery{}, err
 	}
 	delivery := Delivery{ID: deliveryID, EndpointID: id, EventID: eventID, EventType: "webhook.test", Title: "Wave webhook test",
+		Summary: "Your Discord embed and webhook delivery are configured correctly.", AuthorName: "Wave Platform",
 		ResourceID: "platform/webhooks", ResourceURL: service.publicURL + "/admin/webhooks", Status: "queued", CreatedAt: now, NextAttemptAt: now}
 	if err := service.repository.PutDelivery(delivery); err != nil {
 		return Delivery{}, err
@@ -336,7 +341,8 @@ func (service *Service) deliver(ctx context.Context, delivery Delivery) (Deliver
 	if err != nil {
 		return delivery, err
 	}
-	event := Event{ID: delivery.EventID, Type: delivery.EventType, Title: delivery.Title, ResourceID: delivery.ResourceID, URL: delivery.ResourceURL, OccurredAt: delivery.CreatedAt}
+	event := Event{ID: delivery.EventID, Type: delivery.EventType, Title: delivery.Title, Summary: delivery.Summary,
+		AuthorName: delivery.AuthorName, ResourceID: delivery.ResourceID, URL: delivery.ResourceURL, OccurredAt: delivery.CreatedAt}
 	payload, err := eventPayload(endpoint.Kind, event)
 	if err != nil {
 		return delivery, err
@@ -383,10 +389,60 @@ func (service *Service) deliver(ctx context.Context, delivery Delivery) (Deliver
 
 func eventPayload(kind string, event Event) ([]byte, error) {
 	if kind == "discord" {
-		content := "**" + event.Title + "**\n" + event.URL
-		return json.Marshal(map[string]any{"content": content, "allowed_mentions": map[string]any{"parse": []string{}}})
+		embed := map[string]any{
+			"title":       truncateRunes(strings.TrimSpace(event.Title), 256),
+			"url":         event.URL,
+			"color":       0x6654F1,
+			"timestamp":   event.OccurredAt.UTC().Format(time.RFC3339),
+			"footer":      map[string]string{"text": "Wave · " + discordEventLabel(event.Type)},
+			"description": discordPreview(event.Summary, 120),
+		}
+		if strings.TrimSpace(event.AuthorName) != "" {
+			embed["author"] = map[string]string{"name": truncateRunes(strings.TrimSpace(event.AuthorName), 256)}
+		}
+		if embed["description"] == "" {
+			delete(embed, "description")
+		}
+		return json.Marshal(map[string]any{
+			"username":         "Wave",
+			"allowed_mentions": map[string]any{"parse": []string{}},
+			"embeds":           []any{embed},
+		})
 	}
 	return json.Marshal(event)
+}
+
+func discordPreview(value string, limit int) string {
+	value = strings.NewReplacer("\r", " ", "\n", " ", "\t", " ").Replace(value)
+	value = strings.Join(strings.Fields(value), " ")
+	return truncateRunes(value, limit)
+}
+
+func truncateRunes(value string, limit int) string {
+	characters := []rune(strings.TrimSpace(value))
+	if limit > 0 && len(characters) > limit {
+		return strings.TrimSpace(string(characters[:limit])) + "…"
+	}
+	return string(characters)
+}
+
+func discordEventLabel(eventType string) string {
+	switch eventType {
+	case EventCommunityPost:
+		return "Community post"
+	case EventFounderPost:
+		return "LunaStev post"
+	case EventBlogPublished:
+		return "Blog post"
+	case EventReleasePublished:
+		return "Release"
+	case EventPatchReceived:
+		return "Git patch"
+	case "webhook.test":
+		return "Webhook test"
+	default:
+		return eventType
+	}
 }
 
 func normalizeEvents(values []string) ([]string, error) {

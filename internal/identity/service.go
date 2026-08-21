@@ -1051,7 +1051,15 @@ func (service *Service) AcceptSMTP(actor *account.Account, envelopeFrom string, 
 		return MailboxItem{}, err
 	}
 	if actor == nil && service.webhooks != nil && containsAddress(normalized, service.PatchAddress()) && patchdomain.Valid(message.Subject, body) {
+		authorName := message.From
+		if parsedFrom, parseErr := stdmail.ParseAddress(message.From); parseErr == nil {
+			authorName = parsedFrom.Name
+			if authorName == "" {
+				authorName = parsedFrom.Address
+			}
+		}
 		_ = service.webhooks.Publish(webhookdomain.Event{Type: webhookdomain.EventPatchReceived, Title: message.Subject,
+			Summary: body, AuthorName: authorName,
 			ResourceID: "patch/" + message.ID, URL: "/patches/" + message.ID, OccurredAt: now})
 	}
 	return MailboxItem{Entry: sentEntry, Message: message, Body: body,

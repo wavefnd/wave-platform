@@ -105,7 +105,7 @@ func (service *Service) CreatePost(actor account.Account, input CreatePostInput)
 		} else if space.ID == "showcase" {
 			path = "/community/showcase/" + thread.ID
 		}
-		_ = service.webhooks.Publish(webhookdomain.Event{Type: eventType, Title: input.Title,
+		_ = service.webhooks.Publish(webhookdomain.Event{Type: eventType, Title: input.Title, Summary: input.Body, AuthorName: actor.DisplayName,
 			ResourceID: "community/thread/" + thread.ID, URL: path, OccurredAt: now})
 	}
 	return service.repository.ViewFor(thread.ID, actor.ID)

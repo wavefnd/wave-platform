@@ -3,6 +3,7 @@ package webhook
 import (
 	"context"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
@@ -60,7 +61,8 @@ func TestServiceEncryptsEndpointAndDeliversSignedGenericEvent(t *testing.T) {
 		}
 		return &http.Response{StatusCode: http.StatusNoContent, Body: io.NopCloser(strings.NewReader("")), Header: make(http.Header)}, nil
 	})}
-	if err := service.Publish(Event{Type: EventReleasePublished, Title: "Wave v0.3.0", ResourceID: "blog/wave-v0.3.0", URL: "/releases/wave-v0.3.0"}); err != nil {
+	if err := service.Publish(Event{Type: EventReleasePublished, Title: "Wave v0.3.0", Summary: "Release notes preview", AuthorName: "LunaStev",
+		ResourceID: "blog/wave-v0.3.0", URL: "/releases/wave-v0.3.0"}); err != nil {
 		t.Fatal(err)
 	}
 	if err := service.ProcessPending(context.Background()); err != nil {
@@ -70,7 +72,8 @@ func TestServiceEncryptsEndpointAndDeliversSignedGenericEvent(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(deliveries) != 1 || deliveries[0].Status != "delivered" || !strings.Contains(receivedBody, "Wave v0.3.0") || !strings.Contains(receivedBody, "https://wave.example/releases/") {
+	if len(deliveries) != 1 || deliveries[0].Status != "delivered" || deliveries[0].Summary != "Release notes preview" || deliveries[0].AuthorName != "LunaStev" ||
+		!strings.Contains(receivedBody, "Wave v0.3.0") || !strings.Contains(receivedBody, "Release notes preview") || !strings.Contains(receivedBody, "https://wave.example/releases/") {
 		t.Fatalf("deliveries=%#v body=%q", deliveries, receivedBody)
 	}
 }
@@ -132,5 +135,49 @@ func TestAccountScopedEndpointsEnforceOwnership(t *testing.T) {
 	}
 	if _, err := service.TestEndpointScoped(context.Background(), "account-b", created.ID, false); !errors.Is(err, ErrForbidden) {
 		t.Fatalf("test error = %v", err)
+	}
+}
+
+func TestDiscordPayloadUsesLinkedEmbedAndTruncatedPreview(t *testing.T) {
+	eventTime := time.Date(2026, 8, 21, 12, 30, 0, 0, time.UTC)
+	event := Event{Type: EventFounderPost, Title: "Wave compiler work log",
+		Summary: "First line.\n" + strings.Repeat("가", 180), AuthorName: "LunaStev",
+		URL: "https://wave-lang.dev/lunastev/thread/example", OccurredAt: eventTime}
+	payload, err := eventPayload("discord", event)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var value struct {
+		Username        string `json:"username"`
+		Content         string `json:"content"`
+		AllowedMentions struct {
+			Parse []string `json:"parse"`
+		} `json:"allowed_mentions"`
+		Embeds []struct {
+			Title       string `json:"title"`
+			URL         string `json:"url"`
+			Description string `json:"description"`
+			Color       int    `json:"color"`
+			Timestamp   string `json:"timestamp"`
+			Author      struct {
+				Name string `json:"name"`
+			} `json:"author"`
+			Footer struct {
+				Text string `json:"text"`
+			} `json:"footer"`
+		} `json:"embeds"`
+	}
+	if err := json.Unmarshal(payload, &value); err != nil {
+		t.Fatal(err)
+	}
+	if value.Username != "Wave" || value.Content != "" || len(value.AllowedMentions.Parse) != 0 || len(value.Embeds) != 1 {
+		t.Fatalf("discord payload = %s", payload)
+	}
+	embed := value.Embeds[0]
+	if embed.Title != event.Title || embed.URL != event.URL || embed.Author.Name != "LunaStev" || embed.Color != 0x6654F1 || embed.Timestamp != eventTime.Format(time.RFC3339) || embed.Footer.Text != "Wave · LunaStev post" {
+		t.Fatalf("discord embed = %#v", embed)
+	}
+	if characters := []rune(embed.Description); len(characters) != 121 || characters[len(characters)-1] != '…' || strings.Contains(embed.Description, "\n") {
+		t.Fatalf("discord description = %q (%d runes)", embed.Description, len(characters))
 	}
 }
