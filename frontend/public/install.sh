@@ -1,17 +1,20 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION=""
-REPO="wavefnd/Wave"
+WAVE_VERSION=""
+VEX_VERSION="${VEX_VERSION:-}"
+WAVE_REPO="wavefnd/Wave"
+VEX_REPO="wavefnd/Vex"
 INSTALL_DIR="${WAVE_INSTALL_DIR:-$HOME/.wave/bin}"
 
 usage() {
-    echo "Wave Installer"
+    local exit_code="${1:-1}"
+    echo "Wave Toolchain Installer"
     echo "Usage:"
-    echo "  bash install.sh --version <tag>"
+    echo "  bash install.sh --version <wave-tag> [--vex-version <vex-tag>]"
     echo "  bash install.sh latest"
     echo "  curl -fsSL https://wave-lang.dev/install.sh | bash -s -- latest"
-    exit 1
+    exit "$exit_code"
 }
 
 fail() {
@@ -24,6 +27,47 @@ normalize_version() {
         v*) printf "%s" "$1" ;;
         *) printf "v%s" "$1" ;;
     esac
+}
+
+validate_version() {
+    [[ "$1" =~ ^v[0-9A-Za-z][0-9A-Za-z._+-]*$ ]] || fail "Invalid version tag: $1"
+}
+
+resolve_latest_version() {
+    local repository="$1"
+    local response
+    local version
+
+    response="$(curl -fsSL -H "Accept: application/vnd.github+json" "https://api.github.com/repos/${repository}/releases?per_page=1")" \
+        || fail "Unable to query releases for ${repository}."
+    version="$(awk -F '"' '/"tag_name":/ { print $4; exit }' <<< "$response")"
+    [[ -n "$version" ]] || fail "Unable to resolve the latest release for ${repository}."
+    validate_version "$version"
+    printf "%s" "$version"
+}
+
+sha256_file() {
+    if command -v sha256sum >/dev/null 2>&1; then
+        sha256sum "$1" | awk '{ print $1 }'
+    elif command -v shasum >/dev/null 2>&1; then
+        shasum -a 256 "$1" | awk '{ print $1 }'
+    else
+        fail "SHA-256 verification requires sha256sum or shasum."
+    fi
+}
+
+verify_checksum() {
+    local archive="$1"
+    local sums_file="$2"
+    local file_name="$3"
+    local expected
+    local actual
+
+    expected="$(awk -v file="$file_name" '$2 == file || $2 == ("*" file) { print $1; exit }' "$sums_file")"
+    [[ "$expected" =~ ^[0-9A-Fa-f]{64}$ ]] || fail "No valid checksum was published for $file_name."
+    actual="$(sha256_file "$archive")"
+    [[ "$actual" == "$expected" ]] || fail "Checksum verification failed for $file_name."
+    echo "[info] Verified SHA-256: $file_name"
 }
 
 resolve_shell_rc() {
@@ -82,19 +126,25 @@ append_path_if_needed() {
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --version)
-            [[ $# -ge 2 ]] || fail "Missing value after --version."
-            VERSION="$(normalize_version "$2")"
+        --version|--wave-version)
+            [[ $# -ge 2 ]] || fail "Missing value after $1."
+            WAVE_VERSION="$(normalize_version "$2")"
+            shift 2
+            ;;
+        --vex-version)
+            [[ $# -ge 2 ]] || fail "Missing value after --vex-version."
+            VEX_VERSION="$(normalize_version "$2")"
             shift 2
             ;;
         latest)
-            VERSION="$(curl -fsSL "https://api.github.com/repos/${REPO}/releases?per_page=1" | grep -m 1 '"tag_name":' | cut -d '"' -f4)"
-            [[ -n "$VERSION" ]] || fail "Unable to resolve latest release."
-            echo "[info] Latest version: $VERSION"
+            WAVE_VERSION="$(resolve_latest_version "$WAVE_REPO")"
+            VEX_VERSION="$(resolve_latest_version "$VEX_REPO")"
+            echo "[info] Latest Wave version: $WAVE_VERSION"
+            echo "[info] Latest Vex version: $VEX_VERSION"
             shift
             ;;
         -h|--help)
-            usage
+            usage 0
             ;;
         *)
             usage
@@ -102,63 +152,100 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-if [[ -z "$VERSION" ]]; then
-    fail "Missing version. Use --version <tag> or latest."
+if [[ -z "$WAVE_VERSION" ]]; then
+    fail "Missing Wave version. Use --version <tag> or latest."
 fi
+validate_version "$WAVE_VERSION"
+
+if [[ -z "$VEX_VERSION" ]]; then
+    VEX_VERSION="$(resolve_latest_version "$VEX_REPO")"
+    echo "[info] Latest Vex version: $VEX_VERSION"
+fi
+validate_version "$VEX_VERSION"
 
 echo "[info] Detecting system..."
 
 UNAME_OUT="$(uname -s)"
 ARCH="$(uname -m)"
 
-case "$ARCH" in
-    x86_64|amd64) ARCH_SUFFIX="x86_64" ;;
-    arm64|aarch64) ARCH_SUFFIX="aarch64" ;;
-    *) fail "Unsupported architecture: $ARCH" ;;
+case "$UNAME_OUT:$ARCH" in
+    Linux:x86_64|Linux:amd64)
+        WAVE_FILE_SUFFIX="x86_64-linux-gnu"
+        VEX_FILE_SUFFIX="x86_64-unknown-linux-gnu"
+        ;;
+    Darwin:arm64|Darwin:aarch64)
+        WAVE_FILE_SUFFIX="aarch64-apple-darwin"
+        VEX_FILE_SUFFIX="aarch64-apple-darwin"
+        ;;
+    Darwin:x86_64|Darwin:amd64)
+        WAVE_FILE_SUFFIX="x86_64-apple-darwin"
+        VEX_FILE_SUFFIX="x86_64-apple-darwin"
+        ;;
+    Linux:arm64|Linux:aarch64)
+        fail "Wave release archives currently support Linux x86_64 only."
+        ;;
+    *)
+        fail "Unsupported system: $UNAME_OUT $ARCH"
+        ;;
 esac
 
-case "$UNAME_OUT" in
-    Linux) OS_SUFFIX="linux-gnu" ;;
-    Darwin) OS_SUFFIX="apple-darwin" ;;
-    *) fail "This OS is not supported yet: $UNAME_OUT" ;;
-esac
-
-FILE_SUFFIX="${ARCH_SUFFIX}-${OS_SUFFIX}"
-FILE_NAME="wave-${VERSION}-${FILE_SUFFIX}.tar.gz"
-URL="https://github.com/${REPO}/releases/download/${VERSION}/${FILE_NAME}"
+WAVE_FILE_NAME="wave-${WAVE_VERSION}-${WAVE_FILE_SUFFIX}.tar.gz"
+VEX_FILE_NAME="vex-${VEX_VERSION}-${VEX_FILE_SUFFIX}.tar.gz"
+WAVE_URL="https://github.com/${WAVE_REPO}/releases/download/${WAVE_VERSION}/${WAVE_FILE_NAME}"
+VEX_URL="https://github.com/${VEX_REPO}/releases/download/${VEX_VERSION}/${VEX_FILE_NAME}"
+WAVE_SUMS_URL="https://github.com/${WAVE_REPO}/releases/download/${WAVE_VERSION}/SHA256SUMS"
+VEX_SUMS_URL="https://github.com/${VEX_REPO}/releases/download/${VEX_VERSION}/SHA256SUMS"
 INSTALL_PARENT="$(dirname "$INSTALL_DIR")"
 
 mkdir -p "$INSTALL_PARENT"
 TMP_DIR="$(mktemp -d "$INSTALL_PARENT/.wave-install.XXXXXX")"
 STAGE_DIR="${INSTALL_DIR}.new.$$"
 BACKUP_DIR="${INSTALL_DIR}.old.$$"
+WAVE_EXTRACT_DIR="$TMP_DIR/wave"
+VEX_EXTRACT_DIR="$TMP_DIR/vex"
 
 cleanup() {
     rm -rf "$TMP_DIR" "$STAGE_DIR"
 }
 trap cleanup EXIT
 
-echo "[1/3] Downloading Wave $VERSION..."
-echo "[info] Download: $URL"
-curl -fL "$URL" -o "$TMP_DIR/$FILE_NAME"
+echo "[1/4] Downloading Wave $WAVE_VERSION and Vex $VEX_VERSION..."
+echo "[info] Download: $WAVE_URL"
+curl -fL "$WAVE_URL" -o "$TMP_DIR/$WAVE_FILE_NAME"
+echo "[info] Download: $VEX_URL"
+curl -fL "$VEX_URL" -o "$TMP_DIR/$VEX_FILE_NAME"
+curl -fsSL "$WAVE_SUMS_URL" -o "$TMP_DIR/WAVE_SHA256SUMS"
+curl -fsSL "$VEX_SUMS_URL" -o "$TMP_DIR/VEX_SHA256SUMS"
 
-echo "[2/3] Installing Wave..."
-tar -xzf "$TMP_DIR/$FILE_NAME" -C "$TMP_DIR"
+echo "[2/4] Verifying release archives..."
+verify_checksum "$TMP_DIR/$WAVE_FILE_NAME" "$TMP_DIR/WAVE_SHA256SUMS" "$WAVE_FILE_NAME"
+verify_checksum "$TMP_DIR/$VEX_FILE_NAME" "$TMP_DIR/VEX_SHA256SUMS" "$VEX_FILE_NAME"
 
-PACKAGE_DIR="$TMP_DIR/${FILE_NAME%.tar.gz}"
-if [[ ! -d "$PACKAGE_DIR" ]]; then
-    PACKAGE_DIR="$(find "$TMP_DIR" -mindepth 1 -maxdepth 1 -type d ! -name '.wave-install.*' | head -n 1)"
-fi
+echo "[3/4] Installing Wave toolchain..."
+mkdir -p "$WAVE_EXTRACT_DIR" "$VEX_EXTRACT_DIR"
+tar -xzf "$TMP_DIR/$WAVE_FILE_NAME" -C "$WAVE_EXTRACT_DIR"
+tar -xzf "$TMP_DIR/$VEX_FILE_NAME" -C "$VEX_EXTRACT_DIR"
 
-[[ -n "$PACKAGE_DIR" && -d "$PACKAGE_DIR" ]] || fail "Invalid package layout."
-[[ -f "$PACKAGE_DIR/wavec" ]] || fail "Package does not contain wavec."
-[[ -d "$PACKAGE_DIR/llvm" ]] || fail "Package does not contain bundled llvm/."
+WAVE_PACKAGE_DIR="$WAVE_EXTRACT_DIR/${WAVE_FILE_NAME%.tar.gz}"
+VEX_PACKAGE_DIR="$VEX_EXTRACT_DIR/${VEX_FILE_NAME%.tar.gz}"
+
+[[ -d "$WAVE_PACKAGE_DIR" ]] || fail "Invalid Wave package layout."
+[[ -f "$WAVE_PACKAGE_DIR/wavec" ]] || fail "Wave package does not contain wavec."
+[[ -d "$WAVE_PACKAGE_DIR/llvm" ]] || fail "Wave package does not contain bundled llvm/."
+[[ -d "$VEX_PACKAGE_DIR" ]] || fail "Invalid Vex package layout."
+[[ -f "$VEX_PACKAGE_DIR/vex" ]] || fail "Vex package does not contain vex."
 
 rm -rf "$STAGE_DIR" "$BACKUP_DIR"
 mkdir -p "$STAGE_DIR"
-cp "$PACKAGE_DIR/wavec" "$STAGE_DIR/wavec"
-cp -R "$PACKAGE_DIR/llvm" "$STAGE_DIR/llvm"
-chmod +x "$STAGE_DIR/wavec"
+cp -R "$WAVE_PACKAGE_DIR"/. "$STAGE_DIR"/
+cp "$VEX_PACKAGE_DIR/vex" "$STAGE_DIR/vex"
+mkdir -p "$STAGE_DIR/share/vex"
+for notice in COPYRIGHT LICENSE NOTICE README.md; do
+    if [[ -f "$VEX_PACKAGE_DIR/$notice" ]]; then
+        cp "$VEX_PACKAGE_DIR/$notice" "$STAGE_DIR/share/vex/$notice"
+    fi
+done
+chmod +x "$STAGE_DIR/wavec" "$STAGE_DIR/vex"
 chmod +x "$STAGE_DIR/llvm/bin/"* 2>/dev/null || true
 
 if [[ -d "$INSTALL_DIR" ]]; then
@@ -172,21 +259,29 @@ if ! mv "$STAGE_DIR" "$INSTALL_DIR"; then
     fail "Unable to activate the new Wave installation."
 fi
 
-append_path_if_needed
-
-echo "[3/3] Verifying installation..."
-if "$INSTALL_DIR/wavec" --version; then
-    echo "Installation completed successfully."
-else
+rollback_install() {
+    rm -rf "$INSTALL_DIR"
     if [[ -d "$BACKUP_DIR" ]]; then
-        rm -rf "$INSTALL_DIR"
         mv "$BACKUP_DIR" "$INSTALL_DIR"
     fi
-    fail "Installation verification failed."
+}
+
+echo "[4/4] Verifying installation..."
+if ! "$INSTALL_DIR/wavec" --version; then
+    rollback_install
+    fail "wavec installation verification failed."
+fi
+if ! "$INSTALL_DIR/vex" --version; then
+    rollback_install
+    fail "vex installation verification failed."
 fi
 
 rm -rf "$BACKUP_DIR"
+append_path_if_needed
+
+echo "Installation completed successfully."
+echo "[info] Installed wavec $WAVE_VERSION and vex $VEX_VERSION."
 
 if [[ "$PATH_CONFIG_UPDATED" -eq 1 ]]; then
-    echo "[info] To use 'wavec' in the current terminal, run: $SHELL_RELOAD_COMMAND"
+    echo "[info] To use 'wavec' and 'vex' in the current terminal, run: $SHELL_RELOAD_COMMAND"
 fi

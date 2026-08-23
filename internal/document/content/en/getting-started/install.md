@@ -6,31 +6,43 @@ group: getting-started
 group_order: 1
 order: 2
 title: Installing Wave
-summary: Install Wave with the official script or release archives, verify the toolchain, or build the compiler from source.
+summary: Install the Wave compiler and Vex package manager with the official script, verify the toolchain, or use release archives.
 ---
 
 ## Official install scripts
 
-On Linux and macOS, the official shell installer can install the latest release:
+On Linux and macOS, the official shell installer installs the latest releases of both the `wavec` compiler and the `vex` package manager:
 
 ```shell
 curl -fsSL https://wave-lang.dev/install.sh | bash -s -- latest
 ```
 
-On Windows x86-64, run the PowerShell installer:
+On Windows x86-64, run the PowerShell installer. It installs the Windows GNU build of `wavec` and the Windows MSVC build of `vex` into the same toolchain directory:
 
 ```powershell
 irm https://wave-lang.dev/install.ps1 -OutFile install.ps1
 powershell -ExecutionPolicy Bypass -File .\install.ps1 -Latest
 ```
 
-If an installer cannot update the current shell environment, apply the PATH instructions it prints or start a new shell. The Windows installer uses `%LOCALAPPDATA%\Wave\bin` by default and adds it to the user PATH.
+If an installer cannot update the current shell environment, apply the PATH instructions it prints or start a new shell. The Windows installer uses `%LOCALAPPDATA%\Wave\bin` by default and adds it to the user PATH. Both installers verify the published SHA-256 checksum before replacing an existing installation.
+
+Wave and Vex have independent release versions. To pin both instead of resolving the latest Vex release, use:
+
+```shell
+curl -fsSL https://wave-lang.dev/install.sh | bash -s -- --version v0.2.0-pre-beta --vex-version v0.0.1
+```
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\install.ps1 -Version v0.2.0-pre-beta -VexVersion v0.0.1
+```
 
 ## Verify the installation
 
 ```shell
 wavec --version
 wavec --help
+vex --version
+vex --help
 ```
 
 Record this output when reporting a documentation mismatch. The pages describe the current compiler contract; older installed binaries may expose a smaller command or syntax surface.
@@ -74,6 +86,7 @@ The resulting executable is normally `target/debug/wavec` or `target/release/wav
 ## Post-install checks
 
 - Confirm the expected version with `wavec --version`.
+- Confirm the package manager version with `vex --version`.
 - Inspect recognized targets with `wavec print supported-targets`.
 - Locate the standard library with `wavec print std-path`.
 - If the shell cannot find `wavec`, check the installation directory and PATH first.

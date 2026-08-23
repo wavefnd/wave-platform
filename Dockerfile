@@ -31,14 +31,17 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 ARG WAVE_VERSION=0.2.0-pre-beta
+ARG VEX_VERSION=0.0.1
 
-RUN curl -fsSL https://wave-lang.dev/install.sh -o /tmp/install-wave.sh \
-    && bash /tmp/install-wave.sh --version "${WAVE_VERSION}" \
+COPY frontend/public/install.sh /tmp/install-wave.sh
+
+RUN bash /tmp/install-wave.sh --version "${WAVE_VERSION}" --vex-version "${VEX_VERSION}" \
     && rm -f /tmp/install-wave.sh
 
 ENV PATH="/root/.wave/bin:${PATH}"
 
 RUN wavec --version
+RUN vex --version
 
 WORKDIR /src
 

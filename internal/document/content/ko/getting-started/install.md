@@ -6,31 +6,43 @@ group: getting-started
 group_order: 1
 order: 2
 title: Wave 설치
-summary: 공식 설치 스크립트, 릴리스 아카이브와 소스 빌드 방법을 설명합니다.
+summary: 공식 설치 스크립트로 Wave 컴파일러와 Vex 패키지 관리자를 설치하고 툴체인을 검증하는 방법을 설명합니다.
 ---
 
 ## 공식 설치 스크립트
 
-Linux와 macOS에서는 공식 셸 설치 프로그램으로 최신 릴리스를 설치할 수 있습니다.
+Linux와 macOS에서는 공식 셸 설치 프로그램으로 `wavec` 컴파일러와 `vex` 패키지 관리자의 최신 릴리스를 함께 설치할 수 있습니다.
 
 ```shell
 curl -fsSL https://wave-lang.dev/install.sh | bash -s -- latest
 ```
 
-Windows x86-64에서는 PowerShell 설치 프로그램을 실행합니다.
+Windows x86-64에서는 PowerShell 설치 프로그램을 실행합니다. Windows GNU 빌드의 `wavec`와 Windows MSVC 빌드의 `vex`가 같은 툴체인 디렉터리에 설치됩니다.
 
 ```powershell
 irm https://wave-lang.dev/install.ps1 -OutFile install.ps1
 powershell -ExecutionPolicy Bypass -File .\install.ps1 -Latest
 ```
 
-설치가 끝난 뒤 현재 셸에 PATH가 반영되지 않았다면 설치 프로그램이 출력한 안내를 적용하거나 새 셸을 여십시오. Windows 설치 프로그램은 기본적으로 `%LOCALAPPDATA%\Wave\bin`을 사용하고 사용자 PATH에 이 경로를 추가합니다.
+설치가 끝난 뒤 현재 셸에 PATH가 반영되지 않았다면 설치 프로그램이 출력한 안내를 적용하거나 새 셸을 여십시오. Windows 설치 프로그램은 기본적으로 `%LOCALAPPDATA%\Wave\bin`을 사용하고 사용자 PATH에 이 경로를 추가합니다. 두 설치 프로그램은 기존 설치를 교체하기 전에 배포된 SHA-256 체크섬을 검증합니다.
+
+Wave와 Vex는 서로 독립된 릴리스 버전을 사용합니다. 최신 Vex 대신 두 버전을 모두 고정하려면 다음과 같이 실행합니다.
+
+```shell
+curl -fsSL https://wave-lang.dev/install.sh | bash -s -- --version v0.2.0-pre-beta --vex-version v0.0.1
+```
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\install.ps1 -Version v0.2.0-pre-beta -VexVersion v0.0.1
+```
 
 ## 설치 확인
 
 ```shell
 wavec --version
 wavec --help
+vex --version
+vex --help
 ```
 
 문서와 다른 동작을 보고할 때 이 출력을 함께 기록하십시오. 문서는 현재 컴파일러 계약을 설명하므로 오래된 설치 바이너리는 더 작은 명령 또는 문법 범위를 제공할 수 있습니다.
@@ -74,6 +86,7 @@ cargo build --release
 ## 설치 뒤 확인할 것
 
 - `wavec --version`이 예상 버전을 출력하는지 확인합니다.
+- `vex --version`이 예상 패키지 관리자 버전을 출력하는지 확인합니다.
 - `wavec print supported-targets`로 현재 컴파일러가 인식하는 대상 목록을 확인합니다.
 - 표준 라이브러리 경로가 필요하면 `wavec print std-path`를 사용합니다.
 - 셸에서 `wavec`를 찾지 못하면 PATH와 설치 위치를 먼저 확인합니다.

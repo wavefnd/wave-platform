@@ -70,5 +70,8 @@ func TestOfficialInstallDocumentsIncludeWindowsInstaller(t *testing.T) {
 		if !strings.Contains(install.Markdown, "https://wave-lang.dev/install.ps1") || !strings.Contains(install.Markdown, "-Latest") {
 			t.Fatalf("%s official Windows installer command is missing", locale)
 		}
+		if !strings.Contains(install.Markdown, "vex --version") || !strings.Contains(install.Markdown, "VexVersion") {
+			t.Fatalf("%s Vex installation guidance is missing", locale)
+		}
 	}
 }
