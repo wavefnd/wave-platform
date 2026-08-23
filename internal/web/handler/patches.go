@@ -23,8 +23,7 @@ type PatchesResponse struct {
 }
 
 func (handler PatchesHandler) List(writer http.ResponseWriter, request *http.Request) {
-	if handler.Service == nil {
-		writeAPIError(writer, http.StatusServiceUnavailable, "patches-unavailable", "The patch archive is unavailable.")
+	if _, ok := handler.authorizeMember(writer, request); !ok {
 		return
 	}
 	query := strings.TrimSpace(request.URL.Query().Get("q"))
@@ -41,8 +40,7 @@ func (handler PatchesHandler) List(writer http.ResponseWriter, request *http.Req
 }
 
 func (handler PatchesHandler) Get(writer http.ResponseWriter, request *http.Request) {
-	if handler.Service == nil {
-		writeAPIError(writer, http.StatusServiceUnavailable, "patches-unavailable", "The patch archive is unavailable.")
+	if _, ok := handler.authorizeMember(writer, request); !ok {
 		return
 	}
 	item, err := handler.Service.Get(request.PathValue("patch"))
@@ -55,6 +53,21 @@ func (handler PatchesHandler) Get(writer http.ResponseWriter, request *http.Requ
 		return
 	}
 	_ = xmlcodec.Write(writer, http.StatusOK, item)
+}
+
+func (handler PatchesHandler) authorizeMember(writer http.ResponseWriter, request *http.Request) (string, bool) {
+	setPrivateResponseHeaders(writer)
+	writer.Header().Set("X-Robots-Tag", "noindex, nofollow, noarchive")
+	if handler.Service == nil || handler.Auth == nil {
+		writeAPIError(writer, http.StatusServiceUnavailable, "patches-unavailable", "The patch archive is unavailable.")
+		return "", false
+	}
+	actor, authenticated := AuthenticatedAccount(*handler.Auth, request)
+	if !authenticated {
+		writeAPIError(writer, http.StatusUnauthorized, "not-authenticated", "A Wave account is required to view the patch list.")
+		return "", false
+	}
+	return actor.ID, true
 }
 
 func (handler PatchesHandler) Review(writer http.ResponseWriter, request *http.Request) {
@@ -163,6 +176,7 @@ func (handler PatchesHandler) Download(writer http.ResponseWriter, request *http
 
 func (handler PatchesHandler) authorizeMaintainer(writer http.ResponseWriter, request *http.Request, mutation bool) (string, bool) {
 	setPrivateResponseHeaders(writer)
+	writer.Header().Set("X-Robots-Tag", "noindex, nofollow, noarchive")
 	if handler.Service == nil || handler.Auth == nil {
 		writeAPIError(writer, http.StatusServiceUnavailable, "patches-unavailable", "Patch maintenance is unavailable.")
 		return "", false

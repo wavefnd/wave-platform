@@ -111,7 +111,7 @@ func (handler WebhookHandler) UserList(writer http.ResponseWriter, request *http
 		writeAPIError(writer, http.StatusInternalServerError, "webhooks-unavailable", "Webhook deliveries could not be loaded.")
 		return
 	}
-	_ = xmlcodec.Write(writer, http.StatusOK, WebhooksResponse{Events: webhookdomain.SupportedEvents(), Endpoints: endpoints, Deliveries: deliveries})
+	_ = xmlcodec.Write(writer, http.StatusOK, WebhooksResponse{Events: webhookdomain.UserSupportedEvents(), Endpoints: endpoints, Deliveries: deliveries})
 }
 
 func (handler WebhookHandler) UserSave(writer http.ResponseWriter, request *http.Request) {

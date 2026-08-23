@@ -14,10 +14,8 @@ import (
 
 	"github.com/pquerna/otp/totp"
 	maildomain "github.com/wavefnd/wave-platform/internal/mail"
-	patchdomain "github.com/wavefnd/wave-platform/internal/patcharchive"
 	"github.com/wavefnd/wave-platform/internal/permission"
 	"github.com/wavefnd/wave-platform/internal/storage"
-	webhookdomain "github.com/wavefnd/wave-platform/internal/webhook"
 )
 
 const testTOTPSecret = "JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP"
@@ -288,7 +286,7 @@ func TestPatchAddressIsReservedAndBackedByDedicatedMailbox(t *testing.T) {
 	}
 }
 
-func TestIncomingPatchQueuesPatchWebhookEvent(t *testing.T) {
+func TestSMTPCannotBypassInternalPatchMailingList(t *testing.T) {
 	database, err := storage.Open(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
@@ -298,26 +296,17 @@ func TestIncomingPatchQueuesPatchWebhookEvent(t *testing.T) {
 	if _, err := service.EnsurePatchMailbox(); err != nil {
 		t.Fatal(err)
 	}
-	webhooks, err := webhookdomain.NewService(database, "MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=", "https://wave-lang.dev")
+	externalRaw := "From: Contributor <dev@example.net>\r\nTo: patchs@wave-lang.dev\r\nSubject: [PATCH] parser: external\r\nContent-Type: text/plain; charset=utf-8\r\n\r\ndiff --git a/parser.go b/parser.go\n"
+	if _, err := service.AcceptSMTP(nil, "dev@example.net", []string{service.PatchAddress()}, []byte(externalRaw)); !errors.Is(err, ErrRelayDenied) {
+		t.Fatalf("external patch error=%v", err)
+	}
+	contributor, err := service.Register(testRegistration("Patch Contributor"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := webhooks.SaveEndpoint("owner", webhookdomain.EndpointInput{Name: "Patch feed", Kind: "generic", URL: "https://hooks.example.test/patches", Events: []string{webhookdomain.EventPatchReceived}, Enabled: true}); err != nil {
-		t.Fatal(err)
-	}
-	service.SetWebhookService(webhooks)
-	raw := "From: Contributor <dev@example.net>\r\nTo: patchs@wave-lang.dev\r\nSubject: [PATCH] parser: keep ranges\r\nMessage-ID: <patch-1@example.net>\r\nContent-Type: text/plain; charset=utf-8\r\n\r\nCommit message.\n\ndiff --git a/parser.go b/parser.go\n--- a/parser.go\n+++ b/parser.go\n"
-	item, err := service.AcceptSMTP(nil, "dev@example.net", []string{service.PatchAddress()}, []byte(raw))
-	if err != nil {
-		t.Fatal(err)
-	}
-	storedBody, err := service.mail.Body(item.Message)
-	if err != nil || !patchdomain.Valid(item.Message.Subject, storedBody) {
-		t.Fatalf("stored patch body was not recognized: subject=%q body=%q err=%v", item.Message.Subject, storedBody, err)
-	}
-	deliveries, err := webhooks.Deliveries(10)
-	if err != nil || len(deliveries) != 1 || deliveries[0].EventType != webhookdomain.EventPatchReceived || !strings.Contains(deliveries[0].ResourceURL, item.Message.ID) {
-		t.Fatalf("deliveries=%#v err=%v", deliveries, err)
+	raw := "From: Patch Contributor <" + contributor.Email + ">\r\nTo: patchs@wave-lang.dev\r\nSubject: [PATCH] parser: keep ranges\r\nMessage-ID: <patch-1@wave-lang.dev>\r\nContent-Type: text/plain; charset=utf-8\r\n\r\nCommit message.\n\ndiff --git a/parser.go b/parser.go\n--- a/parser.go\n+++ b/parser.go\n"
+	if _, err := service.AcceptSMTP(&contributor, contributor.Email, []string{service.PatchAddress()}, []byte(raw)); !errors.Is(err, ErrInvalidMail) {
+		t.Fatalf("authenticated SMTP patch bypass error=%v", err)
 	}
 }
 
@@ -400,6 +389,25 @@ func TestSendMailUsesOneMessageForSenderAndRecipient(t *testing.T) {
 	}
 	if recipientItems[0].Body != "The message body." || !containsFlag(recipientItems[0].Entry.Flags, "unread") {
 		t.Fatalf("recipient item = %#v", recipientItems[0])
+	}
+	reply, err := service.SendMail(recipient, OutgoingMail{To: sender.Email, Subject: "Re: Wave mail test", Body: "Reply body.", ParentEntryID: recipientItems[0].Entry.ID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if reply.Message.ThreadID != sent.Message.ID || reply.Message.ParentMessageID != sent.Message.ID {
+		t.Fatalf("reply threading = %#v", reply.Message)
+	}
+	storedReply, err := service.mail.Message(reply.Message.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rawReply, err := service.mail.RawMessage(storedReply)
+	if err != nil || !strings.Contains(string(rawReply), "In-Reply-To: "+sent.Message.MessageID) ||
+		!strings.Contains(string(rawReply), "References: "+sent.Message.MessageID) {
+		t.Fatalf("reply headers=%q err=%v", rawReply, err)
+	}
+	if _, err := service.SendMail(recipient, OutgoingMail{To: sender.Email, Subject: "Invalid reply", Body: "No access.", ParentEntryID: senderItems[0].Entry.ID}); !errors.Is(err, ErrInvalidMail) {
+		t.Fatalf("cross-mailbox reply error = %v", err)
 	}
 
 	updated, err := service.UpdateMailboxEntry(recipient.ID, recipientItems[0].Entry.ID, "archive")

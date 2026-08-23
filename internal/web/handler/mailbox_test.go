@@ -138,4 +138,31 @@ func TestManagementMailboxRequiresAdministrator(t *testing.T) {
 			}
 		})
 	}
+
+	sendBody := `<send-management-mail xmlns="https://wave-lang.dev/ns/platform/api/v1"><from>help@wave-lang.dev</from><to>` + member.Email + `</to><subject>Support reply</subject><body>Your request has been resolved.</body></send-management-mail>`
+	memberSendRequest := httptest.NewRequest(http.MethodPost, "http://wave.test/api/v1/admin/mailbox/messages", strings.NewReader(sendBody))
+	memberSendRequest.Header.Set("Origin", "http://wave.test")
+	memberSendRequest.AddCookie(&http.Cookie{Name: SessionCookieName, Value: memberToken})
+	memberSendResponse := httptest.NewRecorder()
+	handler.ManagementSend(memberSendResponse, memberSendRequest)
+	if memberSendResponse.Code != http.StatusForbidden {
+		t.Fatalf("member send status=%d body=%s", memberSendResponse.Code, memberSendResponse.Body.String())
+	}
+
+	ownerSendRequest := httptest.NewRequest(http.MethodPost, "http://wave.test/api/v1/admin/mailbox/messages", strings.NewReader(sendBody))
+	ownerSendRequest.Header.Set("Origin", "http://wave.test")
+	ownerSendRequest.AddCookie(&http.Cookie{Name: SessionCookieName, Value: ownerToken})
+	ownerSendResponse := httptest.NewRecorder()
+	handler.ManagementSend(ownerSendResponse, ownerSendRequest)
+	if ownerSendResponse.Code != http.StatusCreated || !strings.Contains(ownerSendResponse.Body.String(), "Wave Support") {
+		t.Fatalf("owner send status=%d body=%s", ownerSendResponse.Code, ownerSendResponse.Body.String())
+	}
+	managementSent, err := service.ManagementMailboxItems("Sent")
+	if err != nil || len(managementSent) != 1 {
+		t.Fatalf("management sent=%d err=%v", len(managementSent), err)
+	}
+	memberInbox, err := service.MailboxItems(member.ID, "Inbox")
+	if err != nil || len(memberInbox) != 1 || memberInbox[0].Message.Subject != "Support reply" {
+		t.Fatalf("member inbox=%#v err=%v", memberInbox, err)
+	}
 }

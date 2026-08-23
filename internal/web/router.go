@@ -12,6 +12,7 @@ import (
 	communitydomain "github.com/wavefnd/wave-platform/internal/community"
 	documentdomain "github.com/wavefnd/wave-platform/internal/document"
 	"github.com/wavefnd/wave-platform/internal/gitmirror"
+	mailingdomain "github.com/wavefnd/wave-platform/internal/mailinglist"
 	mediadomain "github.com/wavefnd/wave-platform/internal/media"
 	patchdomain "github.com/wavefnd/wave-platform/internal/patcharchive"
 	"github.com/wavefnd/wave-platform/internal/platformstats"
@@ -44,6 +45,7 @@ func NewRouter(
 	webhookService *webhookdomain.Service,
 	patchService *patchdomain.Service,
 	rfcService *rfcdomain.Service,
+	mailingListService *mailingdomain.Service,
 ) http.Handler {
 	mux := http.NewServeMux()
 
@@ -66,6 +68,7 @@ func NewRouter(
 	webhookHandler := handler.WebhookHandler{Service: webhookService, Auth: authHandler}
 	patchesHandler := handler.PatchesHandler{Service: patchService, Auth: authHandler}
 	rfcHandler := handler.RFCHandler{Service: rfcService, Auth: authHandler}
+	mailingListHandler := handler.MailingListHandler{Service: mailingListService, Auth: authHandler}
 	usersHandler := handler.UsersHandler{Community: communityRepository, Questions: questionRepository, Auth: authHandler}
 	seoHandler := NewSEOHandler(publicURL, documentRepository, blogService, communityRepository, questionRepository, rfcService)
 
@@ -110,6 +113,13 @@ func NewRouter(
 	mux.HandleFunc("POST /api/v1/rfcs/{number}", rfcHandler.Update)
 	mux.HandleFunc("POST /api/v1/rfcs/{number}/status", rfcHandler.UpdateStatus)
 	mux.HandleFunc("POST /api/v1/rfcs/{number}/comments", rfcHandler.Comment)
+	mux.HandleFunc("GET /api/v1/mailing-lists", mailingListHandler.Lists)
+	mux.HandleFunc("GET /api/v1/mailing-lists/subscriptions", mailingListHandler.Subscriptions)
+	mux.HandleFunc("GET /api/v1/mailing-lists/{list}/threads", mailingListHandler.Threads)
+	mux.HandleFunc("POST /api/v1/mailing-lists/{list}/threads", mailingListHandler.Post)
+	mux.HandleFunc("GET /api/v1/mailing-lists/{list}/threads/{thread}", mailingListHandler.Thread)
+	mux.HandleFunc("POST /api/v1/mailing-lists/{list}/threads/{thread}/messages", mailingListHandler.Reply)
+	mux.HandleFunc("POST /api/v1/mailing-lists/{list}/subscription", mailingListHandler.Subscription)
 	mux.HandleFunc("GET /api/v1/platform/stats", statsHandler.Get)
 	mux.HandleFunc("GET /api/v1/platform/preferences", adminHandler.PlatformPreferences)
 	mux.HandleFunc("GET /api/v1/users", usersHandler.Directory)
@@ -159,6 +169,7 @@ func NewRouter(
 		mux.HandleFunc("GET /api/v1/mailbox/messages/{entry}", mailboxHandler.Message)
 		mux.HandleFunc("POST /api/v1/mailbox/messages/{entry}/action", mailboxHandler.Action)
 		mux.HandleFunc("GET /api/v1/admin/mailbox", mailboxHandler.ManagementList)
+		mux.HandleFunc("POST /api/v1/admin/mailbox/messages", mailboxHandler.ManagementSend)
 		mux.HandleFunc("GET /api/v1/admin/mailbox/messages/{entry}", mailboxHandler.ManagementMessage)
 		mux.HandleFunc("POST /api/v1/admin/mailbox/messages/{entry}/action", mailboxHandler.ManagementAction)
 	}

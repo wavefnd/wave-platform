@@ -28,7 +28,7 @@ const service = computed(() => {
   if (path.startsWith('/questions')) return 'questions'
 	if (path.startsWith('/rfcs')) return 'rfc'
   if (path.startsWith('/source')) return 'source'
-  if (path.startsWith('/patches')) return 'source'
+  if (path.startsWith('/patches')) return 'mail'
   if (path.startsWith('/admin')) return 'admin'
 	if (path.startsWith('/user')) return 'account'
 	if (path.startsWith('/account') || path.startsWith('/login') || path.startsWith('/register')) return 'account'
@@ -42,7 +42,7 @@ const serviceLabel = computed(() => {
   return t(`nav.${service.value}`)
 })
 const searchLabel = computed(() => t('search.scope.portal'))
-const showHeaderSearch = computed(() => !['source', 'account'].includes(service.value))
+const showHeaderSearch = computed(() => !['source', 'account', 'mail'].includes(service.value))
 const showFooter = computed(() => !['mail', 'source'].includes(service.value))
 const isPortal = computed(() => service.value === 'portal' && route.name === 'home')
 const isAdmin = computed(() => service.value === 'admin')

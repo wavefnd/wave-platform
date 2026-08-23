@@ -150,7 +150,6 @@ watchEffect(() => {
         <RouterLink class="source-org-name" to="/source">Wave Source</RouterLink>
         <nav :aria-label="t('source.sections')">
           <RouterLink to="/source" class="active">{{ t('source.repositories') }} <span>{{ repositories.length }}</span></RouterLink>
-          <RouterLink to="/patches">{{ t('patches.title') }}</RouterLink>
         </nav>
       </div>
     </header>

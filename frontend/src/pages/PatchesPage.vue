@@ -144,8 +144,9 @@ let searchTimer = 0
 watch(() => route.fullPath, load, { immediate: true })
 watch(search, () => { window.clearTimeout(searchTimer); searchTimer = window.setTimeout(load, 250) })
 watchEffect(() => applyPageSEO({
-	title: patch.value ? `${patch.value.subject} · Wave Patches` : 'Wave Patches',
-	description: patch.value?.preview || t('patches.lead'), locale: locale.value, path: route.path,
+	title: patch.value ? `${patch.value.subject} · Wave Mail` : `${t('patches.title')} · Wave Mail`,
+	description: patch.value?.preview || t('patches.reviewHelp'), locale: locale.value, path: route.path,
+	noIndex: true,
 }))
 </script>
 
@@ -153,27 +154,27 @@ watchEffect(() => applyPageSEO({
   <main class="source-forge patch-archive">
     <header class="source-org-header">
       <div class="source-width source-org-row">
-        <RouterLink class="source-org-name" to="/source">Wave Source</RouterLink>
-        <nav :aria-label="t('source.sections')">
-          <RouterLink to="/source">{{ t('source.repositories') }}</RouterLink>
-          <RouterLink to="/patches" class="active">{{ t('patches.title') }}</RouterLink>
+        <RouterLink class="source-org-name" to="/mail">Wave Mail</RouterLink>
+        <nav :aria-label="t('mail.folders')">
+          <RouterLink to="/mail">{{ t('mail.title') }}</RouterLink>
+          <RouterLink to="/mail/lists/patchs/reviews" class="active">{{ t('patches.review') }}</RouterLink>
         </nav>
       </div>
     </header>
 
     <section v-if="!patchID" class="source-width patch-index">
       <header class="patch-heading">
-        <div><h1>{{ t('patches.title') }}</h1><p>{{ t('patches.lead') }}</p></div>
-        <a class="patch-address" :href="`mailto:${address}`"><Mail :size="16" aria-hidden="true" />{{ address }}</a>
+        <div><h1>{{ t('patches.title') }}</h1><p>{{ t('patches.reviewHelp') }}</p></div>
+        <span class="patch-address"><Mail :size="16" aria-hidden="true" />{{ address }}</span>
       </header>
-      <div class="patch-submit-help"><strong>{{ t('patches.submit') }}</strong><code>git send-email --to={{ address }} *.patch</code><p>{{ t('patches.submitHelp') }}</p></div>
+      <div class="patch-submit-help"><strong>{{ t('patches.submit') }}</strong><p><RouterLink to="/mail">{{ t('mail.newMessage') }}</RouterLink> · <code>{{ address }}</code></p></div>
       <label class="source-repository-search"><span class="sr-only">{{ t('patches.search') }}</span><input v-model="search" type="search" :placeholder="t('patches.search')" /></label>
       <div class="patch-list">
         <UiSkeletonRows v-if="loading" :rows="6" />
         <UiInlineState v-else-if="error" :message="t('common.loadError')" :action="t('common.retry')" @action="load" />
         <article v-for="item in patches" v-else :key="item.id">
           <div class="patch-list-main">
-            <RouterLink :to="`/patches/${item.id}`">{{ item.subject }}</RouterLink>
+            <RouterLink :to="`/mail/lists/patchs/patch/${item.id}`">{{ item.subject }}</RouterLink>
             <p v-if="item.preview">{{ item.preview }}</p>
             <small>{{ item.authorName }} &lt;{{ item.authorEmail }}&gt; · {{ formatDate(item.receivedAt) }}</small>
           </div>
@@ -183,7 +184,7 @@ watchEffect(() => applyPageSEO({
             <span v-if="item.version > 1">v{{ item.version }}</span><span v-if="item.total">{{ item.part }}/{{ item.total }}</span><small>{{ item.files.length }} {{ t('patches.files') }}</small>
           </div>
         </article>
-        <p v-if="!loading && !error && patches.length === 0" class="portal-empty-state">{{ t('patches.empty') }}</p>
+        <p v-if="!loading && !error && patches.length === 0" class="portal-empty-state">{{ t('mail.emptyDetail') }}</p>
       </div>
     </section>
 
@@ -191,8 +192,8 @@ watchEffect(() => applyPageSEO({
       <UiSkeletonRows v-if="loading" :rows="8" />
       <UiInlineState v-else-if="error" :message="t('patches.notFound')" :action="t('common.retry')" @action="load" />
       <template v-else-if="patch">
-        <RouterLink class="patch-back" to="/patches"><ArrowLeft :size="15" aria-hidden="true" />{{ t('patches.back') }}</RouterLink>
-        <header><h1>{{ patch.subject }}</h1><p>{{ patch.authorName }} &lt;<a :href="`mailto:${patch.authorEmail}`">{{ patch.authorEmail }}</a>&gt;</p><time :datetime="patch.receivedAt">{{ formatDate(patch.receivedAt) }}</time></header>
+        <RouterLink class="patch-back" to="/mail/lists/patchs/reviews"><ArrowLeft :size="15" aria-hidden="true" />{{ t('patches.back') }}</RouterLink>
+        <header><h1>{{ patch.subject }}</h1><p>{{ patch.authorName }} &lt;{{ patch.authorEmail }}&gt;</p><time :datetime="patch.receivedAt">{{ formatDate(patch.receivedAt) }}</time></header>
 
         <section class="patch-review" :aria-labelledby="'patch-review-title'">
           <header>

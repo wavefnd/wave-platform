@@ -60,9 +60,10 @@ type MailboxItem struct {
 }
 
 type OutgoingMail struct {
-	To      string
-	Subject string
-	Body    string
+	To            string
+	Subject       string
+	Body          string
+	ParentEntryID string
 }
 
 type systemMailContent struct {
@@ -903,11 +904,15 @@ func (service *Service) mailboxItem(box mailbox.Mailbox, entryID string) (Mailbo
 }
 
 func (service *Service) SendMail(actor account.Account, outgoing OutgoingMail) (MailboxItem, error) {
+	parent, err := service.replyParent(actor.ID, strings.TrimSpace(outgoing.ParentEntryID), false)
+	if err != nil {
+		return MailboxItem{}, err
+	}
 	recipients, err := normalizeRecipients(outgoing.To)
 	if err != nil {
 		return MailboxItem{}, fmt.Errorf("%w: %v", ErrInvalidMail, err)
 	}
-	if err := service.validateLocalRecipients(recipients); err != nil {
+	if err := service.validateLocalRecipients(recipients, true); err != nil {
 		return MailboxItem{}, err
 	}
 	subject := strings.TrimSpace(outgoing.Subject)
@@ -923,12 +928,13 @@ func (service *Service) SendMail(actor account.Account, outgoing OutgoingMail) (
 		return MailboxItem{}, err
 	}
 	now := service.now().UTC()
+	threadID, parentMessageID := replyIdentifiers(parent, messageID)
 	message := maildomain.Message{
-		ID: messageID, MessageID: "<" + messageID + "@" + service.mailDomain + ">", ThreadID: messageID,
+		ID: messageID, MessageID: "<" + messageID + "@" + service.mailDomain + ">", ThreadID: threadID, ParentMessageID: parentMessageID,
 		AuthorAccountID: actor.ID, From: (&stdmail.Address{Name: actor.DisplayName, Address: actor.Email}).String(),
 		To: recipients, Subject: subject, ReceivedAt: now, CreatedAt: now,
 	}
-	if err := service.mail.UpsertMessage(message, encodeRawMail(message, body)); err != nil {
+	if err := service.mail.UpsertMessage(message, encodeRawMail(message, body, replyHeaderID(parent))); err != nil {
 		return MailboxItem{}, err
 	}
 	senderBox, err := service.Mailbox(actor.ID)
@@ -945,6 +951,115 @@ func (service *Service) SendMail(actor account.Account, outgoing OutgoingMail) (
 	_ = service.appendAudit(actor.ID, "mail/message/"+message.ID, "mail.send")
 	return MailboxItem{Entry: sentEntry, Message: message, Body: body,
 		DeliveryStatus: service.deliveryStatus(message.ID)}, nil
+}
+
+// SendManagementMail sends a message from one of the shared platform
+// addresses while preserving the acting administrator in the audit trail.
+// Shared mailbox access does not grant ownership of the address to the actor.
+func (service *Service) SendManagementMail(actor account.Account, from string, outgoing OutgoingMail) (MailboxItem, error) {
+	if !service.IsAdministrator(actor.ID) {
+		return MailboxItem{}, ErrRelayDenied
+	}
+	from = strings.ToLower(strings.TrimSpace(from))
+	if !containsAddress(service.ManagementAddresses(), from) {
+		return MailboxItem{}, fmt.Errorf("%w: management sender address is not allowed", ErrInvalidMail)
+	}
+	parent, err := service.replyParent(actor.ID, strings.TrimSpace(outgoing.ParentEntryID), true)
+	if err != nil {
+		return MailboxItem{}, err
+	}
+	recipients, err := normalizeRecipients(outgoing.To)
+	if err != nil {
+		return MailboxItem{}, fmt.Errorf("%w: %v", ErrInvalidMail, err)
+	}
+	if err := service.validateLocalRecipients(recipients, true); err != nil {
+		return MailboxItem{}, err
+	}
+	subject := strings.TrimSpace(outgoing.Subject)
+	body := strings.TrimSpace(strings.ReplaceAll(outgoing.Body, "\r\n", "\n"))
+	if len([]rune(subject)) < 1 || len([]rune(subject)) > 180 || strings.ContainsAny(subject, "\r\n") {
+		return MailboxItem{}, fmt.Errorf("%w: subject must contain between 1 and 180 characters", ErrInvalidMail)
+	}
+	if len([]rune(body)) < 1 || len([]rune(body)) > 50000 {
+		return MailboxItem{}, fmt.Errorf("%w: body must contain between 1 and 50000 characters", ErrInvalidMail)
+	}
+	messageID, err := identifier.New("message")
+	if err != nil {
+		return MailboxItem{}, err
+	}
+	now := service.now().UTC()
+	threadID, parentMessageID := replyIdentifiers(parent, messageID)
+	message := maildomain.Message{
+		ID: messageID, MessageID: "<" + messageID + "@" + service.mailDomain + ">", ThreadID: threadID, ParentMessageID: parentMessageID,
+		AuthorAccountID: actor.ID, From: (&stdmail.Address{Name: managementSenderName(from), Address: from}).String(),
+		To: recipients, Subject: subject, ReceivedAt: now, CreatedAt: now,
+	}
+	if err := service.mail.UpsertMessage(message, encodeRawMail(message, body, replyHeaderID(parent))); err != nil {
+		return MailboxItem{}, err
+	}
+	box, err := service.EnsureManagementMailbox()
+	if err != nil {
+		return MailboxItem{}, err
+	}
+	sentEntry, err := service.addMailboxEntry(box.ID, message.ID, "Sent", nil)
+	if err != nil {
+		return MailboxItem{}, err
+	}
+	if err := service.routeMessage(from, message, recipients, true); err != nil {
+		return MailboxItem{}, err
+	}
+	_ = service.appendAudit(actor.ID, "mailbox/management/message/"+message.ID, "admin.mailbox.send")
+	return MailboxItem{Entry: sentEntry, Message: message, Body: body,
+		DeliveryStatus: service.deliveryStatus(message.ID)}, nil
+}
+
+func managementSenderName(address string) string {
+	local := strings.SplitN(address, "@", 2)[0]
+	switch local {
+	case "admin":
+		return "Wave Administration"
+	case "info":
+		return "Wave Information"
+	default:
+		return "Wave Support"
+	}
+}
+
+func (service *Service) replyParent(actorID, entryID string, management bool) (*MailboxItem, error) {
+	if entryID == "" {
+		return nil, nil
+	}
+	var (
+		item MailboxItem
+		err  error
+	)
+	if management {
+		item, err = service.ManagementMailboxItem(entryID)
+	} else {
+		item, err = service.MailboxItem(actorID, entryID)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("%w: reply target does not exist in this mailbox", ErrInvalidMail)
+	}
+	return &item, nil
+}
+
+func replyIdentifiers(parent *MailboxItem, fallback string) (string, string) {
+	if parent == nil {
+		return fallback, ""
+	}
+	threadID := parent.Message.ThreadID
+	if threadID == "" {
+		threadID = parent.Message.ID
+	}
+	return threadID, parent.Message.ID
+}
+
+func replyHeaderID(parent *MailboxItem) string {
+	if parent == nil {
+		return ""
+	}
+	return parent.Message.MessageID
 }
 
 func (service *Service) sendSystemMail(to string, content systemMailContent) (MailboxItem, error) {
@@ -994,12 +1109,26 @@ func (service *Service) AcceptSMTP(actor *account.Account, envelopeFrom string, 
 	}
 	if actor == nil {
 		for _, recipient := range normalized {
+			if strings.EqualFold(recipient, service.PatchAddress()) {
+				return MailboxItem{}, ErrRelayDenied
+			}
 			if !service.isLocalAddress(recipient) {
+				return MailboxItem{}, ErrRelayDenied
+			}
+			box, lookupErr := service.mailboxes.MailboxByAddress(recipient)
+			if lookupErr != nil {
+				return MailboxItem{}, lookupErr
+			}
+			// Mailing-list messages are accepted through the authenticated Wave
+			// list service rather than server-to-server SMTP.
+			if strings.HasPrefix(box.AccountID, "service/mailing-list/") {
 				return MailboxItem{}, ErrRelayDenied
 			}
 		}
 	} else if !strings.EqualFold(strings.TrimSpace(envelopeFrom), actor.Email) {
 		return MailboxItem{}, ErrRelayDenied
+	} else if err := service.validateLocalRecipients(normalized, true); err != nil {
+		return MailboxItem{}, err
 	}
 
 	parsed, err := stdmail.ReadMessage(bytes.NewReader(raw))
@@ -1068,7 +1197,7 @@ func (service *Service) AcceptSMTP(actor *account.Account, envelopeFrom string, 
 	if err != nil {
 		return MailboxItem{}, err
 	}
-	if actor == nil && service.webhooks != nil && containsAddress(normalized, service.PatchAddress()) && patchdomain.Valid(message.Subject, body) {
+	if service.webhooks != nil && containsAddress(normalized, service.PatchAddress()) && patchdomain.Valid(message.Subject, body) {
 		authorName := message.From
 		if parsedFrom, parseErr := stdmail.ParseAddress(message.From); parseErr == nil {
 			authorName = parsedFrom.Name
@@ -1160,16 +1289,20 @@ func (service *Service) deliveryStatus(messageID string) string {
 	return status
 }
 
-func (service *Service) validateLocalRecipients(recipients []string) error {
+func (service *Service) validateLocalRecipients(recipients []string, rejectMailingLists bool) error {
 	for _, recipient := range recipients {
 		if !service.isLocalAddress(recipient) {
 			continue
 		}
-		if _, err := service.mailboxes.MailboxByAddress(recipient); err != nil {
+		box, err := service.mailboxes.MailboxByAddress(recipient)
+		if err != nil {
 			if errors.Is(err, storage.ErrNotFound) {
 				return fmt.Errorf("%w: local recipient does not exist", ErrInvalidMail)
 			}
 			return err
+		}
+		if rejectMailingLists && (strings.HasPrefix(box.AccountID, "service/mailing-list/") || box.AccountID == PatchMailboxAccountID) {
+			return fmt.Errorf("%w: use the Wave mailing list interface for this recipient", ErrInvalidMail)
 		}
 	}
 	return nil
@@ -1259,20 +1392,26 @@ func (service *Service) appendAudit(actorID, resourceID, action string) error {
 		Action: action, Result: "success", OccurredAt: service.now().UTC()})
 }
 
-func encodeRawMail(message maildomain.Message, body string) []byte {
+func encodeRawMail(message maildomain.Message, body, inReplyTo string) []byte {
 	headers := textproto.MIMEHeader{}
 	headers.Set("From", message.From)
 	headers.Set("To", strings.Join(message.To, ", "))
 	headers.Set("Subject", mime.QEncoding.Encode("utf-8", message.Subject))
 	headers.Set("Date", message.CreatedAt.Format(time.RFC1123Z))
 	headers.Set("Message-ID", message.MessageID)
+	if inReplyTo != "" {
+		headers.Set("In-Reply-To", inReplyTo)
+		headers.Set("References", inReplyTo)
+	}
 	headers.Set("MIME-Version", "1.0")
 	headers.Set("Content-Type", "text/plain; charset=utf-8")
 	headers.Set("Content-Transfer-Encoding", "8bit")
-	order := []string{"From", "To", "Subject", "Date", "Message-ID", "MIME-Version", "Content-Type", "Content-Transfer-Encoding"}
+	order := []string{"From", "To", "Subject", "Date", "Message-ID", "In-Reply-To", "References", "MIME-Version", "Content-Type", "Content-Transfer-Encoding"}
 	var raw strings.Builder
 	for _, name := range order {
-		raw.WriteString(name + ": " + headers.Get(name) + "\r\n")
+		if value := headers.Get(name); value != "" {
+			raw.WriteString(name + ": " + value + "\r\n")
+		}
 	}
 	raw.WriteString("\r\n")
 	raw.WriteString(strings.ReplaceAll(body, "\n", "\r\n"))

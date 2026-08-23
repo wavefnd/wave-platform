@@ -109,6 +109,232 @@ func TestSupportedEventsIncludeCommunityAndFounderPosts(t *testing.T) {
 	}
 }
 
+func TestAccountScopedEndpointsRejectPlatformOnlyPatchEvents(t *testing.T) {
+	database, err := storage.Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer database.Close()
+	key := base64.StdEncoding.EncodeToString([]byte("0123456789abcdef0123456789abcdef"))
+	service, err := NewService(database, key, "https://wave.example")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if contains(UserSupportedEvents(), EventPatchReceived) {
+		t.Fatalf("account-supported events expose %q: %#v", EventPatchReceived, UserSupportedEvents())
+	}
+	if !contains(SupportedEvents(), EventPatchReceived) {
+		t.Fatalf("platform-supported events omit %q: %#v", EventPatchReceived, SupportedEvents())
+	}
+	_, err = service.SaveEndpointScoped("account-a", EndpointInput{
+		Name:    "Patch feed",
+		Kind:    "generic",
+		URL:     "https://hooks.example.test/patches",
+		Events:  []string{EventPatchReceived},
+		Enabled: true,
+	}, false)
+	if !errors.Is(err, ErrInvalidEndpoint) {
+		t.Fatalf("account-scoped patch endpoint error = %v", err)
+	}
+	endpoints, listErr := service.EndpointsFor("account-a")
+	if listErr != nil || len(endpoints) != 0 {
+		t.Fatalf("account endpoints=%#v err=%v", endpoints, listErr)
+	}
+}
+
+func TestPlatformOnlyPatchPublishDoesNotLeakToAccountOrLegacyScopes(t *testing.T) {
+	database, err := storage.Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer database.Close()
+	key := base64.StdEncoding.EncodeToString([]byte("0123456789abcdef0123456789abcdef"))
+	service, err := NewService(database, key, "https://wave.example")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	platform, err := service.SaveEndpointScoped("admin", EndpointInput{
+		Name:    "Maintainer patch feed",
+		Kind:    "generic",
+		URL:     "https://hooks.example.test/platform-patches",
+		Events:  []string{EventPatchReceived},
+		Enabled: true,
+	}, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	storedPlatform, err := service.repository.Endpoint(platform.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if storedPlatform.Scope != "platform" {
+		t.Fatalf("platform endpoint scope = %q", storedPlatform.Scope)
+	}
+
+	account, err := service.SaveEndpointScoped("account-a", EndpointInput{
+		Name:    "Account feed",
+		Kind:    "generic",
+		URL:     "https://hooks.example.test/account",
+		Events:  []string{EventCommunityPost},
+		Enabled: true,
+	}, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	storedAccount, err := service.repository.Endpoint(account.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	storedAccount.Events = []string{EventPatchReceived}
+	if err := service.repository.PutEndpoint(storedAccount); err != nil {
+		t.Fatal(err)
+	}
+	legacy := storedAccount
+	legacy.ID = "legacy-empty-scope"
+	legacy.Scope = ""
+	if err := service.repository.PutEndpoint(legacy); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := service.Publish(Event{Type: EventPatchReceived, Title: "[PATCH] parser fix", URL: "/mail/lists/patchs/patch/example"}); err != nil {
+		t.Fatal(err)
+	}
+	deliveries, err := service.Deliveries(10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(deliveries) != 1 || deliveries[0].EndpointID != platform.ID || deliveries[0].EventType != EventPatchReceived {
+		t.Fatalf("platform-only deliveries = %#v", deliveries)
+	}
+	accountDeliveries, err := service.DeliveriesFor("account-a", 10)
+	if err != nil || len(accountDeliveries) != 0 {
+		t.Fatalf("account deliveries=%#v err=%v", accountDeliveries, err)
+	}
+	accountEndpoints, err := service.EndpointsFor("account-a")
+	if err != nil || len(accountEndpoints) != 1 || accountEndpoints[0].ID != account.ID {
+		t.Fatalf("account endpoints=%#v err=%v", accountEndpoints, err)
+	}
+}
+
+func TestAccountOperationsCannotTakeOverPlatformEndpoint(t *testing.T) {
+	database, err := storage.Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer database.Close()
+	key := base64.StdEncoding.EncodeToString([]byte("0123456789abcdef0123456789abcdef"))
+	service, err := NewService(database, key, "https://wave.example")
+	if err != nil {
+		t.Fatal(err)
+	}
+	platform, err := service.SaveEndpointScoped("admin", EndpointInput{Name: "Platform feed", Kind: "generic",
+		URL: "https://hooks.example.test/platform", Events: []string{EventCommunityPost}, Enabled: true}, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = service.SaveEndpointScoped("admin", EndpointInput{ID: platform.ID, Name: "Taken over", Kind: "generic",
+		Events: []string{EventCommunityPost}, Enabled: true}, false)
+	if !errors.Is(err, ErrForbidden) {
+		t.Fatalf("account update of platform endpoint error = %v", err)
+	}
+	if err := service.DeleteEndpointScoped("admin", platform.ID, false); !errors.Is(err, ErrForbidden) {
+		t.Fatalf("account delete of platform endpoint error = %v", err)
+	}
+	if _, err := service.TestEndpointScoped(context.Background(), "admin", platform.ID, false); !errors.Is(err, ErrForbidden) {
+		t.Fatalf("account test of platform endpoint error = %v", err)
+	}
+	if _, err := service.repository.Endpoint(platform.ID); err != nil {
+		t.Fatalf("platform endpoint was changed or deleted: %v", err)
+	}
+	legacy, err := service.repository.Endpoint(platform.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	legacy.ID = "legacy-unscoped"
+	legacy.Scope = ""
+	if err := service.repository.PutEndpoint(legacy); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := service.TestEndpointScoped(context.Background(), "admin", legacy.ID, true); !errors.Is(err, ErrInvalidEndpoint) {
+		t.Fatalf("legacy endpoint test error = %v", err)
+	}
+	if err := service.Publish(Event{Type: EventCommunityPost, Title: "Public discussion", URL: "/community/thread/example"}); err != nil {
+		t.Fatal(err)
+	}
+	deliveries, err := service.Deliveries(10)
+	if err != nil || len(deliveries) != 1 || deliveries[0].EndpointID != platform.ID {
+		t.Fatalf("legacy unscoped endpoint delivered: %#v err=%v", deliveries, err)
+	}
+}
+
+func TestMailingListEventsAreRestrictedToPlatformEndpoints(t *testing.T) {
+	database, err := storage.Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer database.Close()
+	key := base64.StdEncoding.EncodeToString([]byte("0123456789abcdef0123456789abcdef"))
+	service, err := NewService(database, key, "https://wave.example")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if contains(UserSupportedEvents(), EventMailingListPost) || !contains(SupportedEvents(), EventMailingListPost) {
+		t.Fatalf("mailing-list event visibility: platform=%#v account=%#v", SupportedEvents(), UserSupportedEvents())
+	}
+	if _, err := service.SaveEndpointScoped("member", EndpointInput{Name: "Private list leak", Kind: "generic",
+		URL: "https://hooks.example.test/account-list", Events: []string{EventMailingListPost}, Enabled: true}, false); !errors.Is(err, ErrInvalidEndpoint) {
+		t.Fatalf("account-scoped mailing-list endpoint error = %v", err)
+	}
+	platform, err := service.SaveEndpointScoped("admin", EndpointInput{Name: "Public list feed", Kind: "generic",
+		URL: "https://hooks.example.test/platform-list", Events: []string{EventMailingListPost}, Enabled: true}, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	account, err := service.SaveEndpointScoped("member", EndpointInput{Name: "Community feed", Kind: "generic",
+		URL: "https://hooks.example.test/community", Events: []string{EventCommunityPost}, Enabled: true}, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	storedAccount, err := service.repository.Endpoint(account.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	storedAccount.Events = []string{EventMailingListPost}
+	if err := service.repository.PutEndpoint(storedAccount); err != nil {
+		t.Fatal(err)
+	}
+	legacy := storedAccount
+	legacy.ID = "legacy-list-endpoint"
+	legacy.Scope = ""
+	if err := service.repository.PutEndpoint(legacy); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := service.Publish(Event{Type: EventMailingListPost, Title: "Wave ABI", Summary: "Internal discussion preview",
+		AuthorName: "Wave Member", ResourceID: "mailing-list/development/thread/thread-1",
+		URL: "/mail/lists/development/thread/thread-1"}); err != nil {
+		t.Fatal(err)
+	}
+	deliveries, err := service.Deliveries(10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(deliveries) != 1 || deliveries[0].EndpointID != platform.ID || deliveries[0].EventType != EventMailingListPost ||
+		deliveries[0].Title != "Wave ABI" || deliveries[0].AuthorName != "Wave Member" ||
+		deliveries[0].ResourceID != "mailing-list/development/thread/thread-1" ||
+		deliveries[0].ResourceURL != "https://wave.example/mail/lists/development/thread/thread-1" {
+		t.Fatalf("mailing-list deliveries = %#v", deliveries)
+	}
+	accountDeliveries, err := service.DeliveriesFor("member", 10)
+	if err != nil || len(accountDeliveries) != 0 {
+		t.Fatalf("account mailing-list deliveries=%#v err=%v", accountDeliveries, err)
+	}
+}
+
 func TestAccountScopedEndpointsEnforceOwnership(t *testing.T) {
 	database, err := storage.Open(t.TempDir())
 	if err != nil {

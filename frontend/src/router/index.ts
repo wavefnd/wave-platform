@@ -30,6 +30,13 @@ const router = createRouter({
         { path: 'docs', name: 'docs', component: DocsPage },
         { path: 'docs/:pathMatch(.*)*', name: 'document', component: DocsPage },
         { path: 'mail', name: 'mail', component: MailPage },
+		{ path: 'mail/personal', name: 'mail-personal', component: MailPage },
+		{ path: 'mail/lists', name: 'mail-lists', component: MailPage },
+		{ path: 'mail/lists/:list', name: 'mail-list', component: MailPage },
+		{ path: 'mail/lists/:list/thread/:thread', name: 'mail-list-thread', component: MailPage },
+		{ path: 'mail/team', name: 'mail-team', component: MailPage, meta: { requiresAuth: true, requiresAdmin: true } },
+		{ path: 'mail/lists/patchs/reviews', name: 'patch-reviews', component: PatchesPage, meta: { requiresAuth: true } },
+		{ path: 'mail/lists/patchs/patch/:patch', name: 'patch-detail', component: PatchesPage, meta: { requiresAuth: true } },
         { path: 'community', name: 'community', component: CommunityPage },
 		{ path: 'community/new', name: 'community-new', component: CommunityPage },
 		{ path: 'community/showcase', name: 'community-showcase', component: CommunityPage, meta: { showcase: true } },
@@ -49,8 +56,8 @@ const router = createRouter({
 		{ path: 'rfcs/:number/edit', name: 'rfc-edit', component: RFCPage, meta: { requiresAuth: true } },
         { path: 'source', name: 'source', component: SourcePage },
         { path: 'source/:repository', name: 'source-repository', component: SourcePage },
-        { path: 'patches', name: 'patches', component: PatchesPage },
-        { path: 'patches/:patch', name: 'patch-detail', component: PatchesPage },
+        { path: 'patches', redirect: (to) => ({ name: 'patch-reviews', query: to.query, hash: to.hash }) },
+        { path: 'patches/:patch', redirect: (to) => ({ name: 'patch-detail', params: { patch: to.params.patch }, query: to.query, hash: to.hash }) },
         { path: 'search', name: 'search', component: SearchPage },
 		{ path: 'user', name: 'user-directory', component: () => import('../pages/UserPage.vue') },
 		{ path: 'user/id/:account', name: 'user-id-profile', component: () => import('../pages/UserPage.vue') },
@@ -69,11 +76,14 @@ const router = createRouter({
 })
 
 router.beforeEach(async (to) => {
-  if (!String(to.name ?? '').startsWith('admin') && !to.meta.requiresAuth) return true
+  const isAdminRoute = String(to.name ?? '').startsWith('admin')
+  if (!isAdminRoute && !to.meta.requiresAuth && !to.meta.requiresAdmin) return true
   const auth = useAuthStore()
   await auth.initialize()
-	if (to.meta.requiresAuth && auth.account) return true
-	if (String(to.name ?? '').startsWith('admin') && (auth.account?.owner || auth.account?.administrator)) return true
+  const isAdmin = Boolean(auth.account?.owner || auth.account?.administrator)
+	if (to.meta.requiresAdmin && isAdmin) return true
+	if (isAdminRoute && isAdmin) return true
+	if (to.meta.requiresAuth && !to.meta.requiresAdmin && auth.account) return true
   return { name: 'login', query: { redirect: to.fullPath } }
 })
 

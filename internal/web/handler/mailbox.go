@@ -23,6 +23,15 @@ type MailboxResponse struct {
 	Items     []MailboxItemView `xml:"items>item"`
 }
 
+type ManagementSendRequest struct {
+	XMLName       xml.Name `xml:"https://wave-lang.dev/ns/platform/api/v1 send-management-mail"`
+	From          string   `xml:"from"`
+	To            string   `xml:"to"`
+	Subject       string   `xml:"subject"`
+	Body          string   `xml:"body"`
+	ParentEntryID string   `xml:"parent-entry-id,omitempty"`
+}
+
 func (handler MailboxHandler) ManagementList(writer http.ResponseWriter, request *http.Request) {
 	setPrivateResponseHeaders(writer)
 	actor, ok := handler.managementActor(writer, request, false)
@@ -73,6 +82,36 @@ func (handler MailboxHandler) ManagementMessage(writer http.ResponseWriter, requ
 		return
 	}
 	_ = xmlcodec.Write(writer, http.StatusOK, mailMessageView(item))
+}
+
+func (handler MailboxHandler) ManagementSend(writer http.ResponseWriter, request *http.Request) {
+	setPrivateResponseHeaders(writer)
+	actor, ok := handler.managementActor(writer, request, true)
+	if !ok {
+		return
+	}
+	var input ManagementSendRequest
+	if err := xmlcodec.Decode(request.Body, &input); err != nil {
+		writeAPIError(writer, http.StatusBadRequest, "invalid-xml", "The management mail request is not valid XML.")
+		return
+	}
+	item, err := handler.Auth.Service.SendManagementMail(actor, input.From, identity.OutgoingMail{
+		To: input.To, Subject: input.Subject, Body: input.Body, ParentEntryID: input.ParentEntryID,
+	})
+	if errors.Is(err, identity.ErrInvalidMail) {
+		writeAPIError(writer, http.StatusUnprocessableEntity, "invalid-mail", strings.TrimPrefix(err.Error(), identity.ErrInvalidMail.Error()+": "))
+		return
+	}
+	if errors.Is(err, identity.ErrRelayDenied) {
+		writeAPIError(writer, http.StatusForbidden, "administrator-required", "Administrator access is required.")
+		return
+	}
+	if err != nil {
+		writeAPIError(writer, http.StatusInternalServerError, "mail-send-failed", "The management message could not be sent.")
+		return
+	}
+	writer.Header().Set("Location", "/api/v1/admin/mailbox/messages/"+item.Entry.ID)
+	_ = xmlcodec.Write(writer, http.StatusCreated, mailMessageView(item))
 }
 
 func (handler MailboxHandler) ManagementAction(writer http.ResponseWriter, request *http.Request) {
@@ -146,10 +185,11 @@ type MailMessageResponse struct {
 }
 
 type SendMailRequest struct {
-	XMLName xml.Name `xml:"https://wave-lang.dev/ns/platform/api/v1 send-mail"`
-	To      string   `xml:"to"`
-	Subject string   `xml:"subject"`
-	Body    string   `xml:"body"`
+	XMLName       xml.Name `xml:"https://wave-lang.dev/ns/platform/api/v1 send-mail"`
+	To            string   `xml:"to"`
+	Subject       string   `xml:"subject"`
+	Body          string   `xml:"body"`
+	ParentEntryID string   `xml:"parent-entry-id,omitempty"`
 }
 
 type MailboxActionRequest struct {
@@ -231,7 +271,7 @@ func (handler MailboxHandler) Send(writer http.ResponseWriter, request *http.Req
 		writeAPIError(writer, http.StatusBadRequest, "invalid-xml", "The mail request is not valid XML.")
 		return
 	}
-	item, err := handler.Auth.Service.SendMail(account, identity.OutgoingMail{To: input.To, Subject: input.Subject, Body: input.Body})
+	item, err := handler.Auth.Service.SendMail(account, identity.OutgoingMail{To: input.To, Subject: input.Subject, Body: input.Body, ParentEntryID: input.ParentEntryID})
 	if errors.Is(err, identity.ErrInvalidMail) {
 		writeAPIError(writer, http.StatusUnprocessableEntity, "invalid-mail", strings.TrimPrefix(err.Error(), identity.ErrInvalidMail.Error()+": "))
 		return

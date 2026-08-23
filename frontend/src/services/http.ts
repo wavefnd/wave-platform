@@ -194,6 +194,7 @@ export interface AdminAuditEvent {
 
 export interface WebhookEndpoint {
 	id: string
+	scope: 'account' | 'platform' | ''
 	name: string
 	kind: 'generic' | 'discord'
 	events: string[]
@@ -326,9 +327,55 @@ export interface MailboxItem {
 
 export interface MailboxView {
 	address: string
-	addresses?: string[]
+	addresses: string[]
 	folder: string
 	items: MailboxItem[]
+}
+
+export interface MailingListSummary {
+	id: string
+	address: string
+	name: string
+	description: string
+	postingPolicy: 'members' | 'staff'
+	webhookPolicy: 'disabled' | 'summary' | 'full'
+	webhookPreviewLimit: number
+	subscribed: boolean
+}
+
+export interface MailingListThreadSummary {
+	id: string
+	listId: string
+	rootMessageId: string
+	subject: string
+	preview: string
+	author: string
+	authorAccountId: string
+	messageCount: number
+	createdAt: string
+	lastActivityAt: string
+}
+
+export interface MailingListMessage {
+	id: string
+	entryId: string
+	messageId: string
+	headerMessageId: string
+	parentMessageId: string
+	authorAccountId: string
+	from: string
+	to: string[]
+	subject: string
+	body: string
+	createdAt: string
+}
+
+export interface MailingListThread {
+	id: string
+	listId: string
+	address: string
+	subject: string
+	messages: MailingListMessage[]
 }
 
 export interface UserActivity {
@@ -726,6 +773,12 @@ export async function updateManagementMailEntry(entryId: string, action: 'archiv
 	return parseMailMessage(xml)
 }
 
+export async function sendManagementMail(from: string, to: string, subject: string, body: string, parentEntryId = ''): Promise<MailMessageView> {
+	const xml = await requestXml('/api/v1/admin/mailbox/messages', 'POST', authDocument('send-management-mail', { from, to, subject, body, 'parent-entry-id': parentEntryId }))
+	if (!xml) throw new Error('The server returned an empty team mail response.')
+	return parseMailMessage(xml)
+}
+
 function parseMailMessage(xml: XMLDocument): MailMessageView {
 	const root = xml.documentElement
 	return {
@@ -743,8 +796,8 @@ export async function getMailMessage(entryId: string): Promise<MailMessageView> 
 	return parseMailMessage(await getXml(`/api/v1/mailbox/messages/${encodeURIComponent(entryId)}`))
 }
 
-export async function sendMail(to: string, subject: string, body: string): Promise<MailMessageView> {
-	const xml = await requestXml('/api/v1/mailbox/messages', 'POST', authDocument('send-mail', { to, subject, body }))
+export async function sendMail(to: string, subject: string, body: string, parentEntryId = ''): Promise<MailMessageView> {
+	const xml = await requestXml('/api/v1/mailbox/messages', 'POST', authDocument('send-mail', { to, subject, body, 'parent-entry-id': parentEntryId }))
 	if (!xml) throw new Error('The server returned an empty mail response.')
 	return parseMailMessage(xml)
 }
@@ -753,6 +806,72 @@ export async function updateMailEntry(entryId: string, action: 'archive' | 'tras
 	const xml = await requestXml(`/api/v1/mailbox/messages/${encodeURIComponent(entryId)}/action`, 'POST', authDocument('mailbox-action', { action }))
 	if (!xml) throw new Error('The server returned an empty mailbox response.')
 	return parseMailMessage(xml)
+}
+
+function parseMailingList(element: Element): MailingListSummary {
+	return {
+		id: element.getAttribute('id') ?? '', address: childText(element, 'address'), name: childText(element, 'name'),
+		description: childContent(element, 'description'), postingPolicy: childText(element, 'posting-policy') as MailingListSummary['postingPolicy'],
+		webhookPolicy: childText(element, 'webhook-policy') as MailingListSummary['webhookPolicy'],
+		webhookPreviewLimit: Number(childText(element, 'webhook-preview-limit')), subscribed: childText(element, 'subscribed') === 'true',
+	}
+}
+
+function parseMailingListMessage(element: Element): MailingListMessage {
+	return {
+		id: element.getAttribute('id') ?? '', entryId: childText(element, 'entry-id'), messageId: childText(element, 'message-id'),
+		headerMessageId: childText(element, 'header-message-id'), parentMessageId: childText(element, 'parent-message-id'),
+		authorAccountId: childText(element, 'author-account-id'), from: childText(element, 'from'),
+		to: Array.from(element.children).filter((child) => child.localName === 'to').map((child) => child.textContent?.trim() ?? '').filter(Boolean),
+		subject: childText(element, 'subject'), body: childContent(element, 'body'), createdAt: childText(element, 'created-at'),
+	}
+}
+
+function parseMailingListThread(xml: XMLDocument): MailingListThread {
+	const root = xml.documentElement
+	return {
+		id: root.getAttribute('id') ?? '', listId: childText(root, 'list-id'), address: childText(root, 'address'),
+		subject: childText(root, 'subject'),
+		messages: Array.from(root.querySelectorAll('messages > message')).map(parseMailingListMessage),
+	}
+}
+
+export async function getMailingLists(): Promise<MailingListSummary[]> {
+	const xml = await getXml('/api/v1/mailing-lists')
+	return Array.from(xml.documentElement.children).filter((item) => item.localName === 'list').map(parseMailingList)
+}
+
+export async function getMailingListThreads(list: string, q = '', limit = 30, offset = 0): Promise<MailingListThreadSummary[]> {
+	const query = new URLSearchParams({ limit: String(limit), offset: String(offset) })
+	if (q) query.set('q', q)
+	const xml = await getXml(`/api/v1/mailing-lists/${encodeURIComponent(list)}/threads?${query}`)
+	return Array.from(xml.documentElement.children).filter((item) => item.localName === 'thread').map((item) => ({
+		id: item.getAttribute('id') ?? '', listId: childText(item, 'list-id'), rootMessageId: childText(item, 'root-message-id'),
+		subject: childText(item, 'subject'), preview: childContent(item, 'preview'), author: childText(item, 'author'),
+		authorAccountId: childText(item, 'author-account-id'), messageCount: Number(childText(item, 'message-count')),
+		createdAt: childText(item, 'created-at'), lastActivityAt: childText(item, 'last-activity-at'),
+	}))
+}
+
+export async function getMailingListThread(list: string, thread: string): Promise<MailingListThread> {
+	return parseMailingListThread(await getXml(`/api/v1/mailing-lists/${encodeURIComponent(list)}/threads/${encodeURIComponent(thread)}`))
+}
+
+export async function setMailingListSubscription(list: string, subscribed: boolean): Promise<void> {
+	await requestXml(`/api/v1/mailing-lists/${encodeURIComponent(list)}/subscription`, 'POST', authDocument('mailing-list-subscription', { subscribed: String(subscribed) }))
+}
+
+export async function postMailingListThread(list: string, subject: string, body: string): Promise<MailingListThread> {
+	const xml = await requestXml(`/api/v1/mailing-lists/${encodeURIComponent(list)}/threads`, 'POST', authDocument('mailing-list-post', { subject, body }))
+	if (!xml) throw new Error('The server returned an empty mailing list response.')
+	return parseMailingListThread(xml)
+}
+
+export async function replyMailingListThread(list: string, thread: string, body: string, parentMessageId = ''): Promise<MailingListThread> {
+	const xml = await requestXml(`/api/v1/mailing-lists/${encodeURIComponent(list)}/threads/${encodeURIComponent(thread)}/messages`, 'POST',
+		authDocument('mailing-list-reply', { 'parent-message-id': parentMessageId, body }))
+	if (!xml) throw new Error('The server returned an empty mailing list response.')
+	return parseMailingListThread(xml)
 }
 
 const languageColors: Record<string, string> = {
@@ -1035,6 +1154,7 @@ export async function updateAdminRFCMaintainer(accountId: string, enabled: boole
 function parseWebhook(element: Element): WebhookEndpoint {
 	return {
 		id: element.getAttribute('id') ?? '', name: childText(element, 'name'),
+		scope: childText(element, 'scope') as WebhookEndpoint['scope'],
 		kind: childText(element, 'kind') === 'discord' ? 'discord' : 'generic',
 		events: Array.from(element.querySelectorAll('events > event')).map((item) => item.textContent?.trim() ?? '').filter(Boolean),
 		destination: childText(element, 'destination'), enabled: childText(element, 'enabled') === 'true',

@@ -14,10 +14,10 @@ import {
 } from '@lucide/vue'
 
 import {
-  getAdminSnapshot, getManagementMailbox, getManagementMailMessage, getModules, getPlatformStatus,
+  getAdminSnapshot, getModules, getPlatformStatus,
   deleteAdminWebhook, getAdminBlogPost, getAdminBlogPosts, getAdminWebhooks, saveAdminBlogPost, saveAdminWebhook, testAdminWebhook,
   updateAdminAccountRole, updateAdminAccountStatus, updateAdminRFCMaintainer, updateAdminSourceMaintainer, updateLunaStevTimeZone,
-  type AdminAccount, type AdminSnapshot, type BlogPostInput, type BlogPostSummary, type MailboxView, type MailMessageView, type ModuleStatus, type PlatformStatus,
+  type AdminAccount, type AdminSnapshot, type BlogPostInput, type BlogPostSummary, type ModuleStatus, type PlatformStatus,
   type WebhookAdminView, type WebhookInput,
 } from '../services/http'
 import { useI18n } from '../i18n'
@@ -46,8 +46,6 @@ const desktopLayout = ref(window.innerWidth >= 992)
 const sidebarVisible = ref(desktopLayout.value)
 const accountQuery = ref('')
 const pendingAction = ref<PendingAction | null>(null)
-const managementMailbox = ref<MailboxView | null>(null)
-const managementMessage = ref<MailMessageView | null>(null)
 const lunaStevTimeZone = ref('Asia/Seoul')
 const blogPosts = ref<BlogPostSummary[]>([])
 const blogSaving = ref(false)
@@ -87,7 +85,6 @@ watch(section, async () => {
 	error.value = ''
 	actionError.value = ''
 	blogNotice.value = ''
-	managementMessage.value = null
 	pendingAction.value = null
 	if (window.innerWidth < 992) sidebarVisible.value = false
 	try { await loadSection() }
@@ -127,7 +124,6 @@ async function load() {
 }
 
 async function loadSection() {
-	if (section.value === 'mailbox') managementMailbox.value = await getManagementMailbox()
 	if (section.value === 'blog') blogPosts.value = await getAdminBlogPosts()
 	if (section.value === 'webhooks') webhookView.value = await getAdminWebhooks()
 }
@@ -214,12 +210,6 @@ async function saveLunaStevTimeZone() {
   actionError.value = ''
   try { await updateLunaStevTimeZone(lunaStevTimeZone.value); await load() }
   catch (reason) { actionError.value = reason instanceof Error ? reason.message : t('admin.actionFailed') }
-}
-
-async function openManagementMessage(entryID: string) {
-  actionError.value = ''
-  try { managementMessage.value = await getManagementMailMessage(entryID) }
-  catch (reason) { actionError.value = reason instanceof Error ? reason.message : t('common.loadError') }
 }
 
 function formatDate(value: string) {
@@ -395,7 +385,7 @@ function changeLocale(event: Event) {
 				  <div v-if="actionError" class="alert alert-danger mt-3 mb-0">{{ actionError }}</div>
 				</CCardBody>
 			  </CCard>
-			  <CCard class="mb-4"><CCardHeader><strong>{{ t('admin.webhookEndpoints') }}</strong></CCardHeader><CCardBody class="p-0"><CTable align="middle" class="mb-0 admin-table" responsive><CTableHead><CTableRow><CTableHeaderCell class="ps-4">{{ t('admin.webhookName') }}</CTableHeaderCell><CTableHeaderCell>{{ t('admin.destination') }}</CTableHeaderCell><CTableHeaderCell>{{ t('admin.webhookEvents') }}</CTableHeaderCell><CTableHeaderCell>{{ t('admin.status') }}</CTableHeaderCell><CTableHeaderCell>{{ t('admin.actions') }}</CTableHeaderCell></CTableRow></CTableHead><CTableBody><CTableRow v-for="endpoint in webhookView.endpoints" :key="endpoint.id"><CTableDataCell class="ps-4"><strong>{{ endpoint.name }}</strong><div class="text-body-secondary small">{{ endpoint.kind }}</div></CTableDataCell><CTableDataCell><code>{{ endpoint.destination }}</code></CTableDataCell><CTableDataCell><div v-for="event in endpoint.events" :key="event"><code>{{ event }}</code></div></CTableDataCell><CTableDataCell><CBadge :color="endpoint.enabled ? 'success' : 'secondary'">{{ endpoint.enabled ? t('admin.enabled') : t('admin.disabled') }}</CBadge></CTableDataCell><CTableDataCell class="admin-actions"><CButton color="secondary" variant="outline" size="sm" @click="editWebhook(endpoint.id)">{{ t('common.edit') }}</CButton><CButton color="secondary" variant="outline" size="sm" :disabled="actionLoading" @click="testWebhook(endpoint.id)">{{ t('admin.testWebhook') }}</CButton><CButton color="danger" variant="outline" size="sm" :disabled="actionLoading" @click="removeWebhook(endpoint.id)">{{ t('common.delete') }}</CButton></CTableDataCell></CTableRow><CTableRow v-if="webhookView.endpoints.length === 0"><CTableDataCell colspan="5" class="py-4 text-center text-body-secondary">{{ t('admin.noWebhooks') }}</CTableDataCell></CTableRow></CTableBody></CTable></CCardBody></CCard>
+			  <CCard class="mb-4"><CCardHeader><strong>{{ t('admin.webhookEndpoints') }}</strong></CCardHeader><CCardBody class="p-0"><CTable align="middle" class="mb-0 admin-table" responsive><CTableHead><CTableRow><CTableHeaderCell class="ps-4">{{ t('admin.webhookName') }}</CTableHeaderCell><CTableHeaderCell>{{ t('admin.destination') }}</CTableHeaderCell><CTableHeaderCell>{{ t('admin.webhookEvents') }}</CTableHeaderCell><CTableHeaderCell>{{ t('admin.status') }}</CTableHeaderCell><CTableHeaderCell>{{ t('admin.actions') }}</CTableHeaderCell></CTableRow></CTableHead><CTableBody><CTableRow v-for="endpoint in webhookView.endpoints" :key="endpoint.id"><CTableDataCell class="ps-4"><strong>{{ endpoint.name }}</strong><div class="d-flex align-items-center gap-1 mt-1"><CBadge :color="endpoint.scope === 'platform' ? 'primary' : endpoint.scope === 'account' ? 'info' : 'warning'">{{ endpoint.scope || (locale === 'ko' ? '검토 필요' : 'review required') }}</CBadge><small class="text-body-secondary">{{ endpoint.kind }}</small></div></CTableDataCell><CTableDataCell><code>{{ endpoint.destination }}</code></CTableDataCell><CTableDataCell><div v-for="event in endpoint.events" :key="event"><code>{{ event }}</code></div></CTableDataCell><CTableDataCell><CBadge :color="endpoint.enabled && endpoint.scope ? 'success' : 'secondary'">{{ endpoint.enabled && endpoint.scope ? t('admin.enabled') : t('admin.disabled') }}</CBadge></CTableDataCell><CTableDataCell class="admin-actions"><CButton color="secondary" variant="outline" size="sm" @click="editWebhook(endpoint.id)">{{ t('common.edit') }}</CButton><CButton color="secondary" variant="outline" size="sm" :disabled="actionLoading || !endpoint.scope" @click="testWebhook(endpoint.id)">{{ t('admin.testWebhook') }}</CButton><CButton color="danger" variant="outline" size="sm" :disabled="actionLoading" @click="removeWebhook(endpoint.id)">{{ t('common.delete') }}</CButton></CTableDataCell></CTableRow><CTableRow v-if="webhookView.endpoints.length === 0"><CTableDataCell colspan="5" class="py-4 text-center text-body-secondary">{{ t('admin.noWebhooks') }}</CTableDataCell></CTableRow></CTableBody></CTable></CCardBody></CCard>
 			  <CCard class="mb-4"><CCardHeader><strong>{{ t('admin.webhookDeliveries') }}</strong></CCardHeader><CCardBody class="p-0"><CTable align="middle" class="mb-0 admin-table" responsive><CTableHead><CTableRow><CTableHeaderCell class="ps-4">{{ t('admin.webhookEvents') }}</CTableHeaderCell><CTableHeaderCell>{{ t('admin.status') }}</CTableHeaderCell><CTableHeaderCell>HTTP</CTableHeaderCell><CTableHeaderCell>{{ t('admin.attempts') }}</CTableHeaderCell><CTableHeaderCell>{{ t('admin.updated') }}</CTableHeaderCell></CTableRow></CTableHead><CTableBody><CTableRow v-for="delivery in webhookView.deliveries" :key="delivery.id"><CTableDataCell class="ps-4"><code>{{ delivery.eventType }}</code><div class="text-body-secondary small">{{ delivery.title }}</div><div v-if="delivery.lastError" class="admin-error-detail">{{ delivery.lastError }}</div></CTableDataCell><CTableDataCell><CBadge :color="badgeColor(delivery.status)">{{ delivery.status }}</CBadge></CTableDataCell><CTableDataCell>{{ delivery.httpStatus || '—' }}</CTableDataCell><CTableDataCell>{{ delivery.attempts }}</CTableDataCell><CTableDataCell>{{ formatDate(delivery.lastAttemptAt || delivery.createdAt) }}</CTableDataCell></CTableRow><CTableRow v-if="webhookView.deliveries.length === 0"><CTableDataCell colspan="5" class="py-4 text-center text-body-secondary">{{ t('admin.noWebhookDeliveries') }}</CTableDataCell></CTableRow></CTableBody></CTable></CCardBody></CCard>
 			</div>
 
@@ -427,11 +417,20 @@ function changeLocale(event: Event) {
             </CCard>
 
             <CCard v-if="section === 'mailbox'" class="mb-4">
-              <CCardHeader class="admin-card-header"><div><strong>{{ t('admin.managementMailbox') }}</strong><div class="text-body-secondary small">{{ managementMailbox?.addresses?.join(' · ') }}</div></div></CCardHeader>
-              <CCardBody class="p-0"><CTable align="middle" class="mb-0 admin-table" hover responsive>
-                <CTableHead><CTableRow><CTableHeaderCell class="ps-4">{{ t('mail.from') }}</CTableHeaderCell><CTableHeaderCell>{{ t('mail.subject') }}</CTableHeaderCell><CTableHeaderCell>{{ t('admin.recipient') }}</CTableHeaderCell><CTableHeaderCell>{{ t('admin.updated') }}</CTableHeaderCell></CTableRow></CTableHead>
-                <CTableBody><CTableRow v-for="item in managementMailbox?.items ?? []" :key="item.id" role="button" tabindex="0" @click="openManagementMessage(item.id)" @keydown.enter="openManagementMessage(item.id)"><CTableDataCell class="ps-4">{{ item.from }}</CTableDataCell><CTableDataCell><strong>{{ item.subject }}</strong><div class="text-body-secondary small">{{ item.preview }}</div></CTableDataCell><CTableDataCell>{{ item.to.join(', ') }}</CTableDataCell><CTableDataCell>{{ formatDate(item.receivedAt) }}</CTableDataCell></CTableRow><CTableRow v-if="managementMailbox?.items.length === 0"><CTableDataCell colspan="4" class="py-4 text-center text-body-secondary">{{ t('admin.managementMailboxEmpty') }}</CTableDataCell></CTableRow></CTableBody>
-              </CTable></CCardBody>
+              <CCardHeader><strong>{{ t('admin.managementMailbox') }}</strong></CCardHeader>
+              <CCardBody>
+                <p class="mb-2">{{ locale === 'ko' ? '관리자 설정과 운영 메일 처리를 분리했습니다.' : 'Administrative settings and operational mail are now separated.' }}</p>
+                <p class="text-body-secondary mb-3">{{ locale === 'ko' ? '통합 메일의 읽기, 답장, 발송은 Mail의 팀 메일에서 처리하세요. 이 관리자 화면은 계정 권한, 보안, 전달 상태 같은 플랫폼 설정에 집중합니다.' : 'Read, reply to, and send shared messages from Team mail in Mail. This admin area remains focused on platform settings such as account access, security, and delivery status.' }}</p>
+                <div class="d-flex flex-wrap gap-2 mb-4" aria-label="Management mail addresses">
+                  <CBadge color="secondary">admin@wave-lang.dev</CBadge>
+                  <CBadge color="secondary">help@wave-lang.dev</CBadge>
+                  <CBadge color="secondary">info@wave-lang.dev</CBadge>
+                  <CBadge color="secondary">support@wave-lang.dev</CBadge>
+                </div>
+                <RouterLink class="btn btn-primary d-inline-flex align-items-center gap-2" to="/mail/team">
+                  <MailWarning :size="17" />{{ locale === 'ko' ? '팀 메일 열기' : 'Open Team mail' }}
+                </RouterLink>
+              </CCardBody>
             </CCard>
 
             <CCard v-if="section === 'mail-queue'" class="mb-4">
@@ -469,11 +468,6 @@ function changeLocale(event: Event) {
       <CModalFooter><CButton color="secondary" variant="outline" :disabled="actionLoading" @click="pendingAction = null">{{ t('common.cancel') }}</CButton><CButton :color="pendingAction?.kind === 'status' && pendingAction.status === 'suspended' ? 'danger' : 'primary'" :disabled="actionLoading" @click="confirmAction">{{ t('admin.confirm') }}</CButton></CModalFooter>
     </CModal>
 
-    <CModal :visible="Boolean(managementMessage)" size="lg" alignment="center" @close="managementMessage = null">
-      <CModalHeader><CModalTitle>{{ managementMessage?.subject }}</CModalTitle></CModalHeader>
-      <CModalBody v-if="managementMessage"><dl class="admin-definition-list"><div><dt>{{ t('mail.from') }}</dt><dd>{{ managementMessage.from }}</dd></div><div><dt>{{ t('admin.recipient') }}</dt><dd>{{ managementMessage.to.join(', ') }}</dd></div><div><dt>{{ t('admin.time') }}</dt><dd>{{ formatDate(managementMessage.date) }}</dd></div></dl><pre class="admin-mail-body">{{ managementMessage.body }}</pre></CModalBody>
-      <CModalFooter><CButton color="secondary" variant="outline" @click="managementMessage = null">{{ t('common.close') }}</CButton></CModalFooter>
-    </CModal>
   </main>
 </template>
 

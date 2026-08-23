@@ -19,6 +19,7 @@ import (
 	"github.com/wavefnd/wave-platform/internal/document"
 	"github.com/wavefnd/wave-platform/internal/gitmirror"
 	"github.com/wavefnd/wave-platform/internal/identity"
+	mailingdomain "github.com/wavefnd/wave-platform/internal/mailinglist"
 	"github.com/wavefnd/wave-platform/internal/mailruntime"
 	mediadomain "github.com/wavefnd/wave-platform/internal/media"
 	"github.com/wavefnd/wave-platform/internal/mediapolicy"
@@ -48,6 +49,7 @@ type Application struct {
 	Webhooks       *webhookdomain.Service
 	Patches        *patchdomain.Service
 	RFCs           *rfcdomain.Service
+	MailingLists   *mailingdomain.Service
 }
 
 func New(configPath string) (*Application, error) {
@@ -112,6 +114,15 @@ func New(configPath string) (*Application, error) {
 	}
 	identityService.SetWebhookService(webhookService)
 	patchService := patchdomain.NewService(database, identity.PatchMailboxAccountID, identityService.PatchAddress())
+	var mailingListService *mailingdomain.Service
+	if cfg.Modules.MailingList.Enabled {
+		mailingListService = mailingdomain.NewService(database, cfg.Identity.MailDomain, identity.PatchMailboxAccountID)
+		mailingListService.SetWebhookService(webhookService)
+		if err := mailingListService.EnsureDefaults(); err != nil {
+			_ = database.Close()
+			return nil, fmt.Errorf("initialize mailing lists: %w", err)
+		}
+	}
 	rfcService := rfcdomain.NewService(database)
 	blogService := blogdomain.NewService(database)
 	blogService.SetWebhookService(webhookService)
@@ -209,6 +220,7 @@ func New(configPath string) (*Application, error) {
 		webhookService,
 		patchService,
 		rfcService,
+		mailingListService,
 	)
 
 	server := &http.Server{
@@ -232,6 +244,7 @@ func New(configPath string) (*Application, error) {
 		Webhooks:       webhookService,
 		Patches:        patchService,
 		RFCs:           rfcService,
+		MailingLists:   mailingListService,
 	}, nil
 }
 

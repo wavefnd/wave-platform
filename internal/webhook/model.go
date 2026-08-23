@@ -9,6 +9,7 @@ const (
 	EventBlogPublished    = "blog.published"
 	EventCommunityPost    = "community.post.created"
 	EventFounderPost      = "founder.post.created"
+	EventMailingListPost  = "mailing-list.message.created"
 	EventReleasePublished = "release.published"
 	EventPatchReceived    = "patch.received"
 )
@@ -17,6 +18,7 @@ type Endpoint struct {
 	XMLName                xml.Name  `xml:"https://wave-lang.dev/ns/platform/webhook/v1 endpoint"`
 	ID                     string    `xml:"id,attr"`
 	OwnerAccountID         string    `xml:"owner-account-id"`
+	Scope                  string    `xml:"scope"`
 	Name                   string    `xml:"name"`
 	Kind                   string    `xml:"kind"`
 	Events                 []string  `xml:"events>event"`
@@ -32,6 +34,7 @@ type EndpointView struct {
 	XMLName        xml.Name  `xml:"https://wave-lang.dev/ns/platform/api/v1 webhook"`
 	ID             string    `xml:"id,attr"`
 	OwnerAccountID string    `xml:"owner-account-id,omitempty"`
+	Scope          string    `xml:"scope"`
 	Name           string    `xml:"name"`
 	Kind           string    `xml:"kind"`
 	Events         []string  `xml:"events>event"`

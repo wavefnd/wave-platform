@@ -35,7 +35,12 @@ var (
 
 var supportedEvents = map[string]bool{
 	EventBlogPublished: true, EventCommunityPost: true, EventFounderPost: true,
-	EventReleasePublished: true, EventPatchReceived: true,
+	EventMailingListPost: true, EventReleasePublished: true, EventPatchReceived: true,
+}
+
+var platformOnlyEvents = map[string]bool{
+	EventMailingListPost: true,
+	EventPatchReceived:   true,
 }
 
 var (
@@ -78,6 +83,17 @@ func SupportedEvents() []string {
 	return items
 }
 
+func UserSupportedEvents() []string {
+	items := make([]string, 0, len(supportedEvents))
+	for item := range supportedEvents {
+		if !platformOnlyEvents[item] {
+			items = append(items, item)
+		}
+	}
+	sort.Strings(items)
+	return items
+}
+
 func (service *Service) Endpoints() ([]EndpointView, error) {
 	items, err := service.repository.Endpoints()
 	if err != nil {
@@ -97,7 +113,7 @@ func (service *Service) EndpointsFor(accountID string) ([]EndpointView, error) {
 	}
 	views := make([]EndpointView, 0)
 	for _, item := range items {
-		if item.OwnerAccountID == accountID {
+		if item.OwnerAccountID == accountID && item.Scope == "account" {
 			views = append(views, viewOf(item, ""))
 		}
 	}
@@ -115,7 +131,7 @@ func (service *Service) DeliveriesFor(accountID string, limit int) ([]Delivery, 
 	}
 	owned := map[string]bool{}
 	for _, endpoint := range endpoints {
-		if endpoint.OwnerAccountID == accountID {
+		if endpoint.OwnerAccountID == accountID && endpoint.Scope == "account" {
 			owned[endpoint.ID] = true
 		}
 	}
@@ -151,6 +167,13 @@ func (service *Service) SaveEndpointScoped(actorID string, input EndpointInput, 
 	if err != nil {
 		return EndpointView{}, err
 	}
+	if !allowAll {
+		for _, event := range events {
+			if platformOnlyEvents[event] {
+				return EndpointView{}, fmt.Errorf("%w: event %q is restricted to platform webhooks", ErrInvalidEndpoint, event)
+			}
+		}
+	}
 	now := service.now().UTC()
 	item := Endpoint{ID: input.ID, CreatedAt: now}
 	if item.ID != "" {
@@ -158,7 +181,7 @@ func (service *Service) SaveEndpointScoped(actorID string, input EndpointInput, 
 		if err != nil {
 			return EndpointView{}, err
 		}
-		if !allowAll && item.OwnerAccountID != actorID {
+		if !allowAll && (item.OwnerAccountID != actorID || item.Scope != "account") {
 			return EndpointView{}, ErrForbidden
 		}
 	} else {
@@ -178,6 +201,11 @@ func (service *Service) SaveEndpointScoped(actorID string, input EndpointInput, 
 	}
 	if item.OwnerAccountID == "" {
 		item.OwnerAccountID = actorID
+	}
+	if allowAll {
+		item.Scope = "platform"
+	} else {
+		item.Scope = "account"
 	}
 	if input.URL != "" {
 		destination, parseErr := validateURL(input.URL, input.Kind)
@@ -223,7 +251,7 @@ func (service *Service) DeleteEndpointScoped(actorID, id string, allowAll bool) 
 	if err != nil {
 		return err
 	}
-	if !allowAll && item.OwnerAccountID != actorID {
+	if !allowAll && (item.OwnerAccountID != actorID || item.Scope != "account") {
 		return ErrForbidden
 	}
 	if err := service.repository.DeleteEndpoint(id); err != nil {
@@ -261,6 +289,14 @@ func (service *Service) Publish(event Event) error {
 		if !endpoint.Enabled || !contains(endpoint.Events, event.Type) {
 			continue
 		}
+		// Endpoints created before explicit scopes were introduced must be
+		// reviewed and saved by an administrator before they can deliver again.
+		if endpoint.Scope != "account" && endpoint.Scope != "platform" {
+			continue
+		}
+		if platformOnlyEvents[event.Type] && endpoint.Scope != "platform" {
+			continue
+		}
 		id, idErr := identifier.New("webhook-delivery")
 		if idErr != nil {
 			return idErr
@@ -284,8 +320,11 @@ func (service *Service) TestEndpointScoped(ctx context.Context, actorID, id stri
 	if endpointErr != nil {
 		return Delivery{}, endpointErr
 	}
-	if !allowAll && endpoint.OwnerAccountID != actorID {
+	if !allowAll && (endpoint.OwnerAccountID != actorID || endpoint.Scope != "account") {
 		return Delivery{}, ErrForbidden
+	}
+	if endpoint.Scope != "account" && endpoint.Scope != "platform" {
+		return Delivery{}, fmt.Errorf("%w: endpoint scope must be reviewed", ErrInvalidEndpoint)
 	}
 	now := service.now().UTC()
 	eventID, err := identifier.New("event")
@@ -339,6 +378,13 @@ func (service *Service) deliver(ctx context.Context, delivery Delivery) (Deliver
 	endpoint, err := service.repository.Endpoint(delivery.EndpointID)
 	if err != nil {
 		return delivery, err
+	}
+	if endpoint.Scope != "account" && endpoint.Scope != "platform" {
+		delivery.Status = "failed"
+		delivery.LastError = "webhook endpoint scope requires administrator review"
+		delivery.CompletedAt = service.now().UTC()
+		_ = service.repository.PutDelivery(delivery)
+		return delivery, fmt.Errorf("%w: %s", ErrForbidden, delivery.LastError)
 	}
 	destination, err := service.decrypt(endpoint.EncryptedURL)
 	if err != nil {
@@ -455,6 +501,8 @@ func discordEventLabel(eventType string) string {
 		return "Blog post"
 	case EventReleasePublished:
 		return "Release"
+	case EventMailingListPost:
+		return "Mailing list"
 	case EventPatchReceived:
 		return "Git patch"
 	case "webhook.test":
@@ -558,7 +606,7 @@ func (service *Service) decrypt(value string) (string, error) {
 	return string(plain), err
 }
 func viewOf(item Endpoint, secret string) EndpointView {
-	return EndpointView{ID: item.ID, OwnerAccountID: item.OwnerAccountID, Name: item.Name, Kind: item.Kind, Events: item.Events, Destination: item.Destination, Enabled: item.Enabled, CreatedAt: item.CreatedAt, UpdatedAt: item.UpdatedAt, SigningSecret: secret}
+	return EndpointView{ID: item.ID, OwnerAccountID: item.OwnerAccountID, Scope: item.Scope, Name: item.Name, Kind: item.Kind, Events: item.Events, Destination: item.Destination, Enabled: item.Enabled, CreatedAt: item.CreatedAt, UpdatedAt: item.UpdatedAt, SigningSecret: secret}
 }
 func (service *Service) auditEvent(actorID, resourceID, action, result string) error {
 	id, err := identifier.New("audit")

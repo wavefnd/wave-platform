@@ -13,8 +13,8 @@ import (
 const maxLocalPartBytes = 60
 
 var reservedLocalParts = map[string]bool{
-	"abuse": true, "admin": true, "administrator": true, "contact": true,
-	"help": true, "hostmaster": true, "info": true, "mailer-daemon": true,
+	"abuse": true, "admin": true, "administrator": true, "announce": true, "contact": true,
+	"development": true, "help": true, "hostmaster": true, "info": true, "mailer-daemon": true,
 	"no-reply": true, "noreply": true, "postmaster": true, "root": true,
 	"patchs": true, "security": true, "support": true, "webmaster": true,
 }
