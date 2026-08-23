@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import {
-  ArrowBigDown, ArrowBigUp, Bell, BellOff, Code2, Eye, ImagePlus, Link, MessageSquare, Quote, Search,
+  ArrowBigDown, ArrowBigUp, Bell, BellOff, Eye, ImagePlus, MessageSquare, Search,
 } from '@lucide/vue'
 import { computed, nextTick, ref, watch, watchEffect } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import MarkdownContent from '../components/MarkdownContent.vue'
 import CommunityReplyEditor from '../components/community/CommunityReplyEditor.vue'
+import PlatformWaveEditor from '../components/editor/PlatformWaveEditor.vue'
 import { useI18n } from '../i18n'
 import {
   createCommunityPost, createCommunityReply, getCommunitySpaces, getCommunityThread,
@@ -40,7 +41,7 @@ const postTitle = ref('')
 const postBody = ref('')
 const postTags = ref('')
 const postPreview = ref(false)
-const postBodyInput = ref<HTMLTextAreaElement | null>(null)
+const postBodyInput = ref<{ focus: () => void; insert: (prefix: string, suffix?: string) => void } | null>(null)
 const postImageInput = ref<HTMLInputElement | null>(null)
 const uploadingImage = ref(false)
 
@@ -324,17 +325,6 @@ async function toggleSubscription() {
   catch (reason) { actionError.value = reason instanceof Error ? reason.message : t('community.actionFailed') }
 }
 
-async function insertMarkup(prefix: string, suffix = '') {
-  const element = postBodyInput.value
-  if (!element) return
-  const start = element.selectionStart
-  const end = element.selectionEnd
-  const selected = postBody.value.slice(start, end)
-  postBody.value = postBody.value.slice(0, start) + prefix + selected + suffix + postBody.value.slice(end)
-  await nextTick()
-  element.focus(); element.setSelectionRange(start + prefix.length, end + prefix.length)
-}
-
 async function uploadPostImage(event: Event) {
   const input = event.target as HTMLInputElement
   const file = input.files?.[0]
@@ -346,14 +336,10 @@ async function uploadPostImage(event: Event) {
     const uploaded = await uploadLunaStevImage(file)
     postPreview.value = false
     await nextTick()
-    const element = postBodyInput.value
-    const offset = element?.selectionStart ?? postBody.value.length
     const alternate = file.name.replace(/\.[^.]+$/, '').replace(/[\[\]]/g, '').trim() || 'Image'
     const markdown = `\n![${alternate}](${uploaded.url})\n`
-    postBody.value = postBody.value.slice(0, offset) + markdown + postBody.value.slice(offset)
-    await nextTick()
-    element?.focus()
-    element?.setSelectionRange(offset + markdown.length, offset + markdown.length)
+    if (postBodyInput.value) postBodyInput.value.insert(markdown)
+    else postBody.value += markdown
   } catch (reason) {
     actionError.value = reason instanceof Error ? reason.message : t('community.imageUploadFailed')
   } finally {
@@ -453,11 +439,8 @@ watchEffect(() => {
           </select>
           <label for="post-title">{{ t('community.postTitle') }}</label>
           <input id="post-title" v-model="postTitle" required minlength="5" maxlength="180" />
-          <label for="post-body">{{ t('community.body') }}</label>
+          <label>{{ t('community.body') }}</label>
           <div class="community-editor-toolbar" :aria-label="t('community.formatting')">
-            <button type="button" :title="t('community.code')" @click="insertMarkup('\n```wave\n', '\n```\n')"><Code2 :size="16" /></button>
-            <button type="button" :title="t('community.link')" @click="insertMarkup('[', '](https://)')"><Link :size="16" /></button>
-            <button type="button" :title="t('community.quote')" @click="insertMarkup('> ')"><Quote :size="16" /></button>
             <button v-if="personalMode && auth.account?.owner" type="button" :title="t('community.imageUpload')"
               :aria-label="t('community.imageUpload')" :disabled="uploadingImage" @click="postImageInput?.click()">
               <ImagePlus :size="16" />
@@ -468,7 +451,7 @@ watchEffect(() => {
           </div>
           <small v-if="personalMode && auth.account?.owner" class="community-image-help">{{ uploadingImage ? t('community.imageUploading') : t('community.imageHelp') }}</small>
           <MarkdownContent v-if="postPreview" class="community-editor-preview" :source="postBody" />
-          <textarea v-else id="post-body" ref="postBodyInput" v-model="postBody" required maxlength="20000" rows="12" />
+          <PlatformWaveEditor v-else ref="postBodyInput" v-model="postBody" required :max-length="20000" :rows="12" />
           <label for="post-tags">{{ t('community.tags') }}</label>
           <input id="post-tags" v-model="postTags" :placeholder="t('community.tagsPlaceholder')" />
           <p v-if="actionError" class="community-action-error" role="alert">{{ actionError }}</p>

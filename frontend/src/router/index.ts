@@ -5,6 +5,7 @@ import CommunityPage from '../pages/CommunityPage.vue'
 import DocsPage from '../pages/DocsPage.vue'
 import HomePage from '../pages/HomePage.vue'
 import BlogPage from '../pages/BlogPage.vue'
+import BlogEditorPage from '../pages/BlogEditorPage.vue'
 import MailPage from '../pages/MailPage.vue'
 import NotFoundPage from '../pages/NotFoundPage.vue'
 import QuestionsPage from '../pages/QuestionsPage.vue'
@@ -24,6 +25,8 @@ const router = createRouter({
       children: [
         { path: '', name: 'home', component: HomePage },
 		{ path: 'blog', name: 'blog', component: BlogPage },
+		{ path: 'blog/editor', name: 'blog-editor', component: BlogEditorPage, meta: { requiresAuth: true, requiresAdmin: true } },
+		{ path: 'blog/editor/:slug', name: 'blog-editor-post', component: BlogEditorPage, meta: { requiresAuth: true, requiresAdmin: true } },
 		{ path: 'blog/:slug', name: 'blog-post', component: BlogPage },
 		{ path: 'releases', name: 'releases', component: BlogPage, meta: { blogCategory: 'release' } },
 		{ path: 'releases/:slug', name: 'release-detail', component: BlogPage, meta: { blogCategory: 'release' } },
@@ -68,7 +71,7 @@ const router = createRouter({
 		{ path: 'account/verify-recovery', name: 'verify-recovery', component: () => import('../pages/VerifyRecoveryEmailPage.vue') },
 		{ path: 'account/security', name: 'account-security', component: () => import('../pages/SecuritySettingsPage.vue'), meta: { requiresAuth: true } },
         { path: 'admin', name: 'admin', component: () => import('../pages/AdminPage.vue'), meta: { adminSection: 'overview' } },
-		{ path: 'admin/:section(blog|webhooks|accounts|mailbox|mail-queue|git-mirrors|audit-log|security|modules|system)', name: 'admin-section', component: () => import('../pages/AdminPage.vue') },
+		{ path: 'admin/:section(webhooks|accounts|mailbox|mail-queue|git-mirrors|audit-log|security|modules|system)', name: 'admin-section', component: () => import('../pages/AdminPage.vue') },
         { path: ':pathMatch(.*)*', name: 'not-found', component: NotFoundPage },
       ],
     },

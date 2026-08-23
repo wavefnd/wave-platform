@@ -5,6 +5,7 @@ import {
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 
 import GmailDeliveryWarning from '../GmailDeliveryWarning.vue'
+import PlatformWaveEditor from '../editor/PlatformWaveEditor.vue'
 import { useI18n } from '../../i18n'
 import { containsGmailAddress } from '../../services/email-address'
 import {
@@ -251,7 +252,7 @@ watch(() => auth.account?.id, async () => { mailbox.value = null; selected.value
 				<label>{{ t('mail.to') }}<input v-model="composeTo" required type="text" inputmode="email" :placeholder="t('mail.toPlaceholder')" /></label>
 				<GmailDeliveryWarning v-if="gmailRecipient" />
 				<label>{{ t('mail.subject') }}<input v-model="composeSubject" required maxlength="180" /></label>
-				<label class="mail-compose-body"><span class="sr-only">{{ t('mail.body') }}</span><textarea v-model="composeBody" required maxlength="50000" rows="16" /></label>
+				<div class="mail-compose-body"><PlatformWaveEditor v-model="composeBody" :label="t('mail.body')" mode="plain" required :max-length="50000" :rows="16" /></div>
 				<p v-if="actionError" class="mail-action-error" role="alert">{{ actionError }}</p>
 				<footer><button class="ui-button primary" type="submit" :disabled="submitting">{{ t('mail.sendMessage') }}</button></footer>
 			</form>

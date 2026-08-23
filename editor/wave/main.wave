@@ -1,0 +1,108 @@
+fun is_space(value: u8) -> bool {
+    return value == ' ' || value == '\n' || value == '\r' || value == '\t';
+}
+
+fun prefix_length(command: i32) -> i64 {
+    if (command == 1) { return 2; }
+    if (command == 2) { return 1; }
+    if (command == 3) { return 1; }
+    if (command == 4) { return 3; }
+    if (command == 5) { return 2; }
+    if (command == 6) { return 2; }
+    if (command == 7) { return 1; }
+    return -1;
+}
+
+fun suffix_length(command: i32) -> i64 {
+    if (command == 1) { return 2; }
+    if (command == 2) { return 1; }
+    if (command == 3) { return 1; }
+    if (command == 4 || command == 5 || command == 6) { return 0; }
+    if (command == 7) { return 11; }
+    return -1;
+}
+
+fun write_at(output: ptr<u8>, offset: i64, value: u8) {
+    deref output[offset] = value;
+}
+
+fun write_prefix(output: ptr<u8>, offset: i64, command: i32) -> i64 {
+    if (command == 1) { write_at(output, offset, '*'); write_at(output, offset + 1, '*'); return 2; }
+    if (command == 2) { write_at(output, offset, '*'); return 1; }
+    if (command == 3) { write_at(output, offset, '`'); return 1; }
+    if (command == 4) { write_at(output, offset, '#'); write_at(output, offset + 1, '#'); write_at(output, offset + 2, ' '); return 3; }
+    if (command == 5) { write_at(output, offset, '>'); write_at(output, offset + 1, ' '); return 2; }
+    if (command == 6) { write_at(output, offset, '-'); write_at(output, offset + 1, ' '); return 2; }
+    if (command == 7) { write_at(output, offset, '['); return 1; }
+    return 0;
+}
+
+fun write_suffix(output: ptr<u8>, offset: i64, command: i32) -> i64 {
+    if (command == 1) { write_at(output, offset, '*'); write_at(output, offset + 1, '*'); return 2; }
+    if (command == 2) { write_at(output, offset, '*'); return 1; }
+    if (command == 3) { write_at(output, offset, '`'); return 1; }
+    if (command == 7) {
+        write_at(output, offset, ']'); write_at(output, offset + 1, '(');
+        write_at(output, offset + 2, 'h'); write_at(output, offset + 3, 't'); write_at(output, offset + 4, 't'); write_at(output, offset + 5, 'p');
+        write_at(output, offset + 6, 's'); write_at(output, offset + 7, ':'); write_at(output, offset + 8, '/'); write_at(output, offset + 9, '/');
+        write_at(output, offset + 10, ')'); return 11;
+    }
+    return 0;
+}
+
+export(c, "wave_editor_abi_version") fun editor_abi_version() -> i32 {
+    return 1;
+}
+
+export(c, "wave_editor_analyze") fun editor_analyze(
+    source: ptr<u8>, source_length: i64, out_lines: ptr<i64>, out_words: ptr<i64>
+) -> i32 {
+    if (source_length < 0) { return -1; }
+    var lines: i64 = 1;
+    var words: i64 = 0;
+    var in_word: bool = false;
+    var index: i64 = 0;
+    while (index < source_length) {
+        var current: u8 = source[index];
+        if (current == '\n') { lines += 1; }
+        if (!is_space(current) && !in_word) { words += 1; }
+        in_word = !is_space(current);
+        index += 1;
+    }
+    deref out_lines = lines;
+    deref out_words = words;
+    return 0;
+}
+
+export(c, "wave_editor_transform") fun editor_transform(
+    source: ptr<u8>, source_length: i64,
+    selection_start: i64, selection_end: i64, command: i32,
+    output: ptr<u8>, output_capacity: i64,
+    out_selection_start: ptr<i64>, out_selection_end: ptr<i64>
+) -> i64 {
+    var prefix: i64 = prefix_length(command);
+    var suffix: i64 = suffix_length(command);
+    if (source_length < 0 || selection_start < 0 || selection_end < selection_start || selection_end > source_length || prefix < 0 || suffix < 0) { return -1; }
+    var output_length: i64 = source_length + prefix + suffix;
+    if (output_capacity < output_length) { return -2; }
+
+    var source_index: i64 = 0;
+    var output_index: i64 = 0;
+    while (source_index < selection_start) {
+        deref output[output_index] = source[source_index];
+        source_index += 1; output_index += 1;
+    }
+    output_index += write_prefix(output, output_index, command);
+    while (source_index < selection_end) {
+        deref output[output_index] = source[source_index];
+        source_index += 1; output_index += 1;
+    }
+    output_index += write_suffix(output, output_index, command);
+    while (source_index < source_length) {
+        deref output[output_index] = source[source_index];
+        source_index += 1; output_index += 1;
+    }
+    deref out_selection_start = selection_start + prefix;
+    deref out_selection_end = selection_end + prefix;
+    return output_length;
+}

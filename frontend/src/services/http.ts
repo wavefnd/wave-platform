@@ -55,6 +55,17 @@ export interface BlogPostInput {
 	status: 'draft' | 'published'
 }
 
+export type EditorCommand = 'bold' | 'italic' | 'inline-code' | 'heading' | 'quote' | 'unordered-list' | 'link'
+
+export interface EditorTransformResult {
+	content: string
+	selectionStart: number
+	selectionEnd: number
+	engine: string
+	lines: number
+	words: number
+}
+
 export interface DocumentSummary {
   id: string
   path: string
@@ -1255,17 +1266,17 @@ export async function getBlogPost(slug: string): Promise<BlogPost> {
 	return parseBlogPost((await getXml(`/api/v1/blog/posts/${encodeURIComponent(slug)}`)).documentElement)
 }
 
-export async function getAdminBlogPosts(): Promise<BlogPostSummary[]> {
-	const xml = await getXml('/api/v1/admin/blog/posts')
+export async function getBlogEditorPosts(): Promise<BlogPostSummary[]> {
+	const xml = await getXml('/api/v1/blog/editor/posts')
 	return Array.from(xml.documentElement.children).filter((item) => item.localName === 'post').map(parseBlogSummary)
 }
 
-export async function getAdminBlogPost(slug: string): Promise<BlogPost> {
-	return parseBlogPost((await getXml(`/api/v1/admin/blog/posts/${encodeURIComponent(slug)}`)).documentElement)
+export async function getBlogEditorPost(slug: string): Promise<BlogPost> {
+	return parseBlogPost((await getXml(`/api/v1/blog/editor/posts/${encodeURIComponent(slug)}`)).documentElement)
 }
 
-export async function saveAdminBlogPost(input: BlogPostInput): Promise<BlogPost> {
-	const xml = await requestXml('/api/v1/admin/blog/posts', 'POST', authDocument('blog-post', {
+export async function saveBlogEditorPost(input: BlogPostInput): Promise<BlogPost> {
+	const xml = await requestXml('/api/v1/blog/editor/posts', 'POST', authDocument('blog-post', {
 		slug: input.slug, category: input.category, 'roadmap-status': input.roadmapStatus,
 		'roadmap-order': String(input.roadmapOrder),
 		'target-release-date': input.targetDate,
@@ -1273,6 +1284,34 @@ export async function saveAdminBlogPost(input: BlogPostInput): Promise<BlogPost>
 	}))
 	if (!xml) throw new Error('The server returned an empty blog response.')
 	return parseBlogPost(xml.documentElement)
+}
+
+function unicodeOffset(value: string, browserOffset: number): number {
+	return Array.from(value.slice(0, browserOffset)).length
+}
+
+function browserOffset(value: string, unicodePosition: number): number {
+	return Array.from(value).slice(0, unicodePosition).join('').length
+}
+
+export async function transformEditorDocument(content: string, selectionStart: number, selectionEnd: number, command: EditorCommand): Promise<EditorTransformResult> {
+	const xml = await requestXml('/api/v1/editor/transform', 'POST', authDocument('editor-transform', {
+		content,
+		'selection-start': String(unicodeOffset(content, selectionStart)),
+		'selection-end': String(unicodeOffset(content, selectionEnd)),
+		command,
+	}))
+	if (!xml) throw new Error('WaveEditor returned an empty response.')
+	const root = xml.documentElement
+	const transformed = childContent(root, 'content')
+	return {
+		content: transformed,
+		selectionStart: browserOffset(transformed, Number(childText(root, 'selection-start')) || 0),
+		selectionEnd: browserOffset(transformed, Number(childText(root, 'selection-end')) || 0),
+		engine: childText(root, 'engine'),
+		lines: Number(childText(root, 'lines')) || 1,
+		words: Number(childText(root, 'words')) || 0,
+	}
 }
 
 function parseDocumentSummary(element: Element): DocumentSummary {

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<module xmlns="https://wave-lang.dev/ns/module/v1" id="wave-editor" version="0.1.0">
+  <name>WaveEditor Core</name>
+  <description>Selection transforms and document metrics for the reusable WaveEditor.</description>
+  <language>Wave</language>
+  <abi version="1" />
+  <exports>
+    <symbol>wave_editor_abi_version</symbol>
+    <symbol>wave_editor_analyze</symbol>
+    <symbol>wave_editor_transform</symbol>
+  </exports>
+</module>

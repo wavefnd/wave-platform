@@ -1,0 +1,12 @@
+{
+  "name": "@wavefnd/editor",
+  "version": "0.1.0",
+  "type": "module",
+  "exports": {
+    ".": "./web/index.ts",
+    "./style.css": "./web/wave-editor.css"
+  },
+  "peerDependencies": {
+    "vue": "^3.5.0"
+  }
+}

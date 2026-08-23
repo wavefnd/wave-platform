@@ -62,7 +62,7 @@ func (handler BlogHandler) Get(writer http.ResponseWriter, request *http.Request
 	_ = xmlcodec.Write(writer, http.StatusOK, item)
 }
 
-func (handler BlogHandler) AdminList(writer http.ResponseWriter, request *http.Request) {
+func (handler BlogHandler) EditorList(writer http.ResponseWriter, request *http.Request) {
 	if _, ok := handler.authorize(writer, request, false); !ok {
 		return
 	}
@@ -78,7 +78,7 @@ func (handler BlogHandler) AdminList(writer http.ResponseWriter, request *http.R
 	_ = xmlcodec.Write(writer, http.StatusOK, BlogPostsResponse{Items: summaries})
 }
 
-func (handler BlogHandler) AdminGet(writer http.ResponseWriter, request *http.Request) {
+func (handler BlogHandler) EditorGet(writer http.ResponseWriter, request *http.Request) {
 	if _, ok := handler.authorize(writer, request, false); !ok {
 		return
 	}

@@ -6,11 +6,13 @@ import MarkdownContent from '../components/MarkdownContent.vue'
 import { useI18n } from '../i18n'
 import { getBlogPost, getBlogPosts, type BlogPost, type BlogPostSummary } from '../services/http'
 import { applyPageSEO, plainTextDescription } from '../services/seo'
+import { useAuthStore } from '../stores/auth'
 import UiInlineState from '../ui/UiInlineState.vue'
 import '../ui/blog.css'
 
 const route = useRoute()
 const { locale, t } = useI18n()
+const auth = useAuthStore()
 const posts = ref<BlogPostSummary[]>([])
 const post = ref<BlogPost | null>(null)
 const loading = ref(true)
@@ -23,6 +25,7 @@ const category = computed<'article' | 'release' | 'roadmap' | ''>(() => {
 const releaseIndex = computed(() => !detail.value && category.value === 'release')
 const releaseDetail = computed(() => detail.value && post.value?.category === 'release')
 const editorialIndex = computed(() => !detail.value && category.value === '')
+const canEdit = computed(() => Boolean(auth.account?.owner || auth.account?.administrator))
 
 function publishedTime(item: BlogPostSummary) {
 	const value = item.publishedAt || item.updatedAt
@@ -148,7 +151,7 @@ watchEffect(() => {
 <template>
 	<main class="blog-page portal-width">
 		<header v-if="!detail" class="blog-heading" :class="{ 'release-heading': releaseIndex }">
-			<span>{{ t('blog.official') }}</span>
+			<div class="blog-heading-kicker"><span>{{ t('blog.official') }}</span><RouterLink v-if="canEdit" to="/blog/editor">WaveEditor →</RouterLink></div>
 			<h1>{{ releaseIndex ? t('blog.release.title') : t('blog.title') }}</h1>
 			<p>{{ releaseIndex ? t('blog.release.lead') : t('blog.lead') }}</p>
 		</header>
@@ -270,7 +273,7 @@ watchEffect(() => {
 		</section>
 
 		<article v-else-if="post" class="blog-article" :class="{ 'release-article': releaseDetail, 'roadmap-article': post.category === 'roadmap' }">
-			<RouterLink class="blog-back" :to="detailBack">← {{ releaseDetail ? t('blog.release.back') : t('blog.back') }}</RouterLink>
+			<div class="blog-detail-actions"><RouterLink class="blog-back" :to="detailBack">← {{ releaseDetail ? t('blog.release.back') : t('blog.back') }}</RouterLink><RouterLink v-if="canEdit" :to="`/blog/editor/${encodeURIComponent(post.slug)}`">{{ t('admin.editPost') }}</RouterLink></div>
 			<header>
 				<span>{{ t(`blog.category.${post.category}`) }}</span>
 				<h1>{{ post.title }}</h1>

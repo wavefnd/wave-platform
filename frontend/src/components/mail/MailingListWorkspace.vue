@@ -4,6 +4,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import { useI18n } from '../../i18n'
+import PlatformWaveEditor from '../editor/PlatformWaveEditor.vue'
 import {
 	getMailingLists, getMailingListThread, getMailingListThreads, postMailingListThread,
 	replyMailingListThread, setMailingListSubscription,
@@ -201,7 +202,7 @@ watch([listID, threadID], async ([currentList], [previousList]) => {
 				<header><button type="button" @click="composing = false">{{ t('common.cancel') }}</button><strong>{{ t('mail.lists.newThread') }}</strong></header>
 				<p v-if="selectedList?.id === 'patchs'" class="mailing-patch-help"><FileCode2 :size="17" aria-hidden="true" />{{ t('patches.submitHelp') }}</p>
 				<label>{{ t('mail.subject') }}<input v-model="subject" required maxlength="180" :placeholder="selectedList?.id === 'patchs' ? t('mail.lists.patchSubjectPlaceholder') : ''" /></label>
-				<label><span class="sr-only">{{ t('mail.body') }}</span><textarea v-model="body" required maxlength="20000" rows="16" /></label>
+				<PlatformWaveEditor v-model="body" :label="t('mail.body')" mode="plain" required :max-length="20000" :rows="16" />
 				<p v-if="actionError" class="mail-action-error" role="alert">{{ actionError }}</p>
 				<footer><button class="ui-button primary" type="submit" :disabled="saving">{{ t('mail.lists.publish') }}</button></footer>
 			</form>
@@ -213,7 +214,7 @@ watch([listID, threadID], async ([currentList], [previousList]) => {
 					<pre>{{ message.body }}</pre>
 				</section>
 				<form v-if="canPost" class="mailing-reply-form" @submit.prevent="submitReply">
-					<label><MessageSquareReply :size="17" aria-hidden="true" /><span>{{ t('mail.lists.reply') }}</span><textarea v-model="replyBody" required maxlength="20000" rows="5" /></label>
+					<div class="mailing-reply-editor"><MessageSquareReply :size="17" aria-hidden="true" /><PlatformWaveEditor v-model="replyBody" :label="t('mail.lists.reply')" mode="plain" required :max-length="20000" :rows="5" /></div>
 					<p v-if="actionError" class="mail-action-error" role="alert">{{ actionError }}</p>
 					<footer><button class="ui-button primary" type="submit" :disabled="saving">{{ t('mail.lists.sendReply') }}</button></footer>
 				</form>

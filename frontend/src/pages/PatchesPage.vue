@@ -4,6 +4,7 @@ import { computed, ref, watch, watchEffect } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 
 import { useI18n } from '../i18n'
+import PlatformWaveEditor from '../components/editor/PlatformWaveEditor.vue'
 import {
 	addPatchReviewComment,
 	getPatch,
@@ -224,7 +225,7 @@ watchEffect(() => applyPageSEO({
               <p>{{ comment.body }}</p>
               <button v-if="canMaintain" type="button" :disabled="commentBusy" @click="toggleResolved(comment)">{{ t(comment.resolved ? 'patches.reopen' : 'patches.resolve') }}</button>
             </article>
-            <form v-if="canMaintain" class="patch-comment-form" @submit.prevent="addComment(0)"><label><span>{{ t('patches.addGeneralComment') }}</span><textarea v-model="generalComment" required maxlength="4000" rows="3" /></label><button class="ui-button" type="submit" :disabled="commentBusy">{{ t('patches.addComment') }}</button></form>
+			<form v-if="canMaintain" class="patch-comment-form" @submit.prevent="addComment(0)"><PlatformWaveEditor v-model="generalComment" :label="t('patches.addGeneralComment')" required :max-length="4000" :rows="3" /><button class="ui-button" type="submit" :disabled="commentBusy">{{ t('patches.addComment') }}</button></form>
           </div>
         </section>
 
@@ -243,7 +244,7 @@ watchEffect(() => applyPageSEO({
               <button v-if="canMaintain" type="button" :disabled="commentBusy" @click="toggleResolved(comment)">{{ t(comment.resolved ? 'patches.reopen' : 'patches.resolve') }}</button>
             </article>
             <form v-if="canMaintain && selectedLine === line.number" class="patch-comment-form inline" @submit.prevent="addComment(line.number)">
-              <label><span>{{ t('patches.commentingOn', { path: line.path, line: line.number }) }}</span><textarea v-model="inlineComment" required maxlength="4000" rows="3" autofocus /></label>
+			  <PlatformWaveEditor v-model="inlineComment" :label="t('patches.commentingOn', { path: line.path, line: line.number })" required :max-length="4000" :rows="3" />
               <div><button type="button" class="ui-button" @click="selectedLine = 0; inlineComment = ''">{{ t('common.cancel') }}</button><button class="ui-button primary" type="submit" :disabled="commentBusy">{{ t('patches.addComment') }}</button></div>
             </form>
           </div>

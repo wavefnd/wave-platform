@@ -10,6 +10,7 @@
     "typecheck": "vue-tsc --noEmit"
   },
   "dependencies": {
+	"@wavefnd/editor": "file:../editor",
     "@coreui/coreui": "^5.9.0",
     "@coreui/vue": "^5.10.0",
     "@lucide/vue": "^1.28.0",

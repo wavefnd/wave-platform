@@ -17,6 +17,7 @@ import (
 	"github.com/wavefnd/wave-platform/internal/community"
 	"github.com/wavefnd/wave-platform/internal/config"
 	"github.com/wavefnd/wave-platform/internal/document"
+	editor "github.com/wavefnd/wave-platform/internal/editor"
 	"github.com/wavefnd/wave-platform/internal/gitmirror"
 	"github.com/wavefnd/wave-platform/internal/identity"
 	mailingdomain "github.com/wavefnd/wave-platform/internal/mailinglist"
@@ -44,6 +45,7 @@ type Application struct {
 	GitMirror      *gitmirror.Service
 	SourceAnalyzer sourceanalysis.Analyzer
 	MediaPolicy    *waveruntime.NativeMediaPolicy
+	Editor         *waveruntime.NativeEditor
 	Identity       *identity.Service
 	MailRuntime    *mailruntime.Service
 	Webhooks       *webhookdomain.Service
@@ -135,6 +137,8 @@ func New(configPath string) (*Application, error) {
 	var sourceAnalyzer sourceanalysis.Analyzer
 	var mediaPlanner mediapolicy.Planner
 	var nativeMediaPolicy *waveruntime.NativeMediaPolicy
+	editorEngine := editor.Engine(editor.ReferenceEngine{})
+	var nativeEditor *waveruntime.NativeEditor
 	if cfg.Wave.Enabled {
 		modulePath := filepath.Join(cfg.Wave.Modules, "libwave-source-analyzer.so")
 		loadedAnalyzer, loadErr := waveruntime.OpenSourceAnalyzer(modulePath)
@@ -152,6 +156,15 @@ func New(configPath string) (*Application, error) {
 			nativeMediaPolicy = loadedMediaPolicy
 			mediaPlanner = loadedMediaPolicy
 			log.Printf("Wave media policy ready: %s", mediaPolicyPath)
+		}
+		editorPath := filepath.Join(cfg.Wave.Modules, "libwave-editor.so")
+		loadedEditor, editorErr := waveruntime.OpenEditor(editorPath)
+		if editorErr != nil {
+			log.Printf("WaveEditor native engine unavailable; using reference engine: %v", editorErr)
+		} else {
+			nativeEditor = loadedEditor
+			editorEngine = loadedEditor
+			log.Printf("WaveEditor native engine ready: %s", editorPath)
 		}
 	}
 	mediaService, err := mediadomain.NewService(filepath.Join(cfg.Storage.Root, "blobs", "lunastev", "images"), mediaPlanner, audit.NewRepository(database))
@@ -221,6 +234,7 @@ func New(configPath string) (*Application, error) {
 		patchService,
 		rfcService,
 		mailingListService,
+		editorEngine,
 	)
 
 	server := &http.Server{
@@ -239,6 +253,7 @@ func New(configPath string) (*Application, error) {
 		GitMirror:      gitMirrorService,
 		SourceAnalyzer: sourceAnalyzer,
 		MediaPolicy:    nativeMediaPolicy,
+		Editor:         nativeEditor,
 		Identity:       identityService,
 		MailRuntime:    mailRuntime,
 		Webhooks:       webhookService,
@@ -317,6 +332,9 @@ func (application *Application) Close() error {
 	}
 	if application.MediaPolicy != nil {
 		closeErrors = append(closeErrors, application.MediaPolicy.Close())
+	}
+	if application.Editor != nil {
+		closeErrors = append(closeErrors, application.Editor.Close())
 	}
 	if application.Database != nil {
 		closeErrors = append(closeErrors, application.Database.Close())

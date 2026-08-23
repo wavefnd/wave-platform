@@ -48,7 +48,7 @@ func TestBlogAdministrationRequiresAdministratorAndPublishes(t *testing.T) {
 		{name: "owner", token: ownerToken, status: http.StatusOK},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			request := httptest.NewRequest(http.MethodPost, "http://wave.test/api/v1/admin/blog/posts", strings.NewReader(body))
+			request := httptest.NewRequest(http.MethodPost, "http://wave.test/api/v1/blog/editor/posts", strings.NewReader(body))
 			request.Header.Set("Origin", "http://wave.test")
 			if test.token != "" {
 				request.AddCookie(&http.Cookie{Name: SessionCookieName, Value: test.token})

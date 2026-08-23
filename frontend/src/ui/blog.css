@@ -842,3 +842,5 @@
 		transition: none;
 	}
 }
+.blog-heading-kicker, .blog-detail-actions { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.blog-heading-kicker a, .blog-detail-actions > a:last-child { color: var(--wave-link); font-size: .78rem; font-weight: 700; text-decoration: none; }

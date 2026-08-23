@@ -2,6 +2,10 @@
 
 FROM node:24-bookworm-slim AS frontend-builder
 
+WORKDIR /src
+
+COPY editor/ ./editor/
+
 WORKDIR /src/frontend
 
 COPY frontend/package.json frontend/package-lock.json* ./
@@ -55,6 +59,7 @@ COPY config/ ./config/
 COPY schemas/ ./schemas/
 COPY native/ ./native/
 COPY wave/ ./wave/
+COPY editor/ ./editor/
 
 COPY --from=frontend-builder /src/frontend/dist ./web/dist
 
@@ -77,6 +82,9 @@ RUN mkdir -p build/wave \
     && wavec build wave/source-analyzer/main.wave \
         --emit=obj \
         -o build/wave/source-analyzer.o \
+    && wavec build editor/wave/main.wave \
+        --emit=obj \
+        -o build/wave/editor.o \
     && cc -shared \
         -Wl,-soname,libwave-media-policy.so \
         -o build/wave/libwave-media-policy.so \
@@ -85,6 +93,10 @@ RUN mkdir -p build/wave \
         -Wl,-soname,libwave-source-analyzer.so \
         -o build/wave/libwave-source-analyzer.so \
         build/wave/source-analyzer.o \
+    && cc -shared \
+        -Wl,-soname,libwave-editor.so \
+        -o build/wave/libwave-editor.so \
+        build/wave/editor.o \
     && cc -Inative/include \
         native/tests/source_analyzer_smoke.c \
         build/wave/source-analyzer.o \
@@ -99,7 +111,8 @@ RUN mkdir -p build/wave \
     && rm -f build/wave/media-policy-smoke \
     && cp wave/policy-engine/module.xml build/wave/policy-engine.xml \
     && cp wave/media-policy/module.xml build/wave/media-policy.xml \
-    && cp wave/source-analyzer/module.xml build/wave/source-analyzer.xml
+    && cp wave/source-analyzer/module.xml build/wave/source-analyzer.xml \
+    && cp editor/module.xml build/wave/editor.xml
 
 RUN CGO_ENABLED=1 \
     go build \

@@ -4,6 +4,7 @@ import { computed, onMounted, ref, watch, watchEffect } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import { useI18n } from '../i18n'
+import PlatformWaveEditor from '../components/editor/PlatformWaveEditor.vue'
 import {
   acceptQuestionAnswer, createQuestion, createQuestionAnswer, getQuestion, getQuestions, voteQuestion,
   type QuestionMessage, type QuestionSummary, type QuestionView,
@@ -231,7 +232,7 @@ watchEffect(() => {
     <form v-else-if="mode === 'new'" class="question-editor" @submit.prevent="submitQuestion">
       <header><h1>{{ t('questions.ask') }}</h1><RouterLink to="/questions">{{ t('common.cancel') }}</RouterLink></header>
       <label><span>{{ t('questions.questionTitle') }}</span><input v-model="title" required minlength="10" maxlength="180" /></label>
-      <label><span>{{ t('questions.details') }}</span><textarea v-model="body" required minlength="20" maxlength="30000" rows="15" /></label>
+		<PlatformWaveEditor v-model="body" :label="t('questions.details')" required :min-length="20" :max-length="30000" :rows="15" />
       <div class="question-editor-meta">
         <label><span>{{ t('questions.tagsLabel') }}</span><input v-model="tags" required :placeholder="t('questions.tagsPlaceholder')" /></label>
         <label><span>{{ t('questions.waveVersion') }}</span><input v-model="waveVersion" maxlength="40" placeholder="0.2.0-pre-beta" /></label>
@@ -260,7 +261,7 @@ watchEffect(() => {
           <div class="question-post-content"><pre>{{ answer.body }}</pre><footer><RouterLink v-if="authorProfile(answer.author, answer.authorAccountId)" class="author-profile-link" :to="authorProfile(answer.author, answer.authorAccountId)" :title="authorEmail(answer.author)">{{ displayAuthor(answer.author) }}</RouterLink><span v-else>{{ displayAuthor(answer.author) }}</span><span>· {{ formatDate(answer.createdAt) }}</span><strong v-if="answer.accepted">{{ t('questions.accepted') }}</strong></footer></div>
         </section>
         <p v-if="actionError" class="question-action-error" role="alert">{{ actionError }}</p>
-        <form v-if="auth.account && question.status !== 'closed'" class="question-answer-editor" @submit.prevent="submitAnswer"><h2>{{ t('questions.yourAnswer') }}</h2><textarea v-model="answerBody" required maxlength="20000" rows="10" /><button class="ui-button primary" type="submit" :disabled="submitting">{{ t('questions.postAnswer') }}</button></form>
+		<form v-if="auth.account && question.status !== 'closed'" class="question-answer-editor" @submit.prevent="submitAnswer"><h2>{{ t('questions.yourAnswer') }}</h2><PlatformWaveEditor v-model="answerBody" required :max-length="20000" :rows="10" /><button class="ui-button primary" type="submit" :disabled="submitting">{{ t('questions.postAnswer') }}</button></form>
         <p v-else-if="!auth.account" class="question-login-note"><RouterLink to="/login">{{ t('mail.signIn') }}</RouterLink> {{ t('questions.toAnswer') }}</p>
       </article>
     </template>

@@ -3,6 +3,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import { useI18n } from '../i18n'
+import PlatformWaveEditor from '../components/editor/PlatformWaveEditor.vue'
 import { getUser, getUserByID, getUsers, updateUserProfile, updateWaveAddress, type UserActivity, type UserProfile } from '../services/http'
 import { useAuthStore } from '../stores/auth'
 import UiInlineState from '../ui/UiInlineState.vue'
@@ -104,7 +105,7 @@ watch(() => route.fullPath, load)
         <form @submit.prevent="saveProfile">
           <h2>{{ t('user.profileSettings') }}</h2>
           <label>{{ t('auth.displayName') }}<input v-model="displayName" required maxlength="80" /></label>
-          <label>{{ t('user.bio') }}<textarea v-model="bio" maxlength="500" rows="5" /></label>
+		  <PlatformWaveEditor v-model="bio" :label="t('user.bio')" mode="plain" :max-length="500" :rows="5" />
 		  <label>{{ t('user.timeZone') }}<select v-model="timeZone"><option v-for="zone in timeZones" :key="zone" :value="zone">{{ zone }}</option></select></label>
           <button class="ui-button primary" type="submit">{{ t('common.save') }}</button>
         </form>

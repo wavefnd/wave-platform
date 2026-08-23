@@ -4,6 +4,7 @@ import { computed, ref, watch, watchEffect } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 
 import MarkdownContent from '../components/MarkdownContent.vue'
+import PlatformWaveEditor from '../components/editor/PlatformWaveEditor.vue'
 import { useI18n } from '../i18n'
 import {
 	addRFCComment,
@@ -153,7 +154,7 @@ watchEffect(() => applyPageSEO({
       <header class="rfc-page-heading"><div><span>{{ number ? rfcNumber(number) : t('rfc.new') }}</span><h1>{{ number ? t('rfc.edit') : t('rfc.create') }}</h1><p>{{ t('rfc.editorHelp') }}</p></div></header>
       <form class="rfc-editor" @submit.prevent="saveProposal">
         <label><span>{{ t('rfc.proposalTitle') }}</span><input v-model.trim="title" required minlength="5" maxlength="180" /></label>
-        <label><span>{{ t('rfc.content') }}</span><textarea v-model="content" required minlength="20" maxlength="200000" rows="24" /></label>
+		<PlatformWaveEditor v-model="content" :label="t('rfc.content')" required :min-length="20" :max-length="200000" :rows="24" />
         <p v-if="error" class="rfc-error" role="alert">{{ error }}</p>
         <footer><RouterLink class="ui-button" :to="number ? `/rfcs/${number}` : '/rfcs'">{{ t('common.cancel') }}</RouterLink><button class="ui-button primary" type="submit" :disabled="busy">{{ t('common.save') }}</button></footer>
       </form>
@@ -185,7 +186,7 @@ watchEffect(() => applyPageSEO({
           <header><strong>{{ comment.authorName }}</strong><time :datetime="comment.createdAt">{{ formatDate(comment.createdAt) }}</time></header>
           <p>{{ comment.body }}</p>
         </article>
-        <form v-if="auth.account" class="rfc-comment-form" @submit.prevent="addComment"><label><span>{{ t('rfc.yourComment') }}</span><textarea v-model="commentBody" required maxlength="10000" rows="5" /></label><button class="ui-button primary" type="submit" :disabled="busy">{{ t('rfc.addComment') }}</button></form>
+		<form v-if="auth.account" class="rfc-comment-form" @submit.prevent="addComment"><PlatformWaveEditor v-model="commentBody" :label="t('rfc.yourComment')" required :max-length="10000" :rows="5" /><button class="ui-button primary" type="submit" :disabled="busy">{{ t('rfc.addComment') }}</button></form>
         <p v-else class="rfc-signin"><RouterLink :to="{ name: 'login', query: { redirect: route.fullPath } }">{{ t('auth.signIn') }}</RouterLink> {{ t('rfc.toComment') }}</p>
       </section>
     </template>
