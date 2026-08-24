@@ -23,7 +23,7 @@ if (score >= 90) {
 }
 ```
 
-The unparenthesized form `if score >= 90 { ... }` is not accepted by the parser.
+Write `if (score >= 90) { ... }`; the unparenthesized form is invalid.
 
 ## Conditions cannot mutate state
 
@@ -54,7 +54,7 @@ while (index < 10) {
 
 ## for loops
 
-`for` uses an initializer, condition, and increment expression.
+`for` uses an initializer, condition, and update expression.
 
 ```wave
 for (var i: i32 = 0; i < 10; i += 1) {
@@ -62,7 +62,7 @@ for (var i: i32 = 0; i < 10; i += 1) {
 }
 ```
 
-The initializer can use `var`, a typed binding, or a general expression. `const` and `static` are rejected as local for-loop initializers.
+The initializer can declare a local with `var` or evaluate an expression. `const` and `static` are top-level declarations and cannot be used as for-loop initializers.
 
 ## break and continue
 
@@ -83,7 +83,7 @@ while (i < 20) {
 
 ## match
 
-The value matched by `match` is also parenthesized. Current patterns handle integer literals, identifier-shaped names, and the `_` wildcard.
+The value matched by `match` is parenthesized. A pattern can be an integer literal, an enum variant name, or the `_` wildcard.
 
 ```wave
 match (status) {

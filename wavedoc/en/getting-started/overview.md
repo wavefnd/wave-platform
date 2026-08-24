@@ -6,14 +6,12 @@ group: getting-started
 group_order: 1
 order: 1
 title: Wave language overview
-summary: A practical overview of Wave, its program structure, and the documentation's compatibility scope.
+summary: A practical introduction to Wave syntax, program structure, console I/O, and low-level facilities.
 ---
 
-## Documentation baseline
+## About Wave
 
-Wave is a statically typed systems programming language designed for native code generation and explicit low-level control. This documentation describes the current Wave compiler contract: syntax accepted by the parser, semantic restrictions enforced by the compiler, and options reported by `wavec --help` and `wavec print`.
-
-If an example behaves differently with your compiler, query the installed compiler rather than relying on a hard-coded capability list.
+Wave is a statically typed systems programming language designed for native code generation and explicit low-level control. Types, memory access, native interfaces, and target settings remain visible in source code and build commands.
 
 ## First program
 
@@ -39,7 +37,7 @@ Hosted executables normally start at `main`. Freestanding builds can select anot
 
 ## Basic statement style
 
-Wave uses explicit types for variables and function parameters.
+Wave keeps function signatures explicit. Local variables can state their type or infer it from an initializer.
 
 ```wave
 fun add(left: i32, right: i32) -> i32 {
@@ -49,18 +47,17 @@ fun add(left: i32, right: i32) -> i32 {
 
 fun main() {
     var count: i32 = 1;
+    var next = count + 1;
     count += 1;
-    println("count = {}", count);
+    println("count = {}, next = {}", count, next);
 }
 ```
 
-`var` is the local variable declaration. The former `let` and `let mut`
-spellings have been removed and are syntax errors. `const` and `static` are
-top-level declarations.
+`var` is the syntax for declaring a local variable. In `var next = count + 1;`, the type of `next` is inferred from the initializer. `const` and `static` are top-level declarations.
 
 ## Console I/O
 
-`print`, `println`, and `input` are parser-recognized I/O statements rather than ordinary standard-library function calls. Their first argument must be a string literal, and the number of `{}` placeholders must match the number of following arguments.
+`print`, `println`, and `input` are Wave console I/O statements. Their first argument is a string literal, and each `{}` placeholder corresponds to one following value.
 
 ```wave
 fun main() {
@@ -73,7 +70,7 @@ fun main() {
 
 ## Low-level facilities
 
-Wave provides `ptr<T>`, address-of `&`, explicit `deref`, C ABI boundaries through `extern(c)` and `export(c)`, and inline `asm`. These facilities do not automatically establish ownership, bounds, alignment, or lifetime validity; those properties remain part of the surrounding program and API contract.
+Wave provides `ptr<T>`, address-of `&`, explicit `deref`, C ABI boundaries through `extern(c)` and `export(c)`, and inline `asm`. Programs using these facilities define the ownership, bounds, alignment, and lifetime rules required by each memory or native API.
 
 ## Suggested learning order
 

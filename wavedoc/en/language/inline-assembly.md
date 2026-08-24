@@ -41,7 +41,7 @@ asm {
 - `out("reg") target` stores an output into an assignable Wave target.
 - Register names can be parsed from strings or identifier forms.
 
-Input operands are intentionally limited to forms handled by the asm parser, including variables, integer and string literals, `&identifier`, `deref identifier`, and negative numeric literals.
+An input operand can be a variable, an integer or string literal, `&identifier`, `deref identifier`, or a negative numeric literal.
 
 ## clobbers
 

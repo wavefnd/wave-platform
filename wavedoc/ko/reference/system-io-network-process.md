@@ -12,7 +12,7 @@ summary: fd 기반 I/O, 파일 시스템, 소켓/TCP/UDP와 프로세스 API의 
 ## 파일 열기와 닫기
 
 ```wave
-import("std::fs::file");
+import("std::fs::file")::{fs_open_read, fs_close};
 
 fun main() {
     var fd: i64 = fs_open_read("input.txt");
@@ -55,4 +55,4 @@ if (size < 0) {
 
 ## 플랫폼 의존성
 
-이 모듈들은 내부적으로 `std::sys`와 네이티브 호출을 사용합니다. 특정 오류 코드나 플래그 값에 의존하는 프로그램은 대상 운영체제와 ABI를 명확히 정해 테스트하십시오.
+이 모듈들은 `std::sys`를 통해 운영체제의 네이티브 기능을 사용합니다. 특정 오류 코드나 플래그 값에 의존하는 프로그램은 대상 운영체제와 ABI를 명확히 정해 테스트하십시오.

@@ -23,29 +23,27 @@ static request_count: i64 = 0;
 
 fun main() {
     var limit: i32 = 4;
-    var current: i32 = 0;
+    var active: i32 = 0;
     var retries: i32 = 0;
 
-    current += 1;
+    active += 1;
     retries += 1;
-    println("{} {} {}", limit, current, retries);
+    println("{} {} {}", limit, active, retries);
 }
 ```
 
-## Local declaration contract
+## Local variables
 
 ```wave
 var value: i32 = 1;
 value = 2;
 ```
 
-The reassignment above is allowed. Wave no longer has separate immutable local
-binding syntax: `let` and `let mut` have been removed. Use `const` at the top
-level when a compile-time constant is required.
+`var` declares local storage, and its value can be reassigned. Use a top-level `const` for a named constant.
 
 ## Local const and static
 
-The function parser explicitly rejects `const` and `static` inside function bodies. The same restriction applies to for-loop initializers.
+`const` and `static` are top-level declarations. They cannot be declared inside a function body or used as a for-loop initializer.
 
 ## Lifetimes and pointers
 

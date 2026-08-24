@@ -9,15 +9,13 @@ title: 진단과 문제 해결
 summary: 사람용·JSON 진단, check 모드, 디버그 출력과 재현 가능한 버그 보고 절차를 설명합니다.
 ---
 
-## 먼저 버전 확인
+## 재현 환경 기록
 
-문법 오류를 조사하기 전에 설치된 컴파일러의 정확한 버전을 기록합니다.
+문제를 재현할 때는 사용한 컴파일러와 명령을 함께 기록합니다.
 
 ```shell
 wavec --version
 ```
-
-`wavec --help`의 명령 범위도 함께 비교하십시오. 오래된 컴파일러는 현재 문서의 계약을 모두 구현하지 않을 수 있습니다.
 
 ## 프런트엔드만 검사
 
@@ -39,14 +37,14 @@ wavec --error-format=json build main.wave --emit=check
 
 사람이 읽는 기본 출력과 자동화용 JSON 출력을 구분하면 진단 파싱이 안정적입니다.
 
-## 내부 단계 확인
+## 상세 진단 출력
 
 ```shell
 wavec --debug-wave=tokens build main.wave --emit=check
 wavec --debug-wave=ast build main.wave --emit=check
 ```
 
-`--debug-wave`는 lexer 토큰, AST, IR 등 선택한 내부 단계 확인에 사용할 수 있습니다. 일반 사용자 오류를 해결할 때는 먼저 첫 번째 실제 진단과 해당 소스 위치를 읽고, 내부 덤프는 필요할 때만 사용하십시오.
+`--debug-wave`는 토큰 스트림, 구문 트리와 중간 표현 같은 상세 정보를 출력합니다. 일반적인 오류는 첫 번째 진단과 표시된 소스 위치부터 확인하고, 상세 출력은 문제가 재현되는 단계를 좁힐 때 사용합니다.
 
 ## 흔한 문제 분리
 

@@ -36,7 +36,7 @@ var count: i32 = 1;
 count += 1;
 ```
 
-Die früheren Formen `let` und `let mut` wurden entfernt und sind Syntaxfehler. Für Deklarationen auf oberster Ebene werden `const` und `static` verwendet.
+Konstanten und statischer Speicher auf oberster Ebene werden mit `const` und `static` deklariert.
 
 ## Übersetzungsstatus
 

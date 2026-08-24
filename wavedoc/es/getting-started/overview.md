@@ -36,7 +36,7 @@ var count: i32 = 1;
 count += 1;
 ```
 
-Las formas anteriores `let` y `let mut` fueron eliminadas y ahora producen un error de sintaxis. Usa `const` y `static` para declaraciones de nivel superior.
+Las constantes y el almacenamiento estático de nivel superior se declaran con `const` y `static`.
 
 ## Estado de la traducción
 

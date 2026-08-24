@@ -62,7 +62,7 @@ Progress stages such as `Resolving`, `Fetching`, `Compiling`, `Checking`, `Runni
 
 ## Git-first dependencies
 
-Vex currently needs no central registry. A dependency uses exactly one of a local `path` or a Git URL.
+Vex resolves dependencies from local paths or Git URLs. Each dependency uses exactly one source form.
 
 ```wson
 {
@@ -93,7 +93,7 @@ vex update math shared_core
 
 ## Locked and offline workflows
 
-`--locked` forbids creating or changing `vex.lock`. It fails when the file is missing, uses an unsupported schema, or no longer matches the manifest graph. It may still fetch a commit already pinned by the lockfile.
+`--locked` forbids creating or changing `vex.lock`. It fails when the file is missing, uses an unrecognized schema, or no longer matches the manifest graph. It may still fetch a commit already pinned by the lockfile.
 
 `--offline` prohibits Git network operations. Required checkouts and commits must already exist locally.
 
@@ -113,4 +113,4 @@ vex setup wavec --version <version>
 vex --version
 ```
 
-Vex validates `wavec`'s dry-run JSON schema before the real build. A compiler that does not implement the required schema is rejected with a compatibility error rather than being invoked with an unknown plan.
+Vex validates the JSON build plan returned by `wavec --dry-run` before compiling. If their schema versions do not match, Vex reports a compatibility error without starting the build.

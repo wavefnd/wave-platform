@@ -14,15 +14,23 @@ summary: Local bindings, top-level constants and static storage, built-in types,
 ```wave
 var count: i32 = 1;
 var limit: i32 = 10;
-var index: i32 = 0;
+var index = count + 1;
 ```
 
 | Declaration | Meaning |
 | --- | --- |
-| `var` | Local variable; values may be reassigned |
+| `var` | Declares a local variable whose value can be reassigned |
 
-`var` is the only local declaration form. The removed `let` and `let mut`
-spellings are syntax errors and must not be used in new Wave source.
+`var` is the syntax for declaring local variables.
+
+A type can be written after the variable name, or inferred from an initializer:
+
+```wave
+var capacity: i64 = 4096;
+var doubled = capacity * 2;
+```
+
+Use `var name: Type;` when declaring storage without an initializer. Inferred declarations require an initializer whose type can be determined from the expression.
 
 ## Top-level storage declarations
 
@@ -35,13 +43,14 @@ static request_count: i64 = 0;
 
 ## Integer and floating-point types
 
-The documented fixed-width integer spellings are:
+Wave provides these integer and floating-point types:
 
-- Signed: `i8`, `i16`, `i32`, `i64`, `i128`, `i256`, `i512`, `i1024`
-- Unsigned: `u8`, `u16`, `u32`, `u64`, `u128`, `u256`, `u512`, `u1024`
+- Signed: `i8`, `i16`, `i32`, `i64`, `i128`
+- Unsigned: `u8`, `u16`, `u32`, `u64`, `u128`
+- Pointer-sized: `isz`, `usz`
 - Floating point: `f32`, `f64`
 
-The lexer recognizes `isz` and `usz`, but the current type-conversion path does not handle them. Do not use them until compiler support is documented.
+`isz` and `usz` represent signed and unsigned integers sized for the target's address space.
 
 ## Other built-in types
 
@@ -73,4 +82,4 @@ type UserId = u64;
 var id: UserId = 7;
 ```
 
-A type alias gives an existing type another name; it does not create additional storage or a new runtime representation by itself.
+A type alias is a readable alternative name for another type. In this example, `UserId` can be used anywhere a `u64` is expected.

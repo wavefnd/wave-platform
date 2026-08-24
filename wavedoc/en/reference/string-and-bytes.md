@@ -11,7 +11,7 @@ summary: String submodules, len/is_empty, comparison, search, trimming, ASCII he
 
 ## String module layout
 
-The current `std/string` tree contains these source units:
+`std::string` contains these source units:
 
 - `ascii.wave`
 - `cmp.wave`
@@ -27,7 +27,7 @@ Import the source unit that defines the operations you need.
 `std::string::len` defines both `len` and `is_empty`.
 
 ```wave
-import("std::string::len");
+import("std::string::len")::{len, is_empty};
 
 fun main() {
     var size: i32 = len("Wave");
@@ -36,21 +36,21 @@ fun main() {
 }
 ```
 
-The current `len` implementation indexes the string until it encounters a zero value and returns an `i32` count. Code using this API should therefore follow the release's `str` representation contract.
+`len(s)` returns the number of values before the string's terminating zero as an `i32`. `is_empty(s)` is true when the first value is the terminating zero.
 
 ## Comparison, searching, and trimming
 
 ```wave
-import("std::string::cmp");
-import("std::string::find");
-import("std::string::trim");
+import("std::string::cmp")::{eq, cmp, starts_with, ends_with};
+import("std::string::find")::{find, contains};
+import("std::string::trim")::{trim_range};
 ```
 
-Use the installed standard-library source for exact function names and return contracts. `wavec print std-path` prints the current `std` location.
+Use `wavec print std-path` to locate the standard-library source and read each module's public signatures.
 
 ## ASCII helpers
 
-`std::string::ascii` provides helpers for byte-level ASCII classification and conversion. Do not assume that these APIs provide full Unicode text processing.
+`std::string::ascii` provides byte-level ASCII classification and conversion. These operations follow ASCII rules rather than Unicode text rules.
 
 ## Byte order
 

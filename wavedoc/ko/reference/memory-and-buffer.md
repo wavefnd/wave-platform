@@ -12,8 +12,8 @@ summary: std::mem의 수동 할당·복사·정렬·페이지 도우미와 std::
 ## 기본 수동 할당
 
 ```wave
-import("std::mem::alloc");
-import("std::mem::ops");
+import("std::mem::alloc")::{mem_alloc, mem_free};
+import("std::mem::ops")::{mem_zero};
 
 fun main() {
     var size: i64 = 256;
@@ -30,7 +30,7 @@ fun main() {
 
 ## zeroed와 realloc
 
-`std::mem::alloc`에는 다음 계열이 구현되어 있습니다.
+`std::mem::alloc`은 다음 함수를 제공합니다.
 
 - `mem_alloc`
 - `mem_alloc_zeroed`
@@ -40,7 +40,7 @@ fun main() {
 - 페이지 수와 페이지 정렬 크기 도우미
 - 정렬 할당과 해제 도우미
 
-`mem_realloc`은 새 저장소를 만들고 필요한 범위를 복사한 뒤 이전 저장소를 해제하는 구현이므로, 실패했을 때 기존 포인터의 처리 규칙을 함수 구현과 함께 확인하십시오.
+`mem_realloc`은 새 저장소를 할당하고 기존 내용에서 새 크기에 들어가는 범위를 복사합니다. 성공하면 기존 저장소를 해제하고 새 포인터를 반환합니다. 새 할당이 실패하면 `null`을 반환하며 기존 저장소는 그대로 유지됩니다.
 
 ## 크기 단위
 

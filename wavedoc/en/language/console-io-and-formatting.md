@@ -6,12 +6,12 @@ group: language
 group_order: 2
 order: 13
 title: Console I/O and formatting
-summary: Parser-recognized print, println, and input statements and their placeholder rules.
+summary: The print, println, and input statements and their placeholder rules.
 ---
 
 ## I/O statements
 
-Wave currently recognizes `print`, `println`, and `input` as language statements. They look like calls, but they are parsed directly rather than resolved as ordinary functions.
+`print`, `println`, and `input` are Wave language statements for formatted console I/O.
 
 ```wave
 fun main() {
@@ -32,7 +32,7 @@ Only the exact two-character sequence `{}` is a placeholder.
 println("name = {}, score = {}", name, score);
 ```
 
-The parser counts placeholders and requires exactly the same number of following expressions. A mismatch is a compile-time error.
+The number of placeholders must equal the number of following expressions. A mismatch is a compile-time error.
 
 ```wave
 println("{} {}", one);       // error: two placeholders, one value
@@ -50,11 +50,11 @@ print("loading...");
 println("done");
 ```
 
-Formatting is type-directed during code generation. Integer, floating-point, pointer, string-like, and aggregate values are lowered according to their Wave type and the hosted C runtime interface.
+Formatting accepts scalar values such as integers, floating-point values, strings, and pointers. Arrays and structs are not formatting arguments.
 
 ## input destinations
 
-Every expression after the `input` format must be a writable lvalue because the runtime stores parsed data through its address.
+Every expression after the `input` format must identify writable storage for the parsed value.
 
 ```wave
 var number: i32 = 0;
@@ -63,8 +63,8 @@ input("{}", number);
 
 Variables, supported field accesses, and supported dereference forms can be destinations. Literals and computed rvalues cannot.
 
-The generated hosted implementation checks how many fields were converted. If the runtime does not convert every requested value, the program exits with a failure status.
+If `input` cannot convert every requested value, the program exits with a failure status.
 
 ## Runtime boundary
 
-These statements currently lower through hosted C `printf` and `scanf`-style facilities. They therefore require the normal hosted runtime and are not a portable freestanding I/O mechanism. Kernels and embedded programs should define target-specific output and input behind explicit functions or FFI boundaries.
+These console statements require a hosted runtime. Freestanding kernels and embedded programs provide target-specific input and output through explicit functions or FFI boundaries.

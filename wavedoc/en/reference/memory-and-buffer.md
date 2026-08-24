@@ -12,8 +12,8 @@ summary: Manual allocation, copying, alignment, page helpers in std::mem, and sa
 ## Basic manual allocation
 
 ```wave
-import("std::mem::alloc");
-import("std::mem::ops");
+import("std::mem::alloc")::{mem_alloc, mem_free};
+import("std::mem::ops")::{mem_zero};
 
 fun main() {
     var size: i64 = 256;
@@ -30,7 +30,7 @@ fun main() {
 
 ## Zeroing and reallocation
 
-`std::mem::alloc` implements families including:
+`std::mem::alloc` provides:
 
 - `mem_alloc`
 - `mem_alloc_zeroed`
@@ -40,7 +40,7 @@ fun main() {
 - Page-count and page-alignment helpers
 - Aligned allocation and free helpers
 
-The current `mem_realloc` implementation allocates new storage, copies the necessary range, and frees the old storage. Check its exact failure behavior before building ownership logic around it.
+`mem_realloc(old_ptr, old_size, new_size)` returns storage sized to `new_size` and preserves up to the smaller of the old and new sizes. A non-positive new size frees valid old storage and returns `null`. If a new allocation fails, it returns `null` and leaves the old allocation available to its owner.
 
 ## Size units
 

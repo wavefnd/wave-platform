@@ -62,7 +62,7 @@ Vex의 옵션은 작게 유지됩니다. emit, linker, CPU, ABI 또는 debug처�
 
 ## Git 중심 의존성
 
-현재 Vex는 중앙 registry가 없어도 동작합니다. 의존성 하나에는 로컬 `path`와 Git URL 중 정확히 하나만 지정합니다.
+Vex 의존성은 로컬 `path` 또는 Git URL로 지정합니다. 의존성 하나에는 두 방식 중 하나만 사용할 수 있습니다.
 
 ```wson
 {

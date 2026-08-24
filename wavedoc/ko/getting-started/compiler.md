@@ -6,7 +6,7 @@ group: getting-started
 group_order: 1
 order: 3
 title: 컴파일러 명령 참조
-summary: 현재 wavec 명령, 빌드 파이프라인, 출력, 대상, 진단, 의존성 연결과 도구 질의를 설명합니다.
+summary: wavec 명령, 빌드 파이프라인, 출력, 대상, 진단, 의존성 연결과 도구 질의를 설명합니다.
 ---
 
 ## 명령 모델
@@ -27,7 +27,7 @@ wavec [global-options] <command> [command-options]
 | `wavec update std` | 설치된 표준 라이브러리를 업데이트합니다. |
 | `wavec --version` | 컴파일러와 LLVM 백엔드 버전을 출력합니다. |
 
-정확한 옵션 목록은 설치된 릴리스의 `wavec --help`를 기준으로 하십시오.
+`wavec --help`에서 명령과 옵션의 전체 목록을 확인할 수 있습니다.
 
 ## 빌드, 검사와 실행
 
@@ -39,7 +39,7 @@ wavec run main.wave -- first-argument second-argument
 
 `build`는 기본적으로 실행 파일을 만듭니다. `check`는 프런트엔드 검사를 마친 뒤 멈춥니다. `run`은 바이너리 출력이 필요하며 공유 라이브러리 빌드와 함께 사용할 수 없습니다.
 
-컴파일·링크·실행 없이 요청을 검증하고 예정된 단계를 확인하려면 `--dry-run`을 사용합니다.
+컴파일·링크·실행 없이 요청을 검증하고 실행할 단계를 확인하려면 `--dry-run`을 사용합니다.
 
 ```shell
 wavec build main.wave --target riscv64-unknown-linux-gnu --dry-run
@@ -75,7 +75,7 @@ wavec build module.o --input-type=obj --link-only --emit=bin -o app
 | `--out-dir <dir>` | emit 산출물을 지정한 디렉터리에 둡니다. |
 | `--target-dir <dir>` | 중간 산출물과 기본 산출물 루트를 지정합니다. |
 
-## 최적화와 컴파일러 내부 확인
+## 최적화와 진단 출력
 
 ```shell
 wavec -O2 build main.wave
@@ -115,7 +115,7 @@ wavec --dep math=/opt/wave-deps/math build main.wave
 
 ## 지원 기능 질의
 
-도구에 컴파일러 지원 정보를 하드코딩하지 말고 설치된 컴파일러에 질의하십시오.
+대상이나 산출물 종류를 사용하는 도구는 `wavec print`로 지원 정보를 질의할 수 있습니다.
 
 ```shell
 wavec print host-target
@@ -136,4 +136,4 @@ wavec print dep-search-paths
 
 ## 컴파일러와 툴체인의 경계
 
-`wavec`는 세부 컴파일 작업을 담당합니다. Vex는 패키지 manifest, 의존성 그래프, lockfile과 재현 가능한 패키지 빌드를 담당합니다. Whale은 별도의 저수준 툴체인 프로젝트이며 현재 CLI에서 `wavec --whale` 플래그로 선택하는 기능이 아닙니다.
+`wavec`는 소스 검사, 코드 생성과 링크를 담당합니다. Vex는 패키지 manifest, 의존성 그래프, lockfile과 재현 가능한 패키지 빌드를 담당합니다. Whale은 독립적으로 실행하는 저수준 툴체인입니다.

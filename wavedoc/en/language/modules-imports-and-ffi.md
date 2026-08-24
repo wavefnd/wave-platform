@@ -6,7 +6,7 @@ group: language
 group_order: 2
 order: 8
 title: Modules, imports, and FFI
-summary: Resolution of local, standard, and package imports plus C ABI extern/export declarations.
+summary: Local, standard-library, and package imports; namespaces, visibility, re-exports; and C ABI declarations.
 ---
 
 ## import syntax
@@ -15,7 +15,7 @@ summary: Resolution of local, standard, and package imports plus C ABI extern/ex
 import("std::string::len");
 ```
 
-`import` takes one string literal and ends as a complete `);` statement.
+`import` takes a string literal and ends with `;`. A normal import creates a namespace for the module's public declarations.
 
 ## Standard-library imports
 
@@ -26,24 +26,32 @@ import("std::fs::file");
 import("std::io::fd");
 ```
 
-Use `wavec print std-path` to inspect the standard-library location used by the current compiler.
+Use `wavec print std-path` to locate the installed standard library.
 
-## Local file imports
+## Local module imports
 
-A path without `::` resolves relative to the importing source file's base directory. If `.wave` is omitted, the compiler appends it while searching.
+Local modules use a path beginning with `./`. The path is relative to the importing source file, and `.wave` can be omitted.
 
 ```wave
-import("math");
+import("./math");
 ```
 
-This form resolves `math.wave` in the corresponding base directory.
+This form loads `math.wave` and creates the `math` namespace. Local import paths stay inside the module directory and do not use `..` or backslashes.
 
 ## External package imports
 
-A non-`std::` path containing `::` treats the first component as a package name.
+A bare name identifies an external package root. Additional `::` components identify a module inside that package.
 
 ```wave
+import("math");
 import("math::vector::ops");
+```
+
+The package root loads `src/lib.wave` (or `lib.wave`). A package module such as `math::vector::ops` loads `src/vector/ops.wave` (or `vector/ops.wave`). Public declarations are accessed through the import namespace:
+
+```wave
+var sum = math::add(1, 2);
+var unit = math::vector::ops::normalize(value);
 ```
 
 Provide external package locations with dependency options:
@@ -55,13 +63,56 @@ wavec --dep math=/absolute/path/to/math build main.wave
 
 If the same package appears under multiple dependency roots, resolution is ambiguous; pin it with `--dep name=path`.
 
+## Aliases and selective imports
+
+Use `as` to choose a shorter or unambiguous namespace:
+
+```wave
+import("./geometry_helpers" as geometry);
+var area = geometry::area(width, height);
+```
+
+Use a selective import to bring named public declarations into the importing module:
+
+```wave
+import("math")::{add, Point};
+
+var sum = add(1, 2);
+var origin = Point { x: 0, y: 0 };
+```
+
+An import alias and a selective import are separate forms and cannot be combined.
+
+## Public declarations and re-exports
+
+Declarations are private to their module unless they use `pub`:
+
+```wave
+pub fun add(left: i32, right: i32) -> i32 {
+    return left + right;
+}
+
+pub struct Point {
+    x: i32;
+    y: i32;
+}
+```
+
+`pub` also applies to `enum`, `type`, `const`, and `static` declarations. A module can re-export selected public names from another module:
+
+```wave
+pub import("./arithmetic")::{add, subtract};
+```
+
+`pub` controls Wave module visibility. It is separate from `export(c)`, which exposes a native ABI symbol. The `main` entry function remains private.
+
 ## Importing C functions
 
 ```wave
 extern(c) fun puts(text: ptr<i8>) -> i32;
 ```
 
-The parser also accepts an explicit external symbol name after the ABI:
+Add an explicit external symbol name after the ABI when the Wave name and native symbol differ:
 
 ```wave
 extern(c, "native_symbol") fun local_name(value: i32) -> i32;
@@ -75,7 +126,7 @@ export(c) fun wave_add(left: i32, right: i32) -> i32 {
 }
 ```
 
-`extern` and `export` support both individual functions and block forms. Exported functions cannot be generic.
+`extern` and `export` support both individual functions and block forms. Exported functions cannot be generic. Add `pub` separately when another Wave module must also import an exported function.
 
 ## ABI details to verify explicitly
 
@@ -90,7 +141,7 @@ Successful linking does not by itself prove that the function signature and memo
 
 ## Target-condition attributes
 
-The import preprocessor can handle top-level target conditions such as:
+Top-level declarations can be selected for a target with `#[target(...)]`:
 
 ```wave
 #[target(os="linux", arch="x86_64")]

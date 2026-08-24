@@ -6,12 +6,12 @@ group: reference
 group_order: 3
 order: 1
 title: Standard library index
-summary: The top-level modules declared by the current std manifest and how to navigate them.
+summary: The top-level Wave standard-library modules, import paths, API discovery, and platform boundaries.
 ---
 
 ## Top-level modules
 
-The current `std/manifest.json` declares these top-level modules:
+The Wave standard library contains these top-level modules:
 
 | Area | Modules | Representative purpose |
 | --- | --- | --- |
@@ -28,25 +28,25 @@ The current `std/manifest.json` declares these top-level modules:
 Imports normally identify the specific `.wave` source unit that defines the API you need, rather than only the top-level module name.
 
 ```wave
-import("std::string::len");
-import("std::fs::file");
-import("std::mem::alloc");
+import("std::string::len")::{len, is_empty};
+import("std::fs::file")::{fs_open_read, fs_close};
+import("std::mem::alloc")::{mem_alloc, mem_free};
 ```
 
-For example, the `std::string::len` source unit defines both `len` and `is_empty`.
+The selective form makes the named public declarations available without a namespace prefix. A plain `import("std::string::len");` instead exposes them through the `std::string::len` namespace.
 
 ## Finding APIs
 
-The standard library is shipped as Wave source, so the installed release is the most precise API reference.
+The standard library is distributed as Wave source. Locate it with:
 
 ```shell
 wavec print std-path
 ```
 
-Open the module's `.wave` files at that location to inspect signatures, return contracts, and lower-level imports.
+Open a module's `.wave` files to inspect its public signatures, return contracts, and lower-level imports.
 
 ## Platform boundaries
 
 APIs under modules such as `sys`, `libc`, `fs`, `net`, and `process` often preserve platform-style failure results, including negative error values. Do not assume success; inspect and handle each function's return contract.
 
-The standard library evolves separately from language syntax, so avoid mixing `std` sources from a different Wave release with the compiler you are documenting.
+Use the standard library installed with the compiler so its modules and compiler agree on their language and ABI contracts.

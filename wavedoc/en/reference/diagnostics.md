@@ -9,7 +9,7 @@ title: Diagnostics and troubleshooting
 summary: Human and JSON diagnostics, check mode, debug output, and a reproducible bug-report workflow.
 ---
 
-## Check the version first
+## Record the compiler version
 
 Before investigating syntax behavior, record the exact installed compiler version.
 
@@ -17,9 +17,9 @@ Before investigating syntax behavior, record the exact installed compiler versio
 wavec --version
 ```
 
-Also compare the command surface with `wavec --help`; an older compiler may not implement the current documented contract.
+Use `wavec --help` to confirm the command and option spelling accepted by that installation.
 
-## Check the front end only
+## Check source without linking
 
 To separate Wave source errors from linking or execution:
 
@@ -39,14 +39,14 @@ wavec --error-format=json build main.wave --emit=check
 
 Keep the default human-readable format for terminal use and JSON for automated consumers.
 
-## Inspect compiler stages
+## Inspect compiler output
 
 ```shell
 wavec --debug-wave=tokens build main.wave --emit=check
 wavec --debug-wave=ast build main.wave --emit=check
 ```
 
-`--debug-wave` can expose selected stages such as lexer tokens, AST, or IR. For ordinary source errors, read the first actionable diagnostic and its source location before reaching for internal dumps.
+`--debug-wave` prints selected representations such as tokens, the AST, or IR. For an ordinary source error, start with the first diagnostic and its source location; use debug output when investigating compiler behavior or building developer tools.
 
 ## Separate common failure classes
 

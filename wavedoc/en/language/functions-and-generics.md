@@ -6,7 +6,7 @@ group: language
 group_order: 2
 order: 5
 title: Functions and generics
-summary: Function declarations, default parameters, returns, explicit generic instantiation, and current release limitations.
+summary: Function declarations, return values, default parameters, and explicit generic instantiation.
 ---
 
 ## Function declarations
@@ -67,15 +67,22 @@ fun main() {
 }
 ```
 
-Concrete type combinations are monomorphized during compilation.
+Each concrete type combination produces a specialized function or struct definition.
 
 ## Default parameters
 
-The function parser supports default parameter values represented by integer, floating-point, and string literals. Omitted arguments are filled during the compiler's generic-rewrite stage. Do not assume arbitrary expression defaults are supported.
+Default parameters use integer, floating-point, or string literals. A call can omit a trailing argument when its parameter declares a default value.
 
-## Current generic limitations
+```wave
+fun repeat(value: i32, count: i32 = 1) -> i32 {
+    return value * count;
+}
+
+var result: i32 = repeat(7);
+```
+
+## Generic rules
 
 - Generic function calls require explicit type arguments.
-- Generic methods are not currently supported.
 - Functions exposed through `export(...)` cannot be generic.
-- `ptr<T>` and `array<T, N>` are built-in type forms handled specially by the type parser, not user-defined generic templates.
+- `ptr<T>` and `array<T, N>` are built-in memory types, not user-defined generic templates.

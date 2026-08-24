@@ -21,7 +21,7 @@ wavec build main.wave --emit=obj -o main.o
 wavec build main.wave --emit=bin -o app
 ```
 
-The current artifact emit kinds are `ast`, `ir`, `bc`, `asm`, `obj`, and `bin`. `check` is a control mode rather than an artifact kind and is intended to stand alone.
+Artifact emit kinds are `ast`, `ir`, `bc`, `asm`, `obj`, and `bin`. `check` validates source without producing an artifact and is used alone.
 
 ```shell
 wavec print supported-emit-kinds
@@ -29,7 +29,7 @@ wavec print supported-emit-kinds
 
 ## Input kinds and link-only mode
 
-The compiler distinguishes Wave source, IR, bitcode, assembly, object, and archive inputs. Query the current list with:
+The compiler distinguishes Wave source, IR, bitcode, assembly, object, and archive inputs. Query the installed compiler with:
 
 ```shell
 wavec print supported-input-types
@@ -71,7 +71,7 @@ wavec print target-features --target <triple>
 
 ## Supported target families
 
-A full-target compiler build currently reports these target contracts. Always prefer `wavec print supported-targets` because a compiler built with a reduced backend feature set can expose fewer targets.
+A compiler built with the full target set provides these target contracts. Use `wavec print supported-targets` to see the targets included in a particular compiler build.
 
 | Target | Environment | Object format |
 | --- | --- | --- |

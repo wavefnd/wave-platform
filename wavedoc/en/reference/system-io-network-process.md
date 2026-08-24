@@ -12,7 +12,7 @@ summary: FD-based I/O, file systems, sockets/TCP/UDP, process APIs, and their fa
 ## Opening and closing files
 
 ```wave
-import("std::fs::file");
+import("std::fs::file")::{fs_open_read, fs_close};
 
 fun main() {
     var fd: i64 = fs_open_read("input.txt");
@@ -55,4 +55,4 @@ if (size < 0) {
 
 ## Platform dependence
 
-These modules are implemented on top of `std::sys` and native calls. Programs that depend on specific error values or flags should define and test their target OS and ABI explicitly.
+These modules cross the operating-system boundary through `std::sys` and native calls. Error values, flags, and some structures follow the selected operating system and ABI, so platform-dependent programs should make that target explicit and test it directly.

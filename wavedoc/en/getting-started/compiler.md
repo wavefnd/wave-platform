@@ -6,7 +6,7 @@ group: getting-started
 group_order: 1
 order: 3
 title: Compiler command reference
-summary: The current wavec commands, build pipeline, outputs, targets, diagnostics, dependencies, and tool queries.
+summary: wavec commands for building, checking, running, linking, inspecting targets, and integrating build tools.
 ---
 
 ## Command model
@@ -27,7 +27,7 @@ wavec [global-options] <command> [command-options]
 | `wavec update std` | Update the installed standard library. |
 | `wavec --version` | Print compiler and LLVM backend versions. |
 
-Use the installed release's `wavec --help` as the authoritative option list.
+Use `wavec --help` for the complete option list provided by the installed compiler.
 
 ## Build, check, and run
 
@@ -136,4 +136,4 @@ Other discoverable items include `host`, `default-target`, and `target-list`. It
 
 ## Compiler and toolchain boundaries
 
-`wavec` owns compilation details. Vex owns package manifests, dependency graphs, lockfiles, and repeatable package builds. Whale is a separate low-level toolchain project; it is not selected with a `wavec --whale` flag in the current CLI.
+`wavec` compiles Wave source and controls emitted artifacts, targets, and linking. Vex manages package manifests, dependency graphs, lockfiles, and repeatable package builds. Whale provides a separate low-level toolchain with its own commands.

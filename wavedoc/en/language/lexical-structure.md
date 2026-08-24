@@ -6,12 +6,12 @@ group: language
 group_order: 2
 order: 1
 title: Lexical structure
-summary: Distinguish identifiers, literals, delimiters, type spellings, and lexer-reserved tokens.
+summary: Identifiers, literals, statement delimiters, keywords, and built-in type spellings.
 ---
 
 ## Identifiers
 
-Identifiers name variables, functions, types, fields, and other declarations. Names are case-sensitive. The lexer accepts alphabetic characters, numeric characters, and `_` while scanning an identifier and uses Unicode character classification.
+Identifiers name variables, functions, types, fields, and other declarations. Names are case-sensitive. Identifiers can use Unicode letters, digits, and `_`; a digit cannot begin an identifier.
 
 ```wave
 var request_count: i64 = 0;
@@ -45,14 +45,10 @@ var address: ptr<u8> = null;
 
 Wave has integer, floating-point, string, character, Boolean, and `null` literals. Use `null` as a pointer value.
 
-## Reserved keywords and type spellings
+## Keywords and type spellings
 
-Major spellings tokenized specially by the lexer include:
+Wave keywords include:
 
-`fun`, `extern`, `export`, `type`, `enum`, `static`, `var`, `deref`, `const`, `if`, `else`, `proto`, `struct`, `while`, `for`, `module`, `class`, `in`, `out`, `clobber`, `is`, `as`, `asm`, `xnand`, `import`, `return`, `continue`, `print`, `input`, `println`, `match`, `break`, `true`, `false`, and `null`.
+`pub`, `fun`, `extern`, `export`, `type`, `enum`, `static`, `var`, `deref`, `const`, `if`, `else`, `proto`, `struct`, `while`, `for`, `in`, `out`, `clobber`, `as`, `asm`, `import`, `return`, `continue`, `print`, `input`, `println`, `match`, `break`, `true`, `false`, and `null`.
 
-`char`, `byte`, and the built-in integer and floating-point spellings are also tokenized as types. `ptr` and `array` remain identifier tokens and are interpreted by the type parser when written as `ptr<T>` and `array<T, N>`.
-
-> **Reserved does not mean implemented**
->
-> Lexer-reserved spellings such as `module`, `class`, `is`, and `xnand` do not by themselves imply a completed language feature. Treat a feature as supported when its usable syntax is documented and implemented through parsing and code generation.
+Built-in type spellings include `bool`, `char`, `byte`, `str`, the integer and floating-point types, `ptr<T>`, and `array<T, N>`. Keywords and built-in type names cannot be used as declaration names.

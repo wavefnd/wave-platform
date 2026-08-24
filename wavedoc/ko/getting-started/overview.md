@@ -6,14 +6,12 @@ group: getting-started
 group_order: 1
 order: 1
 title: Wave 언어 개요
-summary: Wave의 성격, 기본 프로그램 구조와 문서 호환 범위를 빠르게 파악합니다.
+summary: Wave의 성격과 기본 프로그램 구조를 빠르게 파악합니다.
 ---
 
-## 문서 기준
+## Wave란
 
-Wave는 정적 타입과 네이티브 코드 생성을 기반으로 저수준 제어를 제공하는 시스템 프로그래밍 언어입니다. 이 문서는 현재 Wave 컴파일러 계약을 기준으로 합니다. 즉, 파서가 받는 문법, 컴파일러가 검사하는 의미 규칙, `wavec --help`와 `wavec print`가 보고하는 옵션을 설명합니다.
-
-예제가 설치된 컴파일러와 다르게 동작한다면 하드코딩된 목록에 의존하지 말고 현재 컴파일러에 지원 기능을 질의하십시오.
+Wave는 정적 타입과 네이티브 코드 생성을 기반으로 저수준 제어를 제공하는 시스템 프로그래밍 언어입니다. 타입, 메모리 접근과 외부 ABI 경계를 코드에 명시하여 프로그램의 동작과 데이터 표현을 분명하게 드러냅니다.
 
 ## 첫 프로그램
 
@@ -39,7 +37,7 @@ wavec build main.wave -o app
 
 ## 문장의 기본 형태
 
-Wave의 변수와 함수 인자는 타입을 명시합니다.
+Wave의 함수 인자와 반환값은 타입을 명시합니다. 지역 변수는 타입을 직접 적거나 초깃값에서 추론할 수 있습니다.
 
 ```wave
 fun add(left: i32, right: i32) -> i32 {
@@ -49,17 +47,17 @@ fun add(left: i32, right: i32) -> i32 {
 
 fun main() {
     var count: i32 = 1;
+    var next = count + 1;
     count += 1;
-    println("count = {}", count);
+    println("count = {}, next = {}", count, next);
 }
 ```
 
-`var`는 지역 변수 선언입니다. 기존 `let`과 `let mut` 표기는 폐지되어
-문법 오류가 됩니다. `const`와 `static`은 최상위 선언입니다.
+`var`는 지역 변수를 선언하는 문법입니다. `var name: Type = value;`는 타입을 직접 지정하고, `var name = value;`는 초깃값의 타입을 사용합니다. `const`와 `static`은 최상위 선언입니다.
 
 ## 콘솔 입출력
 
-`print`, `println`, `input`은 일반적인 표준 라이브러리 함수 호출이 아니라 파서가 직접 인식하는 입출력 문장입니다. 첫 번째 인자는 문자열 리터럴이어야 하며 `{}` 자리표시자의 수와 뒤따르는 인자의 수가 일치해야 합니다.
+`print`, `println`, `input`은 Wave의 콘솔 입출력 문장입니다. 첫 번째 인자는 문자열 리터럴이어야 하며 `{}` 자리표시자의 수와 뒤따르는 인자의 수가 일치해야 합니다.
 
 ```wave
 fun main() {

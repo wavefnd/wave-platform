@@ -36,7 +36,7 @@ var count: i32 = 1;
 count += 1;
 ```
 
-旧的 `let` 和 `let mut` 已被废弃，现在会产生语法错误。顶层常量和静态存储分别使用 `const` 与 `static`。
+顶层常量和静态存储分别使用 `const` 与 `static` 声明。
 
 ## 翻译状态
 

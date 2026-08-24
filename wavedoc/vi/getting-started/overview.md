@@ -36,7 +36,7 @@ var count: i32 = 1;
 count += 1;
 ```
 
-Hai dạng cũ `let` và `let mut` đã bị loại bỏ và hiện là lỗi cú pháp. Dùng `const` và `static` cho khai báo ở cấp cao nhất.
+Hằng số và vùng lưu trữ tĩnh ở cấp cao nhất được khai báo bằng `const` và `static`.
 
 ## Trạng thái bản dịch
 

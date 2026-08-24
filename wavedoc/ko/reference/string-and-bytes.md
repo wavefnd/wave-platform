@@ -11,7 +11,7 @@ summary: string 하위 모듈, len/is_empty, 비교·검색·trim·ASCII와 endi
 
 ## 문자열 모듈 구성
 
-현재 `std/string` 트리에는 다음 소스 단위가 있습니다.
+`std/string`은 다음 소스 단위로 구성됩니다.
 
 - `ascii.wave`
 - `cmp.wave`
@@ -27,7 +27,7 @@ summary: string 하위 모듈, len/is_empty, 비교·검색·trim·ASCII와 endi
 `std::string::len`은 `len`과 `is_empty`를 함께 정의합니다.
 
 ```wave
-import("std::string::len");
+import("std::string::len")::{len, is_empty};
 
 fun main() {
     var size: i32 = len("Wave");
@@ -36,24 +36,31 @@ fun main() {
 }
 ```
 
-현재 구현의 `len`은 문자열을 인덱싱하며 0 값이 나올 때까지 세어 `i32` 길이를 반환합니다. 따라서 이 API를 사용할 때는 해당 릴리스의 `str` 표현 계약을 따르십시오.
+`len`은 문자열의 끝을 나타내는 0 바이트 전까지의 길이를 `i32`로 반환합니다. `is_empty`는 첫 바이트가 문자열 끝인지 확인합니다.
 
 ## 비교·검색·정리
 
 ```wave
-import("std::string::cmp");
-import("std::string::find");
-import("std::string::trim");
+import("std::string::cmp")::{eq, cmp, starts_with, ends_with};
+import("std::string::find")::{find, contains};
+import("std::string::trim")::{trim_range};
 ```
 
-함수 이름과 정확한 반환 규칙은 설치된 표준 라이브러리 소스를 기준으로 하십시오. `wavec print std-path`로 현재 `std` 위치를 확인할 수 있습니다.
+| 모듈 | 주요 함수 |
+| --- | --- |
+| `std::string::cmp` | `eq`, `cmp`, `starts_with`, `ends_with` |
+| `std::string::find` | `find`, `rfind_char`, `contains`, `count` |
+| `std::string::trim` | 공백을 제외한 범위를 찾는 `trim_left_index`, `trim_right_index`, `trim_range` |
+| `std::string::hash` | `djb2_32`, `fnv1a_64` |
+
+검색 함수는 찾은 위치를 `i32`로 반환하고, 일치하는 항목이 없으면 `-1`을 반환합니다. `wavec print std-path`로 표준 라이브러리 소스 경로를 확인할 수 있습니다.
 
 ## ASCII 도우미
 
-`std::string::ascii`는 ASCII 문자 분류와 변환처럼 바이트 수준 문자 처리가 필요한 코드를 위한 도우미를 제공합니다. Unicode 전체 문자 처리를 자동으로 제공한다고 가정하지 마십시오.
+`std::string::ascii`는 `is_digit`, `is_alpha`, `is_alnum`, `is_space`, `to_lower`, `to_upper` 같은 바이트 단위 ASCII 도우미를 제공합니다. 이 함수들은 Unicode 문자 전체가 아니라 ASCII 바이트를 처리합니다.
 
 ## 바이트 순서
 
-`std::bytes`는 바이너리 데이터의 읽기·쓰기와 엔디언 변환을 위한 모듈을 제공합니다. 파일 형식이나 네트워크 프로토콜을 처리할 때는 “호스트의 바이트 순서”와 “외부 형식이 요구하는 바이트 순서”를 구분하십시오.
+`std::bytes::endian`은 16·32·64비트 정수의 바이트 순서 변환과 big-endian·little-endian 읽기/쓰기를 제공합니다. 파일 형식이나 네트워크 프로토콜을 처리할 때는 호스트의 바이트 순서와 외부 형식이 요구하는 바이트 순서를 구분하십시오.
 
 정수 너비와 offset을 명시적으로 유지하면 플랫폼이 달라져도 바이너리 형식 코드를 검토하기 쉽습니다.

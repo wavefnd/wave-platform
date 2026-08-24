@@ -27,7 +27,7 @@ Struct fields use `name: type;`. Field access uses `value.field`.
 
 ## Methods and proto blocks
 
-The parser accepts `fun` methods directly inside a struct body. `proto` also provides a separate block for attaching methods to an already declared struct.
+Methods can be declared with `fun` inside a struct body. A `proto` block can attach methods to an already declared struct.
 
 ```wave
 struct Counter {
@@ -35,7 +35,7 @@ struct Counter {
 }
 
 proto Counter {
-    fun current(self: Counter) -> i32 {
+    fun read(self: Counter) -> i32 {
         return self.value;
     }
 }
@@ -45,12 +45,12 @@ Call a method with ordinary method syntax:
 
 ```wave
 var counter: Counter = Counter { value: 3 };
-var value: i32 = counter.current();
+var value: i32 = counter.read();
 ```
 
 ## Enums
 
-This release's enum syntax writes an underlying representation type after `->`.
+An enum declares its integer representation type after `->`.
 
 ```wave
 enum State -> i32 {
@@ -60,7 +60,7 @@ enum State -> i32 {
 }
 ```
 
-A variant can specify an integer value explicitly; omitted values continue from preceding values according to compiler enum processing.
+A variant can specify an integer value explicitly. The first omitted value is `0`; each later omitted value is one greater than the preceding variant.
 
 ## Type aliases
 
@@ -68,7 +68,14 @@ A variant can specify an integer value explicitly; omitted values continue from 
 type FileHandle = i64;
 ```
 
-Aliases let the same underlying type be referenced by another name.
+A type alias allows the same underlying type to be referenced by another name.
+
+```wave
+var handle: FileHandle = 4;
+var raw: i64 = handle;
+```
+
+`FileHandle` and `i64` are the same type. The alias communicates the value's purpose without requiring a conversion.
 
 ## ABI and layout
 

@@ -36,7 +36,7 @@ var count: i32 = 1;
 count += 1;
 ```
 
-Bentuk lama `let` dan `let mut` telah dihapuskan dan kini merupakan ralat sintaks. Gunakan `const` dan `static` untuk deklarasi aras atas.
+Pemalar dan storan statik pada aras atas dinyatakan dengan `const` dan `static`.
 
 ## Status terjemahan
 

@@ -6,21 +6,20 @@ group: reference
 group_order: 3
 order: 3
 title: 문법 빠른 참조
-summary: 현재 자주 쓰는 선언, 제어 흐름, 타입, 포인터, FFI 문법을 한 페이지에 정리합니다.
+summary: 자주 쓰는 선언, 제어 흐름, 타입, 포인터와 FFI 문법을 한 페이지에 정리합니다.
 ---
 
 ## 선언
 
 ```wave
 var value: i32 = 1;
-var fixed: i32 = 2;
-var mutable: i32 = 3;
+var inferred = value + 1;
 const LIMIT: i32 = 64;
 static total: i64 = 0;
 type Identifier = u64;
 ```
 
-`var`는 지역, `const`/`static`은 최상위 선언입니다.
+`var`는 지역, `const`/`static`은 최상위 선언입니다. 지역 변수의 타입을 생략하면 초깃값에서 추론합니다.
 
 ## 함수
 
@@ -81,7 +80,7 @@ match (status) {
 }
 ```
 
-`if`, `while`, `for`, `match`의 헤더는 이 릴리스에서 괄호를 사용합니다.
+`if`, `while`, `for`, `match`의 헤더는 괄호를 사용합니다.
 
 ## 배열과 포인터
 
@@ -101,10 +100,25 @@ input("{}", value);
 
 첫 인자는 문자열 리터럴입니다. 정확한 `{}` 자리표시자마다 뒤따르는 식이 하나씩 필요하며 `input` 대상은 대입 가능해야 합니다.
 
-## import와 FFI
+## import와 공개 항목
 
 ```wave
 import("std::string::len");
+import("./helpers" as helpers);
+import("math")::{Vector};
+
+pub fun add(left: i32, right: i32) -> i32 {
+    return left + right;
+}
+
+pub import("./extra")::{increment};
+```
+
+로컬 경로는 `./`로 시작합니다. 별칭 import는 모듈 이름을 지정하고, 선택 import는 필요한 공개 항목을 이 파일의 이름 공간으로 가져옵니다. `pub import`는 선택한 항목을 다시 내보냅니다.
+
+## FFI
+
+```wave
 extern(c) fun native_call(value: i32) -> i32;
 
 export(c) fun wave_call(value: i32) -> i32 {
@@ -135,7 +149,7 @@ asm {
 
 명령 텍스트와 레지스터 이름은 대상에 종속됩니다. 블록에 필요한 모든 입력, 출력과 숨은 clobber를 선언하십시오.
 
-## 컴파일러 확인
+## 소스 검사
 
 ```shell
 wavec build main.wave --emit=check

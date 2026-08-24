@@ -6,7 +6,7 @@ group: language
 group_order: 2
 order: 3
 title: Expressions and operators
-summary: Assignment, arithmetic, bitwise and logical operations, casts, increment/decrement, and the parser's actual precedence.
+summary: Assignment, arithmetic, bitwise and logical operations, casts, increment/decrement, and operator precedence.
 ---
 
 ## Main operators
@@ -32,7 +32,7 @@ area += 8;
 
 ## Precedence
 
-At a high level, the parser orders expressions from tighter to looser binding as follows:
+Operators bind from tighter to looser in this order:
 
 1. Primary and postfix operations: calls, field access, indexing, postfix `++` and `--`
 2. Unary operations: `!`, `~`, `&`, `deref`, prefix `++` and `--`, unary `+` and `-`
@@ -46,12 +46,8 @@ At a high level, the parser orders expressions from tighter to looser binding as
 10. `&&`, `||`
 11. Assignment and compound assignment
 
-Assignment parses its right-hand side as another assignment expression, giving chained assignments right-associative behavior. Use parentheses when mixing operators would make intent unclear.
+Assignment is right-associative, so chained assignments are evaluated from right to left. Use parentheses when mixing operators would make intent unclear.
 
 ## Assignable targets
 
 Assignment and `++`/`--` operate on storage locations such as variables, fields, indexed elements, and dereferenced pointers. Writes to `const` values are not allowed.
-
-## Reserved operator spellings
-
-`is` and `xnand` exist as lexer tokens, but they are not wired into the expression parser as supported operators. They are therefore not documented as usable operators.

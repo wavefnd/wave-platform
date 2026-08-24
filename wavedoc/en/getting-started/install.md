@@ -24,7 +24,7 @@ irm https://wave-lang.dev/install.ps1 -OutFile install.ps1
 powershell -ExecutionPolicy Bypass -File .\install.ps1 -Latest
 ```
 
-If an installer cannot update the current shell environment, apply the PATH instructions it prints or start a new shell. The Windows installer uses `%LOCALAPPDATA%\Wave\bin` by default and adds it to the user PATH. Both installers verify the published SHA-256 checksum before replacing an existing installation.
+If an installer cannot update the running shell environment, apply the PATH instructions it prints or start a new shell. The Windows installer uses `%LOCALAPPDATA%\Wave\bin` by default and adds it to the user PATH. Both installers verify the published SHA-256 checksum before replacing an existing installation.
 
 Wave and Vex have independent release versions. To pin both instead of resolving the latest Vex release, use:
 
@@ -45,11 +45,11 @@ vex --version
 vex --help
 ```
 
-Record this output when reporting a documentation mismatch. The pages describe the current compiler contract; older installed binaries may expose a smaller command or syntax surface.
+Include this output when reporting an installation or documentation problem.
 
 ## Release archives
 
-Release asset names include the selected version. Check the current release page for the exact version string and available platforms.
+Release asset names include the selected version. The release page lists the exact version string and available platforms.
 
 | Platform | Archive pattern |
 | --- | --- |

@@ -21,7 +21,7 @@ wavec build main.wave --emit=obj -o main.o
 wavec build main.wave --emit=bin -o app
 ```
 
-현재 artifact emit 종류는 `ast`, `ir`, `bc`, `asm`, `obj`, `bin`입니다. `check`는 산출물 종류가 아니라 검사 제어 모드이며 다른 artifact emit과 섞지 않는 것이 전제입니다.
+artifact emit 종류는 `ast`, `ir`, `bc`, `asm`, `obj`, `bin`입니다. `check`는 산출물 종류가 아니라 검사 제어 모드이며 다른 artifact emit과 함께 사용하지 않습니다.
 
 ```shell
 wavec print supported-emit-kinds
@@ -29,7 +29,7 @@ wavec print supported-emit-kinds
 
 ## 입력 종류와 link-only
 
-컴파일러는 Wave 소스 외에도 IR, bitcode, assembly, object, archive 입력 종류를 구분합니다. 현재 지원 목록은 다음으로 질의합니다.
+컴파일러는 Wave 소스 외에도 IR, bitcode, assembly, object와 archive 입력을 구분합니다. 지원 목록은 다음 명령으로 질의합니다.
 
 ```shell
 wavec print supported-input-types
@@ -59,7 +59,7 @@ wavec --link=m -L ./lib build main.wave
 - `--abi <name>`
 - `--sysroot <path>`
 
-호스트 기본값과 지원 대상은 컴파일러에서 확인하십시오.
+호스트 기본값과 지원 대상은 다음 명령으로 확인합니다.
 
 ```shell
 wavec print host-target
@@ -71,7 +71,7 @@ wavec print target-features --target <triple>
 
 ## 지원 대상 계열
 
-모든 backend 기능을 켠 컴파일러 빌드는 현재 다음 대상 계약을 보고합니다. 일부 backend 기능만 포함해 빌드한 컴파일러는 더 적은 대상을 제공할 수 있으므로 항상 `wavec print supported-targets` 결과를 우선하십시오.
+Wave 툴체인이 정의하는 대상 계열은 다음과 같습니다. 설치된 빌드에서 사용할 수 있는 대상은 `wavec print supported-targets`로 확인합니다.
 
 | 대상 | 환경 | object format |
 | --- | --- | --- |
