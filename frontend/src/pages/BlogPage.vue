@@ -5,7 +5,7 @@ import { useRoute } from 'vue-router'
 import MarkdownContent from '../components/MarkdownContent.vue'
 import { useI18n } from '../i18n'
 import { getBlogPost, getBlogPosts, type BlogPost, type BlogPostSummary } from '../services/http'
-import { applyPageSEO, plainTextDescription } from '../services/seo'
+import { applyPageSEO, firstMarkdownImage, plainTextDescription } from '../services/seo'
 import { useAuthStore } from '../stores/auth'
 import UiInlineState from '../ui/UiInlineState.vue'
 import '../ui/blog.css'
@@ -49,6 +49,12 @@ const homeArticles = computed(() => articlePosts.value.slice(0, 4))
 const homeReleases = computed(() => releasePosts.value.slice(0, 3))
 const homeRoadmap = computed(() => roadmapPosts.value.slice(0, 4))
 const latestRelease = computed(() => releasePosts.value[0] ?? null)
+const seoPosts = computed(() => {
+	if (releaseIndex.value) return releasePosts.value
+	if (category.value === 'roadmap') return roadmapPosts.value
+	if (category.value === 'article') return articlePosts.value
+	return [...publishedPosts.value.filter((item) => item.category !== 'release'), ...roadmapPosts.value]
+})
 const releaseArchive = computed(() => releasePosts.value.slice(1).reduce<Array<{ year: string, items: BlogPostSummary[] }>>((groups, item) => {
 	const year = releaseYear(item.publishedAt)
 	const existing = groups.find((group) => group.year === year)
@@ -91,6 +97,7 @@ async function load() {
 	error.value = ''
 	try {
 		if (detail.value) {
+			post.value = null
 			post.value = await getBlogPost(String(route.params.slug))
 			if (route.name === 'release-detail' && post.value.category !== 'release') throw new Error(t('blog.release.notFound'))
 			posts.value = []
@@ -127,22 +134,58 @@ watchEffect(() => {
 			description: releaseIndex.value ? t('blog.release.lead') : t('blog.lead'),
 			locale: locale.value,
 			path: route.path,
-			schema: { '@type': 'CollectionPage', name: pageTitle },
+			breadcrumbs: [
+				{ name: 'Home', path: '/' },
+				{ name: releaseIndex.value ? 'Releases' : 'Blog', path: releaseIndex.value ? '/releases' : '/blog' },
+			],
+			schema: {
+				'@type': 'CollectionPage', name: pageTitle,
+				mainEntity: {
+					'@type': 'ItemList',
+					itemListElement: seoPosts.value.slice(0, 20).map((item, index) => ({
+						'@type': 'ListItem', position: index + 1, name: item.title, url: new URL(postLink(item), window.location.origin).toString(),
+					})),
+				},
+			},
 		})
 		return
 	}
-	if (!post.value) return
+	if (!post.value) {
+		if (error.value) applyPageSEO({
+			title: 'Page not found · Wave', description: 'The requested Wave page was not found.',
+			locale: locale.value, path: route.path, noIndex: true, schema: { '@type': 'WebPage' },
+		})
+		return
+	}
 	const release = post.value.category === 'release'
+	const canonicalPath = release ? `/releases/${encodeURIComponent(post.value.slug)}` : route.path
+	const sectionName = release ? 'Releases' : post.value.category === 'roadmap' ? 'Roadmap' : 'Blog'
+	const sectionPath = release ? '/releases' : '/blog'
+	const image = firstMarkdownImage(post.value.content)
 	applyPageSEO({
 		title: `${post.value.title} · ${release ? 'Wave Releases' : 'Wave Blog'}`,
 		description: plainTextDescription(post.value.summary || post.value.content, post.value.title),
 		locale: locale.value,
-		path: release ? `/releases/${encodeURIComponent(post.value.slug)}` : route.path,
+		path: canonicalPath,
+		breadcrumbs: [
+			{ name: 'Home', path: '/' },
+			{ name: sectionName, path: sectionPath },
+			{ name: post.value.title, path: canonicalPath },
+		],
+		image: image?.url,
+		imageAlt: image?.alt || post.value.title,
 		schema: {
 			'@type': release || post.value.category === 'roadmap' ? 'TechArticle' : 'BlogPosting',
 			headline: post.value.title,
-			datePublished: post.value.publishedAt,
+			...(post.value.publishedAt ? { datePublished: post.value.publishedAt } : {}),
 			dateModified: post.value.updatedAt,
+			articleSection: sectionName,
+			isAccessibleForFree: true,
+			author: {
+				'@type': post.value.authorName === 'Wave Foundation' ? 'Organization' : 'Person',
+				name: post.value.authorName || 'Wave Foundation',
+				...(post.value.authorAccountId ? { url: new URL(`/user/id/${encodeURIComponent(post.value.authorAccountId)}`, window.location.origin).toString() } : {}),
+			},
 		},
 	})
 })

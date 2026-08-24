@@ -199,6 +199,7 @@ func frontendHandler(root string, seo SEOHandler) http.Handler {
 	const seoEnd = "<!-- wave:seo:end -->"
 	renderIndex := func(writer http.ResponseWriter, request *http.Request) {
 		document := indexDocument
+		document = bytes.Replace(document, []byte(`<html lang="en">`), []byte(`<html lang="`+languageForPath(request.URL.Path)+`">`), 1)
 		start := bytes.Index(document, []byte(seoStart))
 		end := bytes.Index(document, []byte(seoEnd))
 		if start >= 0 && end > start {
@@ -208,6 +209,7 @@ func frontendHandler(root string, seo SEOHandler) http.Handler {
 		}
 		writer.Header().Set("Content-Type", "text/html; charset=utf-8")
 		writer.Header().Set("Cache-Control", "no-cache")
+		writer.WriteHeader(seo.StatusCode(request))
 		_, _ = writer.Write(document)
 	}
 
@@ -215,6 +217,10 @@ func frontendHandler(root string, seo SEOHandler) http.Handler {
 		writer http.ResponseWriter,
 		request *http.Request,
 	) {
+		if redirect := seo.CanonicalRedirect(request.URL.Path); redirect != "" {
+			http.Redirect(writer, request, redirect, http.StatusPermanentRedirect)
+			return
+		}
 		if privateFrontendPath(request.URL.Path) {
 			writer.Header().Set("X-Robots-Tag", "noindex, nofollow, noarchive")
 		}

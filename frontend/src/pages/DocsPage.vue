@@ -100,12 +100,20 @@ watchEffect(() => {
     title: `${document.value.title} · Wave Documentation`,
     description: document.value.summary,
     locale: document.value.locale,
-    path: route.path,
+    path: showingEnglishFallback.value ? `/docs/en/${currentPath.value}` : route.path,
+    breadcrumbs: [
+      { name: 'Home', path: '/' },
+      { name: 'Documentation', path: `/docs/${document.value.locale}` },
+      { name: document.value.title, path: showingEnglishFallback.value ? `/docs/en/${currentPath.value}` : route.path },
+    ],
     schema: {
       '@type': 'TechArticle',
       headline: document.value.title,
       abstract: document.value.summary,
       dateModified: document.value.updatedAt,
+      articleSection: 'Documentation',
+      isAccessibleForFree: true,
+      author: { '@type': 'Organization', name: 'Wave Foundation' },
     },
   })
 })
