@@ -14,6 +14,7 @@ import PatchesPage from '../pages/PatchesPage.vue'
 import SearchPage from '../pages/SearchPage.vue'
 import SourcePage from '../pages/SourcePage.vue'
 import { useAuthStore } from '../stores/auth'
+import { initialDocumentLocale } from '../services/documentLocale'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -30,8 +31,12 @@ const router = createRouter({
 		{ path: 'blog/:slug', name: 'blog-post', component: BlogPage },
 		{ path: 'releases', name: 'releases', component: BlogPage, meta: { blogCategory: 'release' } },
 		{ path: 'releases/:slug', name: 'release-detail', component: BlogPage, meta: { blogCategory: 'release' } },
-        { path: 'docs', name: 'docs', component: DocsPage },
-        { path: 'docs/:pathMatch(.*)*', name: 'document', component: DocsPage },
+        { path: 'docs', name: 'docs', redirect: () => ({ name: 'docs-locale', params: { docLocale: initialDocumentLocale() } }) },
+        { path: 'docs/:docLocale(en|ko|ja|zh|es|de|ru|id|vi)', name: 'docs-locale', component: DocsPage },
+        { path: 'docs/:docLocale(en|ko|ja|zh|es|de|ru|id|vi)/:pathMatch(.*)*', name: 'document', component: DocsPage },
+        { path: 'docs/:pathMatch(.*)*', name: 'document-legacy', redirect: (to) => ({
+          name: 'document', params: { docLocale: initialDocumentLocale(), pathMatch: to.params.pathMatch },
+        }) },
         { path: 'mail', name: 'mail', component: MailPage },
 		{ path: 'mail/personal', name: 'mail-personal', component: MailPage },
 		{ path: 'mail/lists', name: 'mail-lists', component: MailPage },

@@ -55,6 +55,7 @@ RUN go mod download
 
 COPY cmd/ ./cmd/
 COPY internal/ ./internal/
+COPY wavedoc/ ./wavedoc/
 COPY config/ ./config/
 COPY schemas/ ./schemas/
 COPY native/ ./native/

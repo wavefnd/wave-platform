@@ -69,13 +69,14 @@ export interface EditorTransformResult {
 export interface DocumentSummary {
   id: string
   path: string
-  locale: 'en' | 'ko'
+  locale: DocumentLocale
   group: string
   order: number
   title: string
   summary: string
-  version: string
 }
+
+export type DocumentLocale = 'en' | 'ko' | 'ja' | 'zh' | 'es' | 'de' | 'ru' | 'id' | 'vi'
 
 export interface DocumentBlock {
   kind: 'heading' | 'paragraph' | 'note' | 'warning' | 'code' | 'list' | 'table'
@@ -89,7 +90,6 @@ export interface DocumentBlock {
 }
 
 export interface DocumentView extends DocumentSummary {
-  sourceRevision: string
   updatedAt: string
   markdown: string
   blocks: DocumentBlock[]
@@ -1318,23 +1318,22 @@ function parseDocumentSummary(element: Element): DocumentSummary {
   return {
     id: childText(element, 'id'),
     path: childText(element, 'path'),
-    locale: childText(element, 'locale') === 'ko' ? 'ko' : 'en',
+    locale: childText(element, 'locale') as DocumentLocale,
     group: childText(element, 'group'),
     order: Number(childText(element, 'order')) || 0,
     title: childText(element, 'title'),
     summary: childText(element, 'summary'),
-    version: childText(element, 'version'),
   }
 }
 
-export async function getDocuments(locale: 'en' | 'ko'): Promise<DocumentSummary[]> {
+export async function getDocuments(locale: DocumentLocale): Promise<DocumentSummary[]> {
   const xml = await getXml(`/api/v1/documents?locale=${locale}`)
   return Array.from(xml.documentElement.children)
     .filter((element) => element.localName === 'document')
     .map(parseDocumentSummary)
 }
 
-export async function getDocument(path: string, locale: 'en' | 'ko'): Promise<DocumentView> {
+export async function getDocument(path: string, locale: DocumentLocale): Promise<DocumentView> {
   const xml = await getXml(`/api/v1/documents/${path.split('/').map(encodeURIComponent).join('/')}?locale=${locale}`)
   const root = xml.documentElement
   const content = Array.from(root.children).find((element) => element.localName === 'content')
@@ -1353,7 +1352,6 @@ export async function getDocument(path: string, locale: 'en' | 'ko'): Promise<Do
   })) : []
   return {
     ...parseDocumentSummary(root),
-    sourceRevision: childText(root, 'source-revision'),
     updatedAt: childText(root, 'updated-at'),
     markdown: content ? childText(content, 'markdown') : '',
     blocks,

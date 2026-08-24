@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"bytes"
 	"crypto/sha256"
-	"embed"
 	"encoding/hex"
 	"encoding/xml"
 	"errors"
@@ -15,13 +14,8 @@ import (
 	"time"
 
 	"github.com/wavefnd/wave-platform/internal/storage"
+	"github.com/wavefnd/wave-platform/wavedoc"
 )
-
-// Official documents are ordinary Markdown files. The platform turns them into
-// XML revisions when it seeds the document repository.
-//
-//go:embed content
-var officialContent embed.FS
 
 type seedDocument struct {
 	TranslationSetID string
@@ -63,7 +57,7 @@ func SeedOfficial(database *storage.Database) (int, error) {
 		if err := repository.UpsertDocument(Document{ID: id, TranslationSetID: sourceDocument.TranslationSetID,
 			Path: path, Locale: sourceDocument.Locale, Group: sourceDocument.Group, GroupOrder: sourceDocument.GroupOrder,
 			Order: sourceDocument.Order, Title: sourceDocument.Title, Summary: sourceDocument.Summary,
-			Version: "", SourceRevision: "", Status: "published",
+			Status:              "published",
 			PublishedRevisionID: revisionID, CreatedAt: publishedAt, UpdatedAt: publishedAt}); err != nil {
 			return 0, err
 		}
@@ -77,14 +71,14 @@ func SeedOfficial(database *storage.Database) (int, error) {
 func readOfficialDocuments() ([]seedDocument, []byte, error) {
 	result := make([]seedDocument, 0, 48)
 	hash := sha256.New()
-	err := fs.WalkDir(officialContent, "content", func(name string, entry fs.DirEntry, walkErr error) error {
+	err := fs.WalkDir(wavedoc.Content, ".", func(name string, entry fs.DirEntry, walkErr error) error {
 		if walkErr != nil {
 			return walkErr
 		}
 		if entry.IsDir() || !strings.HasSuffix(strings.ToLower(name), ".md") {
 			return nil
 		}
-		source, err := officialContent.ReadFile(name)
+		source, err := wavedoc.Content.ReadFile(name)
 		if err != nil {
 			return err
 		}
@@ -92,8 +86,8 @@ func readOfficialDocuments() ([]seedDocument, []byte, error) {
 		if err != nil {
 			return fmt.Errorf("parse %s: %w", name, err)
 		}
-		if document.Locale != "en" && document.Locale != "ko" {
-			return fmt.Errorf("parse %s: locale must be en or ko", name)
+		if !wavedoc.SupportsLocale(document.Locale) {
+			return fmt.Errorf("parse %s: unsupported locale %q", name, document.Locale)
 		}
 		if document.Path == "" || document.Title == "" || document.Group == "" || document.TranslationSetID == "" {
 			return fmt.Errorf("parse %s: translation_set_id, path, locale, group, and title are required", name)

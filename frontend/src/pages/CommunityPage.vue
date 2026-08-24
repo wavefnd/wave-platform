@@ -433,6 +433,7 @@ watchEffect(() => {
             <RouterLink :to="rootPath">← {{ personalMode ? t('community.personalTitle') : t('community.back') }}</RouterLink>
             <h2>{{ t('community.createPost') }}</h2>
           </header>
+		  <p v-if="!personalMode" class="community-language-policy">{{ t('community.englishOnly') }}</p>
 		  <label v-if="!showcaseMode" for="post-space">{{ t('community.category') }}</label>
 		  <select v-if="!showcaseMode" id="post-space" v-model="postSpace" required>
             <option v-for="space in composerSpaces" :key="space.id" :value="space.id">{{ spaceName(space) }}</option>
@@ -485,6 +486,7 @@ watchEffect(() => {
           <CommunityReplyEditor v-if="replyTo === thread.root.id" ref="replyEditor"
             v-model="replyBody" v-model:preview="replyPreview" :authenticated="Boolean(auth.account)"
             :submitting="submitting" :error="actionError" :replying="true" :login-target="route.fullPath"
+            :english-only="!personalMode"
             @submit="submitReply" @cancel="replyTo = ''" />
 
           <section class="thread-replies" :aria-label="t('community.comments')">
@@ -506,6 +508,7 @@ watchEffect(() => {
               <CommunityReplyEditor v-if="replyTo === item.message.id" ref="replyEditor"
                 v-model="replyBody" v-model:preview="replyPreview" :authenticated="Boolean(auth.account)"
                 :submitting="submitting" :error="actionError" :replying="true" :login-target="route.fullPath"
+                :english-only="!personalMode"
                 :style="{ marginLeft: replyIndent(item.depth + 1) }"
                 @submit="submitReply" @cancel="replyTo = ''" />
             </template>
@@ -515,6 +518,7 @@ watchEffect(() => {
           <CommunityReplyEditor v-if="!thread.locked && !replyTo" ref="replyEditor"
             v-model="replyBody" v-model:preview="replyPreview" :authenticated="Boolean(auth.account)"
             :submitting="submitting" :error="actionError" :replying="false" :login-target="route.fullPath"
+            :english-only="!personalMode"
             @submit="submitReply" @cancel="replyTo = ''" />
         </template>
 

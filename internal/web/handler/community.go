@@ -253,6 +253,8 @@ func (handler CommunityHandler) writeCommunityError(writer http.ResponseWriter, 
 		writeAPIError(writer, http.StatusConflict, "thread-locked", "This post is locked.")
 	case errors.Is(err, communitydomain.ErrPostingRestricted):
 		writeAPIError(writer, http.StatusForbidden, "posting-restricted", "Only the platform owner can publish here. Readers can participate through comments.")
+	case errors.Is(err, communitydomain.ErrEnglishRequired):
+		writeAPIError(writer, http.StatusUnprocessableEntity, "english-required", communitydomain.ErrEnglishRequired.Error()+". Code blocks and inline code are excluded from this check.")
 	case errors.Is(err, communitydomain.ErrInvalidPost):
 		writeAPIError(writer, http.StatusUnprocessableEntity, "invalid-post", strings.TrimPrefix(err.Error(), communitydomain.ErrInvalidPost.Error()+": "))
 	default:

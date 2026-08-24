@@ -1,31 +1,37 @@
 <script setup lang="ts">
 import { Search } from '@lucide/vue'
 import { computed, ref, watch, watchEffect } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 
 import MarkdownContent from '../components/MarkdownContent.vue'
 import { useI18n } from '../i18n'
-import { getDocument, getDocuments, type DocumentSummary, type DocumentView } from '../services/http'
+import { documentLocales, isDocumentLocale, saveDocumentLocale } from '../services/documentLocale'
+import { getDocument, getDocuments, type DocumentLocale, type DocumentSummary, type DocumentView } from '../services/http'
 import { applyPageSEO } from '../services/seo'
 import UiInlineState from '../ui/UiInlineState.vue'
 import UiSkeletonRows from '../ui/UiSkeletonRows.vue'
 
 const route = useRoute()
+const router = useRouter()
 const { locale, t } = useI18n()
 const documents = ref<DocumentSummary[]>([])
 const document = ref<DocumentView | null>(null)
 const query = ref('')
 const loading = ref(true)
 const failed = ref(false)
+const showingEnglishFallback = ref(false)
+
+const docLocale = computed<DocumentLocale>(() => isDocumentLocale(route.params.docLocale) ? route.params.docLocale : 'en')
+const docBase = computed(() => `/docs/${docLocale.value}`)
 
 const currentPath = computed(() => {
   const value = route.params.pathMatch
   return Array.isArray(value) ? value.join('/') : String(value ?? '')
 })
 const filtered = computed(() => {
-  const needle = query.value.trim().toLocaleLowerCase(locale.value)
+  const needle = query.value.trim().toLocaleLowerCase(docLocale.value)
   if (!needle) return documents.value
-  return documents.value.filter((item) => `${item.title} ${item.summary}`.toLocaleLowerCase(locale.value).includes(needle))
+  return documents.value.filter((item) => `${item.title} ${item.summary}`.toLocaleLowerCase(docLocale.value).includes(needle))
 })
 const groups = computed(() => {
   const result = new Map<string, DocumentSummary[]>()
@@ -48,9 +54,28 @@ function groupName(group: string) {
 async function load() {
   loading.value = true
   failed.value = false
+  showingEnglishFallback.value = false
   try {
-    documents.value = await getDocuments(locale.value)
-    document.value = currentPath.value ? await getDocument(currentPath.value, locale.value) : null
+    saveDocumentLocale(docLocale.value)
+    const translated = await getDocuments(docLocale.value)
+    if (docLocale.value === 'en') {
+      documents.value = translated
+    } else {
+      const english = await getDocuments('en')
+      const translatedPaths = new Set(translated.map((item) => item.path))
+      documents.value = [...translated, ...english.filter((item) => !translatedPaths.has(item.path))]
+    }
+    if (!currentPath.value) {
+      document.value = null
+    } else {
+      try {
+        document.value = await getDocument(currentPath.value, docLocale.value)
+      } catch (error) {
+        if (docLocale.value === 'en') throw error
+        document.value = await getDocument(currentPath.value, 'en')
+        showingEnglishFallback.value = true
+      }
+    }
   } catch {
     failed.value = true
     document.value = null
@@ -59,13 +84,22 @@ async function load() {
   }
 }
 
-watch([currentPath, locale], load, { immediate: true })
+watch([currentPath, docLocale], load, { immediate: true })
+
+function changeDocumentLocale(event: Event) {
+  const value = (event.target as HTMLSelectElement).value
+  if (!isDocumentLocale(value)) return
+  saveDocumentLocale(value)
+  router.push(currentPath.value
+    ? { name: 'document', params: { docLocale: value, pathMatch: currentPath.value.split('/') } }
+    : { name: 'docs-locale', params: { docLocale: value } })
+}
 watchEffect(() => {
   if (!document.value) return
   applyPageSEO({
     title: `${document.value.title} · Wave Documentation`,
     description: document.value.summary,
-    locale: locale.value,
+    locale: document.value.locale,
     path: route.path,
     schema: {
       '@type': 'TechArticle',
@@ -82,6 +116,12 @@ watchEffect(() => {
     <header class="docs-service-header">
       <div class="docs-width docs-service-header-inner">
         <div><h1>{{ t('docs.title') }}</h1></div>
+        <label class="docs-locale-select">
+          <span>{{ t('docs.languageSelector') }}</span>
+          <select :value="docLocale" @change="changeDocumentLocale">
+            <option v-for="option in documentLocales" :key="option.id" :value="option.id">{{ option.label }}</option>
+          </select>
+        </label>
         <label class="docs-search"><Search :size="16" aria-hidden="true" /><input v-model="query" :placeholder="t('docs.search')" /></label>
       </div>
     </header>
@@ -90,20 +130,31 @@ watchEffect(() => {
     <div v-else-if="failed" class="docs-width docs-loading"><UiInlineState :message="t('common.loadError')" :action="t('common.retry')" @action="load" /></div>
 
     <div v-else-if="document" class="docs-width docs-reader-layout">
-      <aside class="docs-tree" :aria-label="t('docs.navigation')">
+      <aside class="docs-tree docs-tree-desktop" :aria-label="t('docs.navigation')">
         <section v-for="group in groups" :key="group.id">
           <strong>{{ group.title }}</strong>
-          <RouterLink v-for="item in group.items" :key="item.path" :to="`/docs/${item.path}`" :class="{ active: item.path === document.path }">{{ item.title }}</RouterLink>
+          <RouterLink v-for="item in group.items" :key="item.path" :to="`${docBase}/${item.path}`" :class="{ active: item.path === document.path }">{{ item.title }}</RouterLink>
         </section>
       </aside>
 
+      <details class="docs-tree-mobile">
+        <summary>{{ t('docs.navigation') }}</summary>
+        <div>
+          <section v-for="group in groups" :key="group.id">
+            <strong>{{ group.title }}</strong>
+            <RouterLink v-for="item in group.items" :key="item.path" :to="`${docBase}/${item.path}`" :class="{ active: item.path === document.path }">{{ item.title }}</RouterLink>
+          </section>
+        </div>
+      </details>
+
       <article class="document-page">
-        <nav class="document-breadcrumb"><RouterLink to="/docs">{{ t('docs.title') }}</RouterLink><span>/</span><span>{{ groupName(document.group) }}</span></nav>
+        <nav class="document-breadcrumb"><RouterLink :to="docBase">{{ t('docs.title') }}</RouterLink><span>/</span><span>{{ groupName(document.group) }}</span></nav>
+        <p v-if="showingEnglishFallback" class="docs-translation-notice" role="status">{{ t('docs.englishFallback') }}</p>
         <header><h1>{{ document.title }}</h1><p>{{ document.summary }}</p></header>
         <div class="document-content"><MarkdownContent :source="document.markdown" /></div>
         <nav class="document-pagination">
-          <RouterLink v-if="previous" :to="`/docs/${previous.path}`"><small>{{ t('docs.previous') }}</small><span>← {{ previous.title }}</span></RouterLink><span v-else />
-          <RouterLink v-if="next" :to="`/docs/${next.path}`"><small>{{ t('docs.next') }}</small><span>{{ next.title }} →</span></RouterLink>
+          <RouterLink v-if="previous" :to="`${docBase}/${previous.path}`"><small>{{ t('docs.previous') }}</small><span>← {{ previous.title }}</span></RouterLink><span v-else />
+          <RouterLink v-if="next" :to="`${docBase}/${next.path}`"><small>{{ t('docs.next') }}</small><span>{{ next.title }} →</span></RouterLink>
         </nav>
       </article>
 
@@ -115,7 +166,7 @@ watchEffect(() => {
       <div class="docs-catalog">
         <section v-for="group in groups" :key="group.id" class="docs-catalog-group">
           <h2>{{ group.title }}</h2>
-          <ul><li v-for="item in group.items" :key="item.path"><RouterLink :to="`/docs/${item.path}`"><strong>{{ item.title }}</strong><span>{{ item.summary }}</span></RouterLink></li></ul>
+          <ul><li v-for="item in group.items" :key="item.path"><RouterLink :to="`${docBase}/${item.path}`"><strong>{{ item.title }}</strong><span>{{ item.summary }}</span></RouterLink></li></ul>
         </section>
       </div>
       <p v-if="groups.length === 0" class="docs-empty">{{ t('docs.noResults') }}</p>

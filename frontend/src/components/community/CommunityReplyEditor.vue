@@ -13,6 +13,7 @@ const props = defineProps<{
   error: string
   replying: boolean
   loginTarget: string
+  englishOnly: boolean
 }>()
 
 const emit = defineEmits<{
@@ -39,6 +40,7 @@ defineExpose({ focus })
       <button v-if="replying" type="button" @click="emit('cancel')">{{ t('common.cancel') }}</button>
     </header>
     <template v-if="authenticated">
+      <p v-if="englishOnly" class="community-language-policy">{{ t('community.englishOnly') }}</p>
       <div class="community-editor-toolbar">
         <button type="button" class="preview-toggle" @click="emit('update:preview', !preview)">{{ preview ? t('community.edit') : t('community.preview') }}</button>
       </div>

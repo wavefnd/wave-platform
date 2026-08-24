@@ -22,7 +22,10 @@ Open **Questions** to ask about Wave, add tags and version information, or answe
 
 ## Documentation
 
-Open **Documentation** and choose English or Korean. Interface and document language can be changed independently from the content of mail and community posts.
+Open **Documentation** and choose a documentation language. The interface stays
+English/Korean, while documentation has its own language preference and an
+explicit English fallback for pages awaiting translation. Public community
+posts and comments are English-only; the LunaStev owner space is exempt.
 
 ## Source
 

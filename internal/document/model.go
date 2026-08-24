@@ -19,8 +19,6 @@ type Document struct {
 	Order               int       `xml:"order"`
 	Title               string    `xml:"title"`
 	Summary             string    `xml:"summary"`
-	Version             string    `xml:"version"`
-	SourceRevision      string    `xml:"source-revision"`
 	Status              string    `xml:"status"`
 	DraftRevisionID     string    `xml:"draft-revision-id,omitempty"`
 	PublishedRevisionID string    `xml:"published-revision-id,omitempty"`
@@ -69,14 +67,12 @@ type Summary struct {
 	Order   int    `xml:"order"`
 	Title   string `xml:"title"`
 	Summary string `xml:"summary"`
-	Version string `xml:"version"`
 }
 
 type View struct {
 	XMLName xml.Name `xml:"https://wave-lang.dev/ns/platform/api/v1 document"`
 	Summary
-	SourceRevision string  `xml:"source-revision"`
-	UpdatedAt      string  `xml:"updated-at"`
-	Markdown       string  `xml:"content>markdown"`
-	Blocks         []Block `xml:"content>block"`
+	UpdatedAt string  `xml:"updated-at"`
+	Markdown  string  `xml:"content>markdown"`
+	Blocks    []Block `xml:"content>block"`
 }

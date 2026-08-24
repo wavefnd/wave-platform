@@ -9,6 +9,7 @@ import (
 	"regexp"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/wavefnd/wave-platform/internal/account"
 	"github.com/wavefnd/wave-platform/internal/audit"
@@ -23,10 +24,12 @@ var (
 	ErrInvalidPost       = errors.New("invalid community post")
 	ErrThreadLocked      = errors.New("community thread is locked")
 	ErrPostingRestricted = errors.New("only the platform owner can publish in this space")
+	ErrEnglishRequired   = errors.New("community posts and comments must be written in English")
 )
 
 var (
 	tagPattern                   = regexp.MustCompile(`^[\p{L}\p{N}][\p{L}\p{N}-]{0,29}$`)
+	englishTagPattern            = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{0,29}$`)
 	lunaStevMarkdownImagePattern = regexp.MustCompile(`!\[[^\]\r\n]*\]\((/media/lunastev/image-[0-9]+-[0-9a-f]{32}\.webp)[ \t]*\)`)
 )
 
@@ -67,13 +70,17 @@ func (service *Service) CreatePost(actor account.Account, input CreatePostInput)
 			return ThreadView{}, ErrPostingRestricted
 		}
 	}
+	englishOnly := space.PostingPolicy != "owner"
+	if englishOnly && (!englishProse(input.Title) || !englishProse(withoutMarkdownCode(input.Body))) {
+		return ThreadView{}, ErrEnglishRequired
+	}
 	if len([]rune(input.Title)) < 5 || len([]rune(input.Title)) > 180 || strings.ContainsAny(input.Title, "\r\n") {
 		return ThreadView{}, fmt.Errorf("%w: title must contain between 5 and 180 characters", ErrInvalidPost)
 	}
 	if len([]rune(input.Body)) < 1 || len([]rune(input.Body)) > 20000 {
 		return ThreadView{}, fmt.Errorf("%w: body must contain between 1 and 20000 characters", ErrInvalidPost)
 	}
-	tags, err := normalizeTags(input.Tags)
+	tags, err := normalizeTags(input.Tags, englishOnly)
 	if err != nil {
 		return ThreadView{}, err
 	}
@@ -132,9 +139,16 @@ func (service *Service) AddReply(actor account.Account, input CreateReplyInput) 
 	if thread.Locked {
 		return ThreadView{}, ErrThreadLocked
 	}
+	space, err := service.repository.Space(thread.SpaceID)
+	if err != nil {
+		return ThreadView{}, err
+	}
 	body := normalizeBody(input.Body)
 	if len([]rune(body)) < 1 || len([]rune(body)) > 10000 {
 		return ThreadView{}, fmt.Errorf("%w: reply must contain between 1 and 10000 characters", ErrInvalidPost)
+	}
+	if space.PostingPolicy != "owner" && !englishProse(withoutMarkdownCode(body)) {
+		return ThreadView{}, ErrEnglishRequired
 	}
 	root, err := service.mail.Message(thread.RootMessageID)
 	if err != nil {
@@ -210,7 +224,7 @@ func normalizeBody(value string) string {
 	return strings.TrimSpace(strings.ReplaceAll(value, "\r\n", "\n"))
 }
 
-func normalizeTags(values []string) ([]string, error) {
+func normalizeTags(values []string, englishOnly bool) ([]string, error) {
 	if len(values) > 5 {
 		return nil, fmt.Errorf("%w: at most five tags are allowed", ErrInvalidPost)
 	}
@@ -221,7 +235,11 @@ func normalizeTags(values []string) ([]string, error) {
 		if value == "" {
 			continue
 		}
-		if !tagPattern.MatchString(value) {
+		pattern := tagPattern
+		if englishOnly {
+			pattern = englishTagPattern
+		}
+		if !pattern.MatchString(value) {
 			return nil, fmt.Errorf("%w: tags may contain letters, numbers, and hyphens", ErrInvalidPost)
 		}
 		if !seen[value] {
@@ -230,6 +248,41 @@ func normalizeTags(values []string) ([]string, error) {
 		}
 	}
 	return result, nil
+}
+
+func englishProse(value string) bool {
+	for _, character := range value {
+		if unicode.IsLetter(character) && !unicode.In(character, unicode.Latin) {
+			return false
+		}
+	}
+	return true
+}
+
+func withoutMarkdownCode(value string) string {
+	var result strings.Builder
+	inFence := false
+	for _, line := range strings.Split(value, "\n") {
+		if strings.HasPrefix(strings.TrimSpace(line), "```") {
+			inFence = !inFence
+			continue
+		}
+		if inFence {
+			continue
+		}
+		inInlineCode := false
+		for _, character := range line {
+			if character == '`' {
+				inInlineCode = !inInlineCode
+				continue
+			}
+			if !inInlineCode {
+				result.WriteRune(character)
+			}
+		}
+		result.WriteByte('\n')
+	}
+	return result.String()
 }
 
 func replySubject(subject string) string {

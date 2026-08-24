@@ -7,7 +7,7 @@ import (
 	"github.com/wavefnd/wave-platform/internal/storage"
 )
 
-func TestSeedOfficialPublishesEnglishAndKoreanReference(t *testing.T) {
+func TestSeedOfficialPublishesSupportedDocumentationLocales(t *testing.T) {
 	database, err := storage.Open(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
@@ -15,7 +15,7 @@ func TestSeedOfficialPublishesEnglishAndKoreanReference(t *testing.T) {
 	t.Cleanup(func() { _ = database.Close() })
 
 	count, err := SeedOfficial(database)
-	if err != nil || count != 54 {
+	if err != nil || count != 61 {
 		t.Fatalf("seed count=%d err=%v", count, err)
 	}
 	repository := NewRepository(database)
@@ -32,11 +32,17 @@ func TestSeedOfficialPublishesEnglishAndKoreanReference(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if view.Title != expectedTitles[locale] || view.Version != "" || view.SourceRevision != "" {
+		if view.Title != expectedTitles[locale] {
 			t.Fatalf("unexpected memory document: %#v", view)
 		}
 		if !strings.Contains(view.Markdown, "ptr<T>") || !strings.Contains(view.Markdown, "```wave") {
 			t.Fatal("published revision did not preserve the Markdown authoring source")
+		}
+	}
+	for _, locale := range []string{"ja", "zh", "es", "de", "ru", "id", "vi"} {
+		items, err := repository.Summaries(locale)
+		if err != nil || len(items) != 1 || items[0].Path != "getting-started/overview" {
+			t.Fatalf("%s summaries=%#v err=%v", locale, items, err)
 		}
 	}
 	install, err := repository.Published("en", "getting-started/install")

@@ -9,6 +9,7 @@ import (
 	documentdomain "github.com/wavefnd/wave-platform/internal/document"
 	"github.com/wavefnd/wave-platform/internal/storage"
 	"github.com/wavefnd/wave-platform/internal/xmlcodec"
+	"github.com/wavefnd/wave-platform/wavedoc"
 )
 
 type DocumentsResponse struct {
@@ -72,8 +73,8 @@ func documentLocale(writer http.ResponseWriter, request *http.Request) (string, 
 	if locale == "" {
 		locale = "en"
 	}
-	if locale != "en" && locale != "ko" {
-		writeAPIError(writer, http.StatusBadRequest, "unsupported-locale", "Only English and Korean documents are available.")
+	if !wavedoc.SupportsLocale(locale) {
+		writeAPIError(writer, http.StatusBadRequest, "unsupported-locale", "The requested documentation locale is not supported.")
 		return "", false
 	}
 	return locale, true

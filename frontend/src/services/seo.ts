@@ -37,7 +37,7 @@ const nonIndexableRoutes = new Set([
 interface PageSEO {
   title: string
   description: string
-  locale: Locale
+  locale: string
   path?: string
   schema?: Record<string, unknown>
   noIndex?: boolean
@@ -84,7 +84,11 @@ export function applyPageSEO(options: PageSEO) {
   upsertMeta('meta[property="og:type"]', { property: 'og:type', content: openGraphType })
   upsertMeta('meta[property="og:url"]', { property: 'og:url', content: canonical })
   upsertMeta('meta[property="og:site_name"]', { property: 'og:site_name', content: 'Wave' })
-  upsertMeta('meta[property="og:locale"]', { property: 'og:locale', content: options.locale === 'ko' ? 'ko_KR' : 'en_US' })
+  const openGraphLocales: Record<string, string> = {
+    en: 'en_US', ko: 'ko_KR', ja: 'ja_JP', zh: 'zh_CN', es: 'es_ES',
+    de: 'de_DE', ru: 'ru_RU', id: 'id_ID', vi: 'vi_VN',
+  }
+  upsertMeta('meta[property="og:locale"]', { property: 'og:locale', content: openGraphLocales[options.locale] ?? 'en_US' })
   upsertMeta('meta[name="twitter:card"]', { name: 'twitter:card', content: 'summary' })
   upsertMeta('meta[name="twitter:title"]', { name: 'twitter:title', content: options.title })
   upsertMeta('meta[name="twitter:description"]', { name: 'twitter:description', content: options.description })
@@ -102,7 +106,7 @@ export function applyPageSEO(options: PageSEO) {
   }
   const website = {
     '@type': 'WebSite', '@id': `${window.location.origin}/#website`, name: 'Wave Programming Language', url: window.location.origin,
-    publisher: { '@id': organization['@id'] }, inLanguage: ['en', 'ko'],
+    publisher: { '@id': organization['@id'] }, inLanguage: ['en', 'ko', 'ja', 'zh', 'es', 'de', 'ru', 'id', 'vi'],
     potentialAction: { '@type': 'SearchAction', target: `${window.location.origin}/search?q={search_term_string}`, 'query-input': 'required name=search_term_string' },
   }
   const page = {

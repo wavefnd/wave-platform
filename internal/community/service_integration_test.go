@@ -214,3 +214,45 @@ func TestOwnerSpacesRestrictPostsButAllowComments(t *testing.T) {
 		t.Fatalf("comment view=%#v err=%v", view, err)
 	}
 }
+
+func TestMemberCommunityRequiresEnglishButOwnerSpaceDoesNot(t *testing.T) {
+	database, err := storage.Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = database.Close() })
+	if err := community.SeedSpaces(database); err != nil {
+		t.Fatal(err)
+	}
+	identities, err := testsupport.NewIdentity(database)
+	if err != nil {
+		t.Fatal(err)
+	}
+	owner, _, err := identities.BootstrapTOTPAdmin("Wave Owner", "wave-owner", "owner@example.net", testsupport.TOTPSecret)
+	if err != nil {
+		t.Fatal(err)
+	}
+	member, err := testsupport.Register(identities, "Community Writer")
+	if err != nil {
+		t.Fatal(err)
+	}
+	service := community.NewService(database, "wave-lang.dev")
+
+	if _, err := service.CreatePost(member, community.CreatePostInput{SpaceID: "development", Title: "컴파일러 개발 기록", Body: "오늘 파서를 수정했습니다."}); !errors.Is(err, community.ErrEnglishRequired) {
+		t.Fatalf("non-English member post error=%v", err)
+	}
+	post, err := service.CreatePost(member, community.CreatePostInput{SpaceID: "development", Title: "Compiler parser update", Body: "The parser now accepts this Wave example.\n\n```wave\nvar 인사: str = \"안녕\";\n```", Tags: []string{"compiler"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := service.AddReply(member, community.CreateReplyInput{ThreadID: post.Thread.ID, Body: "좋은 변경입니다."}); !errors.Is(err, community.ErrEnglishRequired) {
+		t.Fatalf("non-English member reply error=%v", err)
+	}
+	ownerPost, err := service.CreatePost(owner, community.CreatePostInput{SpaceID: "founder-notes", Title: "Wave 개발 이야기", Body: "창시자 공간은 한국어도 사용할 수 있습니다.", Tags: []string{"개발"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := service.AddReply(member, community.CreateReplyInput{ThreadID: ownerPost.Thread.ID, Body: "잘 읽었습니다."}); err != nil {
+		t.Fatalf("owner-space Korean reply error=%v", err)
+	}
+}

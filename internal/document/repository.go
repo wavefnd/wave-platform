@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/wavefnd/wave-platform/internal/storage"
+	"github.com/wavefnd/wave-platform/wavedoc"
 )
 
 type Repository struct{ database *storage.Database }
@@ -15,7 +16,7 @@ type Repository struct{ database *storage.Database }
 func NewRepository(database *storage.Database) *Repository { return &Repository{database: database} }
 
 func (repository *Repository) UpsertDocument(value Document) error {
-	if value.ID == "" || value.Path == "" || (value.Locale != "en" && value.Locale != "ko") {
+	if value.ID == "" || value.Path == "" || !wavedoc.SupportsLocale(value.Locale) {
 		return errors.New("document id, path, and supported locale are required")
 	}
 	data, err := xml.Marshal(value)
@@ -119,11 +120,11 @@ func (repository *Repository) Published(locale, path string) (View, error) {
 	if err := xml.Unmarshal(revision.ContentXML, &content); err != nil {
 		return View{}, fmt.Errorf("decode document content: %w", err)
 	}
-	return View{Summary: summaryOf(value), SourceRevision: value.SourceRevision,
-		UpdatedAt: value.UpdatedAt.Format("2006-01-02"), Markdown: content.Markdown, Blocks: content.Blocks}, nil
+	return View{Summary: summaryOf(value), UpdatedAt: value.UpdatedAt.Format("2006-01-02"),
+		Markdown: content.Markdown, Blocks: content.Blocks}, nil
 }
 
 func summaryOf(value Document) Summary {
 	return Summary{ID: value.ID, Path: value.Path, Locale: value.Locale, Group: value.Group,
-		Order: value.Order, Title: value.Title, Summary: value.Summary, Version: value.Version}
+		Order: value.Order, Title: value.Title, Summary: value.Summary}
 }
