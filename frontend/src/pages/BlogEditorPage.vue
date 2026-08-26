@@ -5,7 +5,7 @@ import { useRoute, useRouter } from 'vue-router'
 import MarkdownContent from '../components/MarkdownContent.vue'
 import PlatformWaveEditor from '../components/editor/PlatformWaveEditor.vue'
 import { useI18n } from '../i18n'
-import { getBlogEditorPost, getBlogEditorPosts, saveBlogEditorPost, type BlogPostInput, type BlogPostSummary } from '../services/http'
+import { getBlogEditorComments, getBlogEditorPost, getBlogEditorPosts, saveBlogEditorPost, setBlogCommentStatus, type BlogComment, type BlogPostInput, type BlogPostSummary } from '../services/http'
 import { applyPageSEO } from '../services/seo'
 import '../ui/blog-editor.css'
 
@@ -20,12 +20,13 @@ const saving = ref(false)
 const error = ref('')
 const notice = ref('')
 const preview = ref(true)
+const comments = ref<BlogComment[]>([])
 
 const editing = computed(() => Boolean(originalSlug.value))
 const generatedSlug = computed(() => slugFromTitle(form.value.title))
 
 function blankPost(): BlogPostInput {
-  return { slug: '', category: 'article', roadmapStatus: '', roadmapOrder: 1, targetDate: '', title: '', summary: '', content: '', status: 'draft' }
+  return { slug: '', category: 'article', roadmapStatus: '', roadmapOrder: 1, targetDate: '', title: '', summary: '', content: '', status: 'draft', commentPolicy: 'open' }
 }
 
 function slugFromTitle(title: string) {
@@ -42,10 +43,15 @@ async function load() {
       const item = await getBlogEditorPost(slug)
       originalSlug.value = item.slug
       form.value = { slug: item.slug, category: item.category, roadmapStatus: item.roadmapStatus, roadmapOrder: item.roadmapOrder,
-        targetDate: item.targetDate, title: item.title, summary: item.summary, content: item.content, status: item.status || 'draft' }
+        targetDate: item.targetDate, title: item.title, summary: item.summary, content: item.content, status: item.status || 'draft', commentPolicy: item.commentPolicy }
+      if (item.category === 'article') {
+        try { comments.value = await getBlogEditorComments(item.slug) }
+        catch (reason) { comments.value = []; error.value = reason instanceof Error ? reason.message : t('common.loadError') }
+      } else comments.value = []
     } else {
       originalSlug.value = ''
       form.value = blankPost()
+      comments.value = []
     }
   } catch (reason) {
     error.value = reason instanceof Error ? reason.message : t('common.loadError')
@@ -61,10 +67,23 @@ async function save() {
     const saved = await saveBlogEditorPost({ ...form.value, slug: originalSlug.value || generatedSlug.value })
     originalSlug.value = saved.slug
     form.value = { slug: saved.slug, category: saved.category, roadmapStatus: saved.roadmapStatus, roadmapOrder: saved.roadmapOrder,
-      targetDate: saved.targetDate, title: saved.title, summary: saved.summary, content: saved.content, status: saved.status || 'draft' }
+      targetDate: saved.targetDate, title: saved.title, summary: saved.summary, content: saved.content, status: saved.status || 'draft', commentPolicy: saved.commentPolicy }
     posts.value = await getBlogEditorPosts()
     notice.value = t('blog.editor.saved')
     if (route.params.slug !== saved.slug) await router.replace({ name: 'blog-editor-post', params: { slug: saved.slug } })
+  } catch (reason) {
+    error.value = reason instanceof Error ? reason.message : t('admin.actionFailed')
+  } finally { saving.value = false }
+}
+
+async function toggleComment(item: BlogComment) {
+  if (!originalSlug.value || saving.value) return
+  if (item.status === 'visible' && !window.confirm(t('blog.comments.hideConfirm'))) return
+  saving.value = true
+  error.value = ''
+  try {
+    const updated = await setBlogCommentStatus(originalSlug.value, item.id, item.status === 'visible' ? 'hidden' : 'visible')
+    comments.value = comments.value.map((comment) => comment.id === updated.id ? updated : comment)
   } catch (reason) {
     error.value = reason instanceof Error ? reason.message : t('admin.actionFailed')
   } finally { saving.value = false }
@@ -109,6 +128,7 @@ watch(() => route.params.slug, load)
         <div class="blog-editor-fields">
           <label>{{ t('admin.blogCategory') }}<select v-model="form.category"><option value="article">{{ t('blog.category.article') }}</option><option value="release">{{ t('blog.category.release') }}</option><option value="roadmap">{{ t('blog.category.roadmap') }}</option></select></label>
           <label>{{ t('admin.blogStatus') }}<select v-model="form.status"><option value="draft">{{ t('admin.draft') }}</option><option value="published">{{ t('admin.published') }}</option></select></label>
+          <label v-if="form.category === 'article'">{{ t('blog.comments.policy') }}<select v-model="form.commentPolicy"><option value="open">{{ t('blog.comments.policyOpen') }}</option><option value="locked">{{ t('blog.comments.policyLocked') }}</option><option value="disabled">{{ t('blog.comments.policyDisabled') }}</option></select></label>
           <label class="wide">{{ t('admin.blogTitle') }}<input v-model="form.title" required maxlength="160" :placeholder="form.category === 'release' || form.category === 'roadmap' ? 'v0.3.0' : ''" /></label>
           <label class="wide slug-field">{{ t('admin.blogSlug') }}<input :value="originalSlug || generatedSlug" readonly /><small>{{ t('blog.editor.slugHelp') }}</small></label>
           <template v-if="form.category === 'roadmap'">
@@ -132,6 +152,15 @@ watch(() => route.params.slug, load)
           <a v-if="editing && form.status === 'published'" :href="publicLink(form)">{{ t('blog.editor.openPublished') }}</a>
           <span v-if="notice" role="status">{{ notice }}</span><small>Ctrl/⌘ + S</small>
         </footer>
+
+		<section v-if="editing && form.category === 'article'" class="blog-editor-comments" aria-labelledby="editor-comments-title">
+			<header><h2 id="editor-comments-title">{{ t('blog.comments.moderation') }}</h2><span>{{ comments.length }}</span></header>
+			<p v-if="comments.length === 0">{{ t('blog.comments.empty') }}</p>
+			<article v-for="item in comments" :key="item.id" :class="{ hidden: item.status === 'hidden' }">
+				<header><strong>{{ item.authorName }}</strong><time :datetime="item.createdAt">{{ new Date(item.createdAt).toLocaleString() }}</time><button type="button" :disabled="saving" @click="toggleComment(item)">{{ item.status === 'visible' ? t('blog.comments.hide') : t('blog.comments.restore') }}</button></header>
+				<MarkdownContent :source="item.body" />
+			</article>
+		</section>
       </form>
     </div>
   </main>

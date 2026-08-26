@@ -19,6 +19,7 @@ type Post struct {
 	Summary         string    `xml:"summary"`
 	Content         string    `xml:"content"`
 	Status          string    `xml:"status"`
+	CommentPolicy   string    `xml:"comment-policy"`
 	AuthorAccountID string    `xml:"author-account-id"`
 	AuthorName      string    `xml:"author-name"`
 	PublishedAt     string    `xml:"published-at,omitempty"`
@@ -35,6 +36,7 @@ type Summary struct {
 	Title         string `xml:"title"`
 	Summary       string `xml:"summary"`
 	Status        string `xml:"status,omitempty"`
+	CommentPolicy string `xml:"comment-policy,omitempty"`
 	AuthorName    string `xml:"author-name"`
 	PublishedAt   string `xml:"published-at,omitempty"`
 	UpdatedAt     string `xml:"updated-at"`
@@ -50,4 +52,26 @@ type Input struct {
 	Summary       string `xml:"summary"`
 	Content       string `xml:"content"`
 	Status        string `xml:"status"`
+	CommentPolicy string `xml:"comment-policy"`
+}
+
+type Comment struct {
+	XMLName xml.Name `xml:"https://wave-lang.dev/ns/platform/blog/v1 comment"`
+
+	ID              string    `xml:"id,attr"`
+	PostSlug        string    `xml:"post-slug,omitempty"`
+	AuthorAccountID string    `xml:"author-account-id"`
+	AuthorName      string    `xml:"author-name"`
+	Body            string    `xml:"body"`
+	Status          string    `xml:"status"`
+	CreatedAt       time.Time `xml:"created-at"`
+	UpdatedAt       time.Time `xml:"updated-at"`
+}
+
+type CommentInput struct {
+	Body string `xml:"body"`
+}
+
+type CommentStatusInput struct {
+	Status string `xml:"status"`
 }

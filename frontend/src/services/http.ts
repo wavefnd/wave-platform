@@ -32,6 +32,7 @@ export interface BlogPostSummary {
 	title: string
 	summary: string
 	status: 'draft' | 'published' | ''
+	commentPolicy: 'open' | 'locked' | 'disabled'
 	authorName: string
 	publishedAt: string
 	updatedAt: string
@@ -53,6 +54,17 @@ export interface BlogPostInput {
 	summary: string
 	content: string
 	status: 'draft' | 'published'
+	commentPolicy: 'open' | 'locked' | 'disabled'
+}
+
+export interface BlogComment {
+	id: string
+	authorAccountId: string
+	authorName: string
+	body: string
+	status: 'visible' | 'hidden'
+	createdAt: string
+	updatedAt: string
 }
 
 export type EditorCommand = 'bold' | 'italic' | 'inline-code' | 'heading' | 'quote' | 'unordered-list' | 'link'
@@ -1243,6 +1255,7 @@ function parseBlogSummary(element: ParentNode): BlogPostSummary {
 		targetDate: childText(element, 'target-release-date'),
 		title: childText(element, 'title'), summary: childContent(element, 'summary'),
 		status: childText(element, 'status') as BlogPostSummary['status'], authorName: childText(element, 'author-name'),
+		commentPolicy: (childText(element, 'comment-policy') || 'open') as BlogPostSummary['commentPolicy'],
 		publishedAt: childText(element, 'published-at'), updatedAt: childText(element, 'updated-at'),
 	}
 }
@@ -1280,10 +1293,41 @@ export async function saveBlogEditorPost(input: BlogPostInput): Promise<BlogPost
 		slug: input.slug, category: input.category, 'roadmap-status': input.roadmapStatus,
 		'roadmap-order': String(input.roadmapOrder),
 		'target-release-date': input.targetDate,
-		title: input.title, summary: input.summary, content: input.content, status: input.status,
+		title: input.title, summary: input.summary, content: input.content, status: input.status, 'comment-policy': input.commentPolicy,
 	}))
 	if (!xml) throw new Error('The server returned an empty blog response.')
 	return parseBlogPost(xml.documentElement)
+}
+
+function parseBlogComment(element: Element): BlogComment {
+	return {
+		id: element.getAttribute('id') ?? '', authorAccountId: childText(element, 'author-account-id'),
+		authorName: childText(element, 'author-name'), body: childContent(element, 'body'),
+		status: (childText(element, 'status') || 'visible') as BlogComment['status'],
+		createdAt: childText(element, 'created-at'), updatedAt: childText(element, 'updated-at'),
+	}
+}
+
+export async function getBlogComments(slug: string): Promise<BlogComment[]> {
+	const xml = await getXml(`/api/v1/blog/posts/${encodeURIComponent(slug)}/comments`)
+	return Array.from(xml.documentElement.children).filter((item) => item.localName === 'comment').map(parseBlogComment)
+}
+
+export async function addBlogComment(slug: string, body: string): Promise<BlogComment> {
+	const xml = await requestXml(`/api/v1/blog/posts/${encodeURIComponent(slug)}/comments`, 'POST', authDocument('blog-comment', { body }))
+	if (!xml) throw new Error('The server returned an empty blog comment response.')
+	return parseBlogComment(xml.documentElement)
+}
+
+export async function getBlogEditorComments(slug: string): Promise<BlogComment[]> {
+	const xml = await getXml(`/api/v1/blog/editor/posts/${encodeURIComponent(slug)}/comments`)
+	return Array.from(xml.documentElement.children).filter((item) => item.localName === 'comment').map(parseBlogComment)
+}
+
+export async function setBlogCommentStatus(slug: string, comment: string, status: BlogComment['status']): Promise<BlogComment> {
+	const xml = await requestXml(`/api/v1/blog/editor/posts/${encodeURIComponent(slug)}/comments/${encodeURIComponent(comment)}/status`, 'POST', authDocument('blog-comment-status', { status }))
+	if (!xml) throw new Error('The server returned an empty blog comment response.')
+	return parseBlogComment(xml.documentElement)
 }
 
 function unicodeOffset(value: string, browserOffset: number): number {

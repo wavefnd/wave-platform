@@ -117,3 +117,85 @@ func TestRoadmapDerivesVersionSlugAndContentSummary(t *testing.T) {
 		t.Fatalf("summary=%q runes=%d", item.Summary, len(got))
 	}
 }
+
+func TestArticleCommentsArePublicModeratableAndRateLimited(t *testing.T) {
+	database, err := storage.Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = database.Close() })
+	now := time.Date(2026, 8, 26, 3, 0, 0, 0, time.UTC)
+	accounts := account.NewRepository(database)
+	for _, item := range []account.Account{
+		{ID: "owner", Username: "owner", DisplayName: "Wave Owner", Email: "owner@wave.test", Status: "active", CreatedAt: now, UpdatedAt: now},
+		{ID: "member", Username: "member", DisplayName: "Wave Member", Email: "member@wave.test", Status: "active", CreatedAt: now, UpdatedAt: now},
+	} {
+		if err := accounts.Create(item); err != nil {
+			t.Fatal(err)
+		}
+	}
+	service := NewService(database)
+	service.now = func() time.Time { return now }
+	post, err := service.Save("owner", Input{Slug: "compiler-notes", Category: "article", Title: "Compiler notes",
+		Summary: "An engineering update", Content: "## Parser", Status: "published", CommentPolicy: "open"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if post.CommentPolicy != "open" {
+		t.Fatalf("comment policy=%q", post.CommentPolicy)
+	}
+	comment, err := service.AddComment("member", post.Slug, CommentInput{Body: "This makes the parser easier to follow."})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if comment.AuthorName != "Wave Member" || comment.Status != "visible" {
+		t.Fatalf("comment=%#v", comment)
+	}
+	if _, err := service.AddComment("member", post.Slug, CommentInput{Body: "A second comment."}); !errors.Is(err, ErrCommentRateLimited) {
+		t.Fatalf("rate-limit error=%v", err)
+	}
+	if _, err := service.AddComment("owner", post.Slug, CommentInput{Body: "![image](https://example.test/image.webp)"}); !errors.Is(err, ErrInvalidComment) {
+		t.Fatalf("image error=%v", err)
+	}
+	if _, err := service.AddComment("owner", post.Slug, CommentInput{Body: "좋은 글입니다."}); !errors.Is(err, ErrInvalidComment) {
+		t.Fatalf("language error=%v", err)
+	}
+	hidden, err := service.SetCommentStatus("owner", post.Slug, comment.ID, "hidden")
+	if err != nil || hidden.Status != "hidden" {
+		t.Fatalf("hidden=%#v err=%v", hidden, err)
+	}
+	visible, err := service.Comments(post.Slug, false)
+	if err != nil || len(visible) != 0 {
+		t.Fatalf("visible=%#v err=%v", visible, err)
+	}
+	all, err := service.Comments(post.Slug, true)
+	if err != nil || len(all) != 1 {
+		t.Fatalf("all=%#v err=%v", all, err)
+	}
+}
+
+func TestReleaseCommentsRemainDisabled(t *testing.T) {
+	database, err := storage.Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = database.Close() })
+	now := time.Date(2026, 8, 26, 3, 0, 0, 0, time.UTC)
+	if err := account.NewRepository(database).Create(account.Account{ID: "owner", Username: "owner", DisplayName: "Wave Owner",
+		Email: "owner@wave.test", Status: "active", CreatedAt: now, UpdatedAt: now}); err != nil {
+		t.Fatal(err)
+	}
+	service := NewService(database)
+	service.now = func() time.Time { return now }
+	post, err := service.Save("owner", Input{Slug: "v0.3.0", Category: "release", Title: "Wave v0.3.0",
+		Summary: "Release", Content: "Details", Status: "published", CommentPolicy: "open"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if post.CommentPolicy != "disabled" {
+		t.Fatalf("release policy=%q", post.CommentPolicy)
+	}
+	if _, err := service.Comments(post.Slug, false); !errors.Is(err, ErrCommentsClosed) {
+		t.Fatalf("comments error=%v", err)
+	}
+}

@@ -56,7 +56,8 @@
   background: var(--wave-editor-workspace, var(--wave-surface, #fff));
   color: inherit;
   caret-color: var(--wave-editor-focus, var(--wave-focus, #6654f1));
-  font: 400 .94rem/1.65 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font: 400 .94rem/1.65 var(--wave-font-code, ui-monospace, SFMono-Regular, Menlo, Consolas, monospace);
+  font-variant-ligatures: none;
   tab-size: 2;
 }
 

@@ -3,8 +3,9 @@ import { computed, onMounted, ref, watch, watchEffect } from 'vue'
 import { useRoute } from 'vue-router'
 
 import MarkdownContent from '../components/MarkdownContent.vue'
+import PlatformWaveEditor from '../components/editor/PlatformWaveEditor.vue'
 import { useI18n } from '../i18n'
-import { getBlogPost, getBlogPosts, type BlogPost, type BlogPostSummary } from '../services/http'
+import { addBlogComment, getBlogComments, getBlogPost, getBlogPosts, setBlogCommentStatus, type BlogComment, type BlogPost, type BlogPostSummary } from '../services/http'
 import { applyPageSEO, firstMarkdownImage, plainTextDescription } from '../services/seo'
 import { useAuthStore } from '../stores/auth'
 import UiInlineState from '../ui/UiInlineState.vue'
@@ -17,6 +18,11 @@ const posts = ref<BlogPostSummary[]>([])
 const post = ref<BlogPost | null>(null)
 const loading = ref(true)
 const error = ref('')
+const comments = ref<BlogComment[]>([])
+const commentBody = ref('')
+const commentBusy = ref(false)
+const commentError = ref('')
+const commentNotice = ref('')
 const detail = computed(() => typeof route.params.slug === 'string' && route.params.slug !== '')
 const category = computed<'article' | 'release' | 'roadmap' | ''>(() => {
 	if (route.meta.blogCategory === 'release') return 'release'
@@ -26,6 +32,7 @@ const releaseIndex = computed(() => !detail.value && category.value === 'release
 const releaseDetail = computed(() => detail.value && post.value?.category === 'release')
 const editorialIndex = computed(() => !detail.value && category.value === '')
 const canEdit = computed(() => Boolean(auth.account?.owner || auth.account?.administrator))
+const commentsAvailable = computed(() => post.value?.category === 'article' && post.value.commentPolicy !== 'disabled')
 
 function publishedTime(item: BlogPostSummary) {
 	const value = item.publishedAt || item.updatedAt
@@ -95,12 +102,20 @@ function postDate(item: BlogPostSummary) {
 async function load() {
 	loading.value = true
 	error.value = ''
+	commentError.value = ''
+	commentNotice.value = ''
+	commentBody.value = ''
+	comments.value = []
 	try {
 		if (detail.value) {
 			post.value = null
 			post.value = await getBlogPost(String(route.params.slug))
 			if (route.name === 'release-detail' && post.value.category !== 'release') throw new Error(t('blog.release.notFound'))
 			posts.value = []
+			if (post.value.category === 'article' && post.value.commentPolicy !== 'disabled') {
+				try { comments.value = await getBlogComments(post.value.slug) }
+				catch (reason) { commentError.value = reason instanceof Error ? reason.message : t('blog.comments.failed') }
+			}
 		} else {
 			posts.value = await getBlogPosts(category.value || undefined)
 			post.value = null
@@ -110,6 +125,40 @@ async function load() {
 	} finally {
 		loading.value = false
 	}
+}
+
+function formatCommentDate(value: string) {
+	const parsed = new Date(value)
+	if (Number.isNaN(parsed.getTime())) return ''
+	return new Intl.DateTimeFormat(locale.value === 'ko' ? 'ko-KR' : 'en-US', {
+		year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
+	}).format(parsed)
+}
+
+async function submitComment() {
+	if (!post.value || commentBusy.value || !commentBody.value.trim()) return
+	commentBusy.value = true
+	commentError.value = ''
+	commentNotice.value = ''
+	try {
+		comments.value.push(await addBlogComment(post.value.slug, commentBody.value))
+		commentBody.value = ''
+		commentNotice.value = t('blog.comments.saved')
+	} catch (reason) {
+		commentError.value = reason instanceof Error ? reason.message : t('blog.comments.failed')
+	} finally { commentBusy.value = false }
+}
+
+async function hideComment(item: BlogComment) {
+	if (!post.value || commentBusy.value || !window.confirm(t('blog.comments.hideConfirm'))) return
+	commentBusy.value = true
+	commentError.value = ''
+	try {
+		await setBlogCommentStatus(post.value.slug, item.id, 'hidden')
+		comments.value = comments.value.filter((comment) => comment.id !== item.id)
+	} catch (reason) {
+		commentError.value = reason instanceof Error ? reason.message : t('blog.comments.failed')
+	} finally { commentBusy.value = false }
 }
 
 function roadmapStatusLabel(value: BlogPostSummary['roadmapStatus']) {
@@ -186,6 +235,13 @@ watchEffect(() => {
 				name: post.value.authorName || 'Wave Foundation',
 				...(post.value.authorAccountId ? { url: new URL(`/user/id/${encodeURIComponent(post.value.authorAccountId)}`, window.location.origin).toString() } : {}),
 			},
+			...(post.value.category === 'article' ? {
+				commentCount: comments.value.length,
+				comment: comments.value.slice(0, 20).map((item) => ({
+					'@type': 'Comment', text: plainTextDescription(item.body, ''), dateCreated: item.createdAt,
+					author: { '@type': 'Person', name: item.authorName, url: new URL(`/user/id/${encodeURIComponent(item.authorAccountId)}`, window.location.origin).toString() },
+				})),
+			} : {}),
 		},
 	})
 })
@@ -337,6 +393,29 @@ watchEffect(() => {
 				<p v-if="post.summary" class="blog-article-summary">{{ post.summary }}</p>
 			</header>
 			<MarkdownContent :source="post.content" />
+
+			<section v-if="commentsAvailable" class="blog-comments" aria-labelledby="blog-comments-title">
+				<header><div><h2 id="blog-comments-title">{{ t('blog.comments.title') }}</h2><p>{{ t('blog.comments.englishOnly') }}</p></div><strong>{{ comments.length }}</strong></header>
+				<p v-if="commentError" class="ui-alert danger" role="alert">{{ commentError }}</p>
+				<p v-if="commentNotice" class="ui-alert success" role="status">{{ commentNotice }}</p>
+				<div v-if="comments.length" class="blog-comment-list">
+					<article v-for="item in comments" :key="item.id" class="blog-comment">
+						<header>
+							<RouterLink :to="`/user/id/${encodeURIComponent(item.authorAccountId)}`">{{ item.authorName }}</RouterLink>
+							<time :datetime="item.createdAt">{{ formatCommentDate(item.createdAt) }}</time>
+							<button v-if="canEdit" type="button" :disabled="commentBusy" @click="hideComment(item)">{{ t('blog.comments.hide') }}</button>
+						</header>
+						<MarkdownContent :source="item.body" />
+					</article>
+				</div>
+				<p v-else class="blog-comments-empty">{{ t('blog.comments.empty') }}</p>
+				<form v-if="auth.account && post.commentPolicy === 'open'" class="blog-comment-form" @submit.prevent="submitComment">
+					<PlatformWaveEditor v-model="commentBody" :label="t('blog.comments.yourComment')" required :max-length="10000" :rows="6" />
+					<div><small>{{ t('blog.comments.noImages') }}</small><button class="ui-button primary" type="submit" :disabled="commentBusy || !commentBody.trim()">{{ t('blog.comments.post') }}</button></div>
+				</form>
+				<p v-else-if="post.commentPolicy === 'locked'" class="blog-comments-locked">{{ t('blog.comments.locked') }}</p>
+				<p v-else class="blog-comments-signin"><RouterLink :to="{ name: 'login', query: { redirect: route.fullPath } }">{{ t('auth.signIn') }}</RouterLink> {{ t('blog.comments.toComment') }}</p>
+			</section>
 		</article>
 	</main>
 </template>

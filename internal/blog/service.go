@@ -6,6 +6,7 @@ import (
 	"regexp"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/wavefnd/wave-platform/internal/account"
 	"github.com/wavefnd/wave-platform/internal/audit"
@@ -15,8 +16,12 @@ import (
 )
 
 var (
-	ErrInvalidPost = errors.New("invalid blog post")
-	slugPattern    = regexp.MustCompile(`^[a-z0-9]+(?:[.-][a-z0-9]+)*$`)
+	ErrInvalidPost        = errors.New("invalid blog post")
+	ErrInvalidComment     = errors.New("invalid blog comment")
+	ErrCommentsClosed     = errors.New("blog comments are not open")
+	ErrCommentRateLimited = errors.New("wait before posting another blog comment")
+	slugPattern           = regexp.MustCompile(`^[a-z0-9]+(?:[.-][a-z0-9]+)*$`)
+	markdownImagePattern  = regexp.MustCompile(`(?i)<\s*img\b|!\[[^\]]*\]\s*(?:\([^)]*\)|\[[^\]]*\])`)
 )
 
 type Service struct {
@@ -46,6 +51,7 @@ func (service *Service) Save(actorID string, input Input) (Post, error) {
 	input.Summary = strings.TrimSpace(input.Summary)
 	input.Content = strings.TrimSpace(strings.ReplaceAll(input.Content, "\r\n", "\n"))
 	input.Status = strings.ToLower(strings.TrimSpace(input.Status))
+	input.CommentPolicy = strings.ToLower(strings.TrimSpace(input.CommentPolicy))
 	input.Slug = strings.ToLower(strings.TrimSpace(input.Slug))
 	if input.Category == "roadmap" && input.Slug == "" {
 		input.Slug = SlugFromTitle(input.Title)
@@ -82,6 +88,14 @@ func (service *Service) Save(actorID string, input Input) (Post, error) {
 	if input.Status != "draft" && input.Status != "published" {
 		return Post{}, fmt.Errorf("%w: status must be draft or published", ErrInvalidPost)
 	}
+	if input.CommentPolicy == "" {
+		input.CommentPolicy = NormalizeCommentPolicy(input.Category, "")
+	}
+	if input.Category != "article" {
+		input.CommentPolicy = "disabled"
+	} else if input.CommentPolicy != "open" && input.CommentPolicy != "locked" && input.CommentPolicy != "disabled" {
+		return Post{}, fmt.Errorf("%w: comment policy must be open, locked, or disabled", ErrInvalidPost)
+	}
 	author, err := service.accounts.Account(actorID)
 	if err != nil {
 		return Post{}, err
@@ -97,6 +111,7 @@ func (service *Service) Save(actorID string, input Input) (Post, error) {
 		previouslyPublished = item.PublishedAt != ""
 	}
 	item.Category, item.Title, item.Content, item.Status = input.Category, input.Title, input.Content, input.Status
+	item.CommentPolicy = input.CommentPolicy
 	item.Summary = input.Summary
 	if item.Category == "roadmap" {
 		item.Summary = SummaryFromContent(input.Content)
@@ -122,6 +137,140 @@ func (service *Service) Save(actorID string, input Input) (Post, error) {
 			AuthorName: item.AuthorName, ResourceID: "blog/" + item.Slug, URL: path, OccurredAt: now})
 	}
 	return item, nil
+}
+
+func NormalizeCommentPolicy(category, value string) string {
+	if NormalizeCategory(category) != "article" {
+		return "disabled"
+	}
+	value = strings.ToLower(strings.TrimSpace(value))
+	if value == "locked" || value == "disabled" {
+		return value
+	}
+	return "open"
+}
+
+func (service *Service) Comments(slug string, includeHidden bool) ([]Comment, error) {
+	post, err := service.repository.Post(slug, false)
+	if err != nil {
+		return nil, err
+	}
+	if NormalizeCategory(post.Category) != "article" || NormalizeCommentPolicy(post.Category, post.CommentPolicy) == "disabled" {
+		return nil, ErrCommentsClosed
+	}
+	return service.repository.Comments(post.Slug, includeHidden)
+}
+
+func (service *Service) EditorComments(slug string) ([]Comment, error) {
+	post, err := service.repository.Post(slug, true)
+	if err != nil {
+		return nil, err
+	}
+	if NormalizeCategory(post.Category) != "article" {
+		return nil, ErrCommentsClosed
+	}
+	return service.repository.Comments(post.Slug, true)
+}
+
+func (service *Service) AddComment(actorID, slug string, input CommentInput) (Comment, error) {
+	post, err := service.repository.Post(slug, false)
+	if err != nil {
+		return Comment{}, err
+	}
+	if NormalizeCommentPolicy(post.Category, post.CommentPolicy) != "open" {
+		return Comment{}, ErrCommentsClosed
+	}
+	body := strings.TrimSpace(strings.ReplaceAll(input.Body, "\r\n", "\n"))
+	if len([]rune(body)) < 1 || len([]rune(body)) > 10000 {
+		return Comment{}, fmt.Errorf("%w: body must contain between 1 and 10000 characters", ErrInvalidComment)
+	}
+	if markdownImagePattern.MatchString(body) {
+		return Comment{}, fmt.Errorf("%w: images are not supported in blog comments", ErrInvalidComment)
+	}
+	if !englishProse(withoutMarkdownCode(body)) {
+		return Comment{}, fmt.Errorf("%w: comments must be written in English", ErrInvalidComment)
+	}
+	author, err := service.accounts.Account(actorID)
+	if err != nil {
+		return Comment{}, err
+	}
+	existing, err := service.repository.Comments(post.Slug, true)
+	if err != nil {
+		return Comment{}, err
+	}
+	now := service.now().UTC()
+	for index := len(existing) - 1; index >= 0; index-- {
+		if existing[index].AuthorAccountID == actorID && now.Sub(existing[index].CreatedAt) < 30*time.Second {
+			return Comment{}, ErrCommentRateLimited
+		}
+	}
+	id, err := identifier.New("blog-comment")
+	if err != nil {
+		return Comment{}, err
+	}
+	item := Comment{ID: id, PostSlug: post.Slug, AuthorAccountID: author.ID, AuthorName: author.DisplayName,
+		Body: body, Status: "visible", CreatedAt: now, UpdatedAt: now}
+	if err := service.repository.AddComment(item); err != nil {
+		return Comment{}, err
+	}
+	if err := service.appendAudit(actorID, post.Slug+"/comments/"+id, "blog.comment.create"); err != nil {
+		return Comment{}, err
+	}
+	return item, nil
+}
+
+func (service *Service) SetCommentStatus(actorID, slug, commentID, status string) (Comment, error) {
+	status = strings.ToLower(strings.TrimSpace(status))
+	if status != "visible" && status != "hidden" {
+		return Comment{}, fmt.Errorf("%w: status must be visible or hidden", ErrInvalidComment)
+	}
+	item, err := service.repository.Comment(slug, commentID)
+	if err != nil {
+		return Comment{}, err
+	}
+	item.Status, item.UpdatedAt = status, service.now().UTC()
+	if err := service.repository.AddComment(item); err != nil {
+		return Comment{}, err
+	}
+	if err := service.appendAudit(actorID, strings.ToLower(strings.TrimSpace(slug))+"/comments/"+commentID, "admin.blog.comment."+status); err != nil {
+		return Comment{}, err
+	}
+	return item, nil
+}
+
+func englishProse(value string) bool {
+	for _, character := range value {
+		if unicode.IsLetter(character) && !unicode.In(character, unicode.Latin) {
+			return false
+		}
+	}
+	return true
+}
+
+func withoutMarkdownCode(value string) string {
+	var result strings.Builder
+	inFence := false
+	for _, line := range strings.Split(value, "\n") {
+		if strings.HasPrefix(strings.TrimSpace(line), "```") {
+			inFence = !inFence
+			continue
+		}
+		if inFence {
+			continue
+		}
+		inInlineCode := false
+		for _, character := range line {
+			if character == '`' {
+				inInlineCode = !inInlineCode
+				continue
+			}
+			if !inInlineCode {
+				result.WriteRune(character)
+			}
+		}
+		result.WriteByte('\n')
+	}
+	return result.String()
 }
 
 func SlugFromTitle(title string) string {

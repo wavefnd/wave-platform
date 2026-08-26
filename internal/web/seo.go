@@ -57,6 +57,8 @@ type pageMetadata struct {
 	ImageAlt       string
 	Breadcrumbs    []seoBreadcrumb
 	Items          []seoItem
+	Comments       []seoComment
+	CommentCount   int
 	Language       string
 }
 
@@ -68,6 +70,13 @@ type seoBreadcrumb struct {
 type seoItem struct {
 	Name string
 	URL  string
+}
+
+type seoComment struct {
+	AuthorName string
+	AuthorURL  string
+	Text       string
+	CreatedAt  string
 }
 
 var markdownImagePattern = regexp.MustCompile(`!\[([^\]]*)\]\((?:<([^>]+)>|([^\s)]+))(?:\s+["'][^)]*["'])?\)`)
@@ -252,6 +261,21 @@ func (handler SEOHandler) HTMLMetadata(request *http.Request) string {
 		}
 		if metadata.Image != "" {
 			article["image"] = []string{metadata.Image}
+		}
+		if metadata.SchemaType == "BlogPosting" {
+			article["commentCount"] = metadata.CommentCount
+			comments := make([]map[string]any, 0, len(metadata.Comments))
+			for _, comment := range metadata.Comments {
+				author := map[string]any{"@type": "Person", "name": comment.AuthorName}
+				if comment.AuthorURL != "" {
+					author["url"] = comment.AuthorURL
+				}
+				comments = append(comments, map[string]any{"@type": "Comment", "text": comment.Text,
+					"dateCreated": comment.CreatedAt, "author": author})
+			}
+			if len(comments) > 0 {
+				article["comment"] = comments
+			}
 		}
 		graph = append(graph, article)
 		pageSchema["mainEntity"] = map[string]any{"@id": articleID}
@@ -582,6 +606,8 @@ func notFoundMetadata(metadata pageMetadata) pageMetadata {
 	metadata.Image = ""
 	metadata.ImageAlt = ""
 	metadata.Items = nil
+	metadata.Comments = nil
+	metadata.CommentCount = 0
 	return metadata
 }
 
@@ -616,6 +642,8 @@ func (handler SEOHandler) blogPostMetadata(metadata pageMetadata, post blogdomai
 	}
 	metadata.ArticleSection = sectionName
 	metadata.Items = nil
+	metadata.Comments = nil
+	metadata.CommentCount = 0
 	metadata.Breadcrumbs = []seoBreadcrumb{
 		{Name: "Home", URL: strings.TrimRight(base, "/") + "/"},
 		{Name: sectionName, URL: handler.location(base, sectionPath)},
@@ -624,6 +652,19 @@ func (handler SEOHandler) blogPostMetadata(metadata pageMetadata, post blogdomai
 	metadata.Image, metadata.ImageAlt = markdownImage(post.Content, metadata.Canonical)
 	if metadata.Image != "" && metadata.ImageAlt == "" {
 		metadata.ImageAlt = post.Title
+	}
+	if metadata.SchemaType == "BlogPosting" && handler.blog != nil {
+		if comments, err := handler.blog.Comments(post.Slug, false); err == nil {
+			metadata.CommentCount = len(comments)
+			for _, comment := range comments {
+				metadata.Comments = append(metadata.Comments, seoComment{AuthorName: comment.AuthorName,
+					AuthorURL: handler.location(base, "user", "id", comment.AuthorAccountID), Text: seoDescription(comment.Body, "Comment"),
+					CreatedAt: comment.CreatedAt.UTC().Format(time.RFC3339)})
+				if len(metadata.Comments) == 20 {
+					break
+				}
+			}
+		}
 	}
 	return metadata
 }

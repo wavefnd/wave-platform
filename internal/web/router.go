@@ -81,6 +81,8 @@ func NewRouter(
 	mux.HandleFunc("GET /api/v1/releases/{slug}", releasesHandler.Get)
 	mux.HandleFunc("GET /api/v1/blog/posts", blogHandler.List)
 	mux.HandleFunc("GET /api/v1/blog/posts/{slug}", blogHandler.Get)
+	mux.HandleFunc("GET /api/v1/blog/posts/{slug}/comments", blogHandler.Comments)
+	mux.HandleFunc("POST /api/v1/blog/posts/{slug}/comments", blogHandler.AddComment)
 	mux.HandleFunc("GET /api/v1/sponsors", sponsorsHandler.List)
 	mux.HandleFunc("GET /api/v1/documents", documentsHandler.List)
 	mux.HandleFunc("GET /api/v1/documents/{path...}", documentsHandler.Get)
@@ -140,6 +142,8 @@ func NewRouter(
 	mux.HandleFunc("GET /api/v1/blog/editor/posts", blogHandler.EditorList)
 	mux.HandleFunc("GET /api/v1/blog/editor/posts/{slug}", blogHandler.EditorGet)
 	mux.HandleFunc("POST /api/v1/blog/editor/posts", blogHandler.Save)
+	mux.HandleFunc("GET /api/v1/blog/editor/posts/{slug}/comments", blogHandler.EditorComments)
+	mux.HandleFunc("POST /api/v1/blog/editor/posts/{slug}/comments/{comment}/status", blogHandler.SetCommentStatus)
 	mux.HandleFunc("GET /api/v1/admin/webhooks", webhookHandler.List)
 	mux.HandleFunc("POST /api/v1/admin/webhooks", webhookHandler.Save)
 	mux.HandleFunc("DELETE /api/v1/admin/webhooks/{webhook}", webhookHandler.Delete)
@@ -235,6 +239,9 @@ func frontendHandler(root string, seo SEOHandler) http.Handler {
 		)
 
 		if info, err := os.Stat(requestedPath); err == nil && !info.IsDir() {
+			if strings.HasPrefix(request.URL.Path, "/fonts/") {
+				writer.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+			}
 			fileServer.ServeHTTP(writer, request)
 			return
 		}

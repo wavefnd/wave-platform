@@ -2,6 +2,8 @@ package web
 
 import (
 	"encoding/json"
+	"encoding/xml"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -89,8 +91,50 @@ func TestReleaseCanonicalRedirectAndSitemap(t *testing.T) {
 	sitemapResponse := httptest.NewRecorder()
 	seo.Sitemap(sitemapResponse, sitemapRequest)
 	body := sitemapResponse.Body.String()
+	if contentType := sitemapResponse.Header().Get("Content-Type"); contentType != "application/xml; charset=utf-8" {
+		t.Fatalf("sitemap content type = %q", contentType)
+	}
+	var decoded sitemapURLSet
+	if err := xml.Unmarshal(sitemapResponse.Body.Bytes(), &decoded); err != nil {
+		t.Fatalf("sitemap is not valid XML: %v\n%s", err, body)
+	}
+	if decoded.XMLNS != "http://www.sitemaps.org/schemas/sitemap/0.9" || len(decoded.URLs) == 0 {
+		t.Fatalf("invalid sitemap root: %#v", decoded)
+	}
+	if strings.Contains(strings.ToLower(body), "<!doctype html") || strings.Contains(strings.ToLower(body), "<html") {
+		t.Fatalf("sitemap fell back to the SPA document: %s", body)
+	}
 	if !strings.Contains(body, "https://wave.example/releases/v0.2.2") || strings.Contains(body, "https://wave.example/blog/v0.2.2") {
 		t.Fatalf("sitemap uses a non-canonical release URL: %s", body)
+	}
+}
+
+func TestBlogMetadataIncludesVisibleComments(t *testing.T) {
+	service, closeDatabase := testSEOService(t)
+	defer closeDatabase()
+	now := time.Date(2026, time.August, 26, 4, 0, 0, 0, time.UTC)
+	if err := service.Repository().Upsert(blogdomain.Post{Slug: "comments", Category: "article", CommentPolicy: "open",
+		Title: "Comments", Summary: "Discussion", Content: "Article", Status: "published", AuthorName: "Wave Foundation",
+		PublishedAt: "2026-08-26", CreatedAt: now, UpdatedAt: now}); err != nil {
+		t.Fatal(err)
+	}
+	if err := service.Repository().AddComment(blogdomain.Comment{ID: "visible", PostSlug: "comments", AuthorAccountID: "member",
+		AuthorName: "Member", Body: "Useful compiler note.", Status: "visible", CreatedAt: now, UpdatedAt: now}); err != nil {
+		t.Fatal(err)
+	}
+	if err := service.Repository().AddComment(blogdomain.Comment{ID: "hidden", PostSlug: "comments", AuthorAccountID: "member",
+		AuthorName: "Member", Body: "Hidden note.", Status: "hidden", CreatedAt: now, UpdatedAt: now}); err != nil {
+		t.Fatal(err)
+	}
+	graph := metadataGraph(t, NewSEOHandler("https://wave.example", nil, service, nil, nil, nil).HTMLMetadata(
+		httptest.NewRequest(http.MethodGet, "/blog/comments", nil)))
+	article := graphNode(t, graph, "BlogPosting")
+	if article["commentCount"] != float64(1) {
+		t.Fatalf("commentCount=%#v", article["commentCount"])
+	}
+	comments, _ := article["comment"].([]any)
+	if len(comments) != 1 || strings.Contains(strings.ToLower(fmt.Sprint(comments)), "hidden note") {
+		t.Fatalf("comments=%#v", comments)
 	}
 }
 

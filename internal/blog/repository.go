@@ -35,6 +35,7 @@ func (repository *Repository) Post(slug string, includeDrafts bool) (Post, error
 		return Post{}, storage.ErrNotFound
 	}
 	item.Category = NormalizeCategory(item.Category)
+	item.CommentPolicy = NormalizeCommentPolicy(item.Category, item.CommentPolicy)
 	if item.Category == "roadmap" {
 		item.Summary = SummaryFromContent(item.Content)
 	}
@@ -54,6 +55,7 @@ func (repository *Repository) PostsByCategory(category string, includeDrafts boo
 			return fmt.Errorf("decode blog post: %w", err)
 		}
 		item.Category = NormalizeCategory(item.Category)
+		item.CommentPolicy = NormalizeCommentPolicy(item.Category, item.CommentPolicy)
 		if item.Category == "roadmap" {
 			item.Summary = SummaryFromContent(item.Content)
 		}
@@ -85,6 +87,46 @@ func (repository *Repository) PostsByCategory(category string, includeDrafts boo
 	return items, nil
 }
 
+func (repository *Repository) AddComment(item Comment) error {
+	data, err := xml.Marshal(item)
+	if err != nil {
+		return fmt.Errorf("encode blog comment: %w", err)
+	}
+	return repository.database.Set(storage.Key("blog", "comment", item.PostSlug, item.ID), data)
+}
+
+func (repository *Repository) Comment(slug, id string) (Comment, error) {
+	data, err := repository.database.Get(storage.Key("blog", "comment", strings.ToLower(strings.TrimSpace(slug)), strings.TrimSpace(id)))
+	if err != nil {
+		return Comment{}, err
+	}
+	var item Comment
+	if err := xml.Unmarshal(data, &item); err != nil {
+		return Comment{}, fmt.Errorf("decode blog comment: %w", err)
+	}
+	return item, nil
+}
+
+func (repository *Repository) Comments(slug string, includeHidden bool) ([]Comment, error) {
+	items := make([]Comment, 0)
+	err := repository.database.Scan(storage.Prefix("blog", "comment", strings.ToLower(strings.TrimSpace(slug))), func(_, data []byte) error {
+		var item Comment
+		if err := xml.Unmarshal(data, &item); err != nil {
+			return fmt.Errorf("decode blog comment: %w", err)
+		}
+		if !includeHidden && item.Status != "visible" {
+			return nil
+		}
+		items = append(items, item)
+		return nil
+	})
+	if err != nil && !errors.Is(err, storage.ErrNotFound) {
+		return nil, err
+	}
+	sort.Slice(items, func(left, right int) bool { return items[left].CreatedAt.Before(items[right].CreatedAt) })
+	return items, nil
+}
+
 const timeLayout = "2006-01-02T15:04:05.999999999Z07:00"
 
 func SummaryOf(item Post, includeStatus bool) Summary {
@@ -98,5 +140,6 @@ func SummaryOf(item Post, includeStatus bool) Summary {
 	}
 	return Summary{Slug: item.Slug, Category: NormalizeCategory(item.Category), RoadmapStatus: item.RoadmapStatus,
 		RoadmapOrder: item.RoadmapOrder, TargetDate: item.TargetDate, Title: item.Title, Summary: summary,
-		Status: status, AuthorName: item.AuthorName, PublishedAt: item.PublishedAt, UpdatedAt: item.UpdatedAt.Format(timeLayout)}
+		Status: status, CommentPolicy: NormalizeCommentPolicy(item.Category, item.CommentPolicy), AuthorName: item.AuthorName,
+		PublishedAt: item.PublishedAt, UpdatedAt: item.UpdatedAt.Format(timeLayout)}
 }
