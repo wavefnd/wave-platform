@@ -1,12 +1,78 @@
 {
   "name": "@wavefnd/editor",
-  "version": "0.1.0",
+  "version": "0.2.0",
+  "description": "Wave-powered, framework-independent text editor core with DOM and Vue adapters.",
   "type": "module",
+  "license": "MPL-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/wavefnd/wave-platform.git",
+    "directory": "editor"
+  },
+  "files": [
+    "core",
+    "dist",
+    "dom",
+    "examples",
+    "src",
+    "style.ts",
+    "vue",
+    "wave",
+    "web",
+    "module.xml",
+    "vex.ws",
+    "README.md"
+  ],
+  "sideEffects": [
+    "**/*.css"
+  ],
+  "main": "./dist/core.js",
+  "module": "./dist/core.js",
+  "types": "./dist/types/core/index.d.ts",
   "exports": {
-    ".": "./web/index.ts",
-    "./style.css": "./web/wave-editor.css"
+    ".": {
+      "types": "./dist/types/core/index.d.ts",
+      "import": "./dist/core.js"
+    },
+    "./core": {
+      "types": "./dist/types/core/index.d.ts",
+      "import": "./dist/core.js"
+    },
+    "./dom": {
+      "types": "./dist/types/dom/index.d.ts",
+      "import": "./dist/dom.js"
+    },
+    "./vue": {
+      "types": "./dist/types/vue/index.d.ts",
+      "import": "./dist/vue.js"
+    },
+    "./style.css": "./dist/style.css",
+    "./wave": "./src/lib.wave",
+    "./vex.ws": "./vex.ws",
+    "./source/core": "./core/index.ts",
+    "./source/dom": "./dom/index.ts",
+    "./source/vue": "./vue/index.ts",
+    "./source/style.css": "./web/wave-editor.css"
+  },
+  "scripts": {
+    "build": "vite build && vue-tsc -p tsconfig.build.json",
+    "test": "vitest run",
+    "typecheck": "vue-tsc -p tsconfig.json --noEmit",
+    "prepack": "npm run test && npm run build"
   },
   "peerDependencies": {
     "vue": "^3.5.0"
+  },
+  "peerDependenciesMeta": {
+    "vue": { "optional": true }
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "6.0.8",
+    "@types/node": "^24.0.0",
+    "typescript": "5.9.3",
+    "vite": "8.2.0",
+    "vitest": "4.1.11",
+    "vue": "3.5.40",
+    "vue-tsc": "3.3.9"
   }
 }

@@ -1,0 +1,6 @@
+export { commandDefinition, transformSelection, waveEditorCommands } from './commands'
+export type { WaveEditorCommandDefinition } from './commands'
+export { WaveEditorDocument } from './document'
+export { createTransform, WaveEditorEngine } from './engine'
+export { analyzeDocument, browserOffsetToUnicode, normalizeSelection, unicodeOffsetToBrowser } from './metrics'
+export * from './types'

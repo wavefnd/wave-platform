@@ -74,6 +74,7 @@ export interface EditorTransformResult {
 	selectionStart: number
 	selectionEnd: number
 	engine: string
+	characters: number
 	lines: number
 	words: number
 }
@@ -1353,6 +1354,7 @@ export async function transformEditorDocument(content: string, selectionStart: n
 		selectionStart: browserOffset(transformed, Number(childText(root, 'selection-start')) || 0),
 		selectionEnd: browserOffset(transformed, Number(childText(root, 'selection-end')) || 0),
 		engine: childText(root, 'engine'),
+		characters: Array.from(transformed).length,
 		lines: Number(childText(root, 'lines')) || 1,
 		words: Number(childText(root, 'words')) || 0,
 	}

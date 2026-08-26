@@ -1,0 +1,13 @@
+{
+    version = 2,
+    package = [
+        {
+            name = "wave_editor",
+            version = "0.2.0",
+            source = "path",
+            path = "../..",
+            resolved = "../..",
+            dependencies = []
+        }
+    ]
+}

@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<module xmlns="https://wave-lang.dev/ns/module/v1" id="wave-editor" version="0.1.0">
+<module xmlns="https://wave-lang.dev/ns/module/v1" id="wave-editor" version="0.2.0">
   <name>WaveEditor Core</name>
   <description>Selection transforms and document metrics for the reusable WaveEditor.</description>
   <language>Wave</language>

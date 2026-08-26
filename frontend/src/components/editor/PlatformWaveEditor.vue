@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { WaveEditor } from '@wavefnd/editor'
-import type { WaveEditorCommand } from '@wavefnd/editor'
+import { WaveEditor } from '@wavefnd/editor/source/vue'
+import type { WaveEditorCommand } from '@wavefnd/editor/source/vue'
 import { computed, ref } from 'vue'
 
 import { useI18n } from '../../i18n'

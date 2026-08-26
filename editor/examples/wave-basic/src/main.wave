@@ -1,0 +1,6 @@
+import("wave_editor")::{editor_abi_version};
+
+fun main() {
+    var version: i32 = editor_abi_version();
+    println("WaveEditor ABI: {}", version);
+}

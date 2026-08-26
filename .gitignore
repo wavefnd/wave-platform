@@ -1,6 +1,8 @@
 data/
 
 frontend/node_modules/
+editor/node_modules/
+editor/.vex/
 frontend/dist/
 frontend/.vite/
 frontend/*.tsbuildinfo

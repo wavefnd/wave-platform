@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, ref } from 'vue'
-import type { WaveEditorCommand, WaveEditorTransform, WaveEditorTransformResult } from './types'
+import { transformSelection, waveEditorCommands } from '../core'
+import type { WaveEditorCommand, WaveEditorTransform, WaveEditorTransformResult } from '../core'
 
 const props = withDefaults(defineProps<{
   modelValue: string
@@ -41,26 +42,10 @@ const lineCount = computed(() => (props.modelValue.match(/\n/g)?.length ?? 0) + 
 const wordCount = computed(() => props.modelValue.trim() ? props.modelValue.trim().split(/\s+/u).length : 0)
 const characterCount = computed(() => Array.from(props.modelValue).length)
 
-const commands: Array<{ command: WaveEditorCommand; text: string; title: string }> = [
-  { command: 'bold', text: 'B', title: 'Bold' },
-  { command: 'italic', text: 'I', title: 'Italic' },
-  { command: 'inline-code', text: '</>', title: 'Inline code' },
-  { command: 'heading', text: 'H2', title: 'Heading' },
-  { command: 'quote', text: '“', title: 'Quote' },
-  { command: 'unordered-list', text: '•', title: 'List' },
-  { command: 'link', text: '↗', title: 'Link' },
-]
+const commands = waveEditorCommands.map((item) => ({ command: item.id, text: item.toolbarText, title: item.label }))
 
 function localTransform(content: string, start: number, end: number, command: WaveEditorCommand): WaveEditorTransformResult {
-  const wrappers: Record<WaveEditorCommand, [string, string]> = {
-    bold: ['**', '**'], italic: ['*', '*'], 'inline-code': ['`', '`'], heading: ['## ', ''],
-    quote: ['> ', ''], 'unordered-list': ['- ', ''], link: ['[', '](https://)'],
-  }
-  const [prefix, suffix] = wrappers[command]
-  return {
-    content: content.slice(0, start) + prefix + content.slice(start, end) + suffix + content.slice(end),
-    selectionStart: start + prefix.length, selectionEnd: end + prefix.length, engine: 'web',
-  }
+  return { ...transformSelection(content, start, end, command), engine: 'web' }
 }
 
 async function apply(command: WaveEditorCommand) {
