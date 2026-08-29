@@ -191,7 +191,7 @@ func (handler SEOHandler) HTMLMetadata(request *http.Request) string {
 	organization := map[string]any{
 		"@type": "Organization", "@id": organizationID, "name": "Wave Foundation", "url": base + "/",
 		"logo":   map[string]any{"@type": "ImageObject", "url": base + "/img/wave-logo.ico", "width": 256, "height": 256},
-		"sameAs": []string{"https://github.com/wavefnd", "https://opencollective.com/wave-lang"},
+		"sameAs": []string{"https://github.com/wavefnd", "https://discord.gg/3nev5nHqq9", "https://opencollective.com/wave-lang"},
 	}
 	website := map[string]any{
 		"@type": "WebSite", "@id": websiteID, "name": "Wave Programming Language", "url": base + "/",

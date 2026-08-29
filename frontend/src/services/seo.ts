@@ -149,7 +149,7 @@ export function applyPageSEO(options: PageSEO) {
   const organization = {
     '@type': 'Organization', '@id': `${window.location.origin}/#organization`, name: 'Wave Foundation', url: `${window.location.origin}/`,
     logo: { '@type': 'ImageObject', url: new URL('/img/wave-logo.ico', window.location.origin).toString(), width: 256, height: 256 },
-    sameAs: ['https://github.com/wavefnd', 'https://opencollective.com/wave-lang'],
+    sameAs: ['https://github.com/wavefnd', 'https://discord.gg/3nev5nHqq9', 'https://opencollective.com/wave-lang'],
   }
   const website = {
     '@type': 'WebSite', '@id': `${window.location.origin}/#website`, name: 'Wave Programming Language', url: `${window.location.origin}/`,

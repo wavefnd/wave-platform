@@ -4,6 +4,7 @@ import { onBeforeUnmount, onMounted, ref } from 'vue'
 
 import { useI18n, type Locale } from '../../i18n'
 import { useAuthStore } from '../../stores/auth'
+import DiscordMark from '../icons/DiscordMark.vue'
 import GitHubMark from '../icons/GitHubMark.vue'
 import ThemeSelector from './ThemeSelector.vue'
 
@@ -42,8 +43,11 @@ onBeforeUnmount(() => {
 <template>
   <div class="platform-account">
     <ThemeSelector />
-    <a class="github-link" href="https://github.com/wavefnd/Wave" target="_blank" rel="noopener noreferrer" :aria-label="t('nav.github')" :title="t('nav.github')">
+    <a class="external-icon-link" href="https://github.com/wavefnd/Wave" target="_blank" rel="noopener noreferrer" :aria-label="t('nav.github')" :title="t('nav.github')">
       <GitHubMark :size="17" />
+    </a>
+    <a class="external-icon-link" href="https://discord.gg/3nev5nHqq9" target="_blank" rel="noopener noreferrer" :aria-label="t('nav.discord')" :title="t('nav.discord')">
+      <DiscordMark :size="17" />
     </a>
     <select :value="locale" :aria-label="t('nav.language')" @change="changeLocale">
       <option value="en">English</option>
