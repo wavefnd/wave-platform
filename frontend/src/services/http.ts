@@ -114,6 +114,23 @@ export interface PlatformStats {
   gitMirrors: number
 }
 
+export interface NotificationItem {
+	id: string
+	actorAccountId: string
+	actorName: string
+	kind: 'blog.comment' | 'community.reply' | 'question.answer' | 'question.accepted' | 'rfc.comment' | 'rfc.status'
+	subject: string
+	detail: string
+	url: string
+	createdAt: string
+	readAt: string
+}
+
+export interface NotificationList {
+	unreadCount: number
+	items: NotificationItem[]
+}
+
 export interface PatchSummary {
 	id: string
 	messageId: string
@@ -704,6 +721,41 @@ export async function getSponsors(): Promise<SponsorsView> {
 
 export async function logout(): Promise<void> {
 	await requestXml('/api/v1/auth/logout', 'POST')
+}
+
+function parseNotification(element: Element): NotificationItem {
+	return {
+		id: childText(element, 'id'),
+		actorAccountId: childText(element, 'actor-account-id'),
+		actorName: childText(element, 'actor-name'),
+		kind: childText(element, 'kind') as NotificationItem['kind'],
+		subject: childContent(element, 'subject'),
+		detail: childContent(element, 'detail'),
+		url: childText(element, 'url'),
+		createdAt: childText(element, 'created-at'),
+		readAt: childText(element, 'read-at'),
+	}
+}
+
+export async function getNotifications(limit = 20): Promise<NotificationList> {
+	const query = new URLSearchParams({ limit: String(limit) })
+	const xml = await getXml(`/api/v1/notifications?${query}`)
+	return {
+		unreadCount: Number(textOf(xml, 'unread-count')) || 0,
+		items: Array.from(xml.querySelectorAll('notifications > notification')).map(parseNotification),
+	}
+}
+
+export async function markNotificationRead(id: string): Promise<NotificationItem> {
+	const xml = await requestXml(`/api/v1/notifications/${encodeURIComponent(id)}/read`, 'POST')
+	if (!xml) throw new Error('The server returned an empty notification response.')
+	const item = xml.querySelector('notification')
+	if (!item) throw new Error('The server returned an invalid notification response.')
+	return parseNotification(item)
+}
+
+export async function markAllNotificationsRead(): Promise<void> {
+	await requestXml('/api/v1/notifications/read-all', 'POST')
 }
 
 export async function getMailbox(folder = 'Inbox', q = ''): Promise<MailboxView> {

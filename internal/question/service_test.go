@@ -4,6 +4,7 @@ import (
 	"errors"
 	"testing"
 
+	notificationdomain "github.com/wavefnd/wave-platform/internal/notification"
 	"github.com/wavefnd/wave-platform/internal/storage"
 	"github.com/wavefnd/wave-platform/internal/testsupport"
 )
@@ -27,6 +28,8 @@ func TestQuestionLifecycleUsesMailThreadWithoutMailboxProjection(t *testing.T) {
 		t.Fatal(err)
 	}
 	service := NewService(database, "wave-lang.dev")
+	notifications := notificationdomain.NewService(database)
+	service.SetNotificationService(notifications)
 
 	created, err := service.Create(asker, CreateInput{Title: "Why does generic inference fail here?",
 		Body: "The compiler reports a type mismatch for this generic function call.",
@@ -44,6 +47,10 @@ func TestQuestionLifecycleUsesMailThreadWithoutMailboxProjection(t *testing.T) {
 	if answered.Question.Status != "answered" || len(answered.Answers) != 1 {
 		t.Fatalf("answered = %#v", answered)
 	}
+	askerNotifications, unread, err := notifications.List(asker.ID, 20)
+	if err != nil || unread != 1 || len(askerNotifications) != 1 || askerNotifications[0].Kind != "question.answer" {
+		t.Fatalf("asker notifications=%#v unread=%d err=%v", askerNotifications, unread, err)
+	}
 	answerID := answered.Answers[0].ID
 	if _, err := service.Vote(answerer.ID, created.Question.ID, "question", created.Question.ID, 1); err != nil {
 		t.Fatal(err)
@@ -57,6 +64,10 @@ func TestQuestionLifecycleUsesMailThreadWithoutMailboxProjection(t *testing.T) {
 	}
 	if accepted.Question.Status != "resolved" || accepted.Question.AcceptedMessageID != answerID || !accepted.Answers[0].Accepted {
 		t.Fatalf("accepted = %#v", accepted)
+	}
+	answererNotifications, unread, err := notifications.List(answerer.ID, 20)
+	if err != nil || unread != 1 || len(answererNotifications) != 1 || answererNotifications[0].Kind != "question.accepted" {
+		t.Fatalf("answerer notifications=%#v unread=%d err=%v", answererNotifications, unread, err)
 	}
 	if _, err := service.Accept(answerer, created.Question.ID, "", false); !errors.Is(err, ErrForbidden) {
 		t.Fatalf("non-owner accept error = %v", err)

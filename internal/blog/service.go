@@ -11,6 +11,7 @@ import (
 	"github.com/wavefnd/wave-platform/internal/account"
 	"github.com/wavefnd/wave-platform/internal/audit"
 	"github.com/wavefnd/wave-platform/internal/identifier"
+	notificationdomain "github.com/wavefnd/wave-platform/internal/notification"
 	"github.com/wavefnd/wave-platform/internal/storage"
 	webhookdomain "github.com/wavefnd/wave-platform/internal/webhook"
 )
@@ -25,11 +26,12 @@ var (
 )
 
 type Service struct {
-	repository *Repository
-	accounts   *account.Repository
-	audit      *audit.Repository
-	webhooks   *webhookdomain.Service
-	now        func() time.Time
+	repository    *Repository
+	accounts      *account.Repository
+	audit         *audit.Repository
+	webhooks      *webhookdomain.Service
+	notifications *notificationdomain.Service
+	now           func() time.Time
 }
 
 func NewService(database *storage.Database) *Service {
@@ -41,6 +43,10 @@ func (service *Service) Repository() *Repository { return service.repository }
 
 func (service *Service) SetWebhookService(webhooks *webhookdomain.Service) {
 	service.webhooks = webhooks
+}
+
+func (service *Service) SetNotificationService(notifications *notificationdomain.Service) {
+	service.notifications = notifications
 }
 
 func (service *Service) Save(actorID string, input Input) (Post, error) {
@@ -215,6 +221,11 @@ func (service *Service) AddComment(actorID, slug string, input CommentInput) (Co
 	}
 	if err := service.appendAudit(actorID, post.Slug+"/comments/"+id, "blog.comment.create"); err != nil {
 		return Comment{}, err
+	}
+	if service.notifications != nil {
+		_, _ = service.notifications.Notify(notificationdomain.Input{RecipientAccountID: post.AuthorAccountID,
+			ActorAccountID: author.ID, ActorName: author.DisplayName, Kind: "blog.comment", Subject: post.Title,
+			URL: "/blog/" + post.Slug})
 	}
 	return item, nil
 }

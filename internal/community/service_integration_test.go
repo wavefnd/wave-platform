@@ -9,6 +9,7 @@ import (
 
 	"github.com/wavefnd/wave-platform/internal/community"
 	"github.com/wavefnd/wave-platform/internal/mailbox"
+	notificationdomain "github.com/wavefnd/wave-platform/internal/notification"
 	"github.com/wavefnd/wave-platform/internal/storage"
 	"github.com/wavefnd/wave-platform/internal/testsupport"
 	webhookdomain "github.com/wavefnd/wave-platform/internal/webhook"
@@ -38,6 +39,8 @@ func TestMailBackedPostReplyStayOutOfPersonalMailbox(t *testing.T) {
 	}
 
 	service := community.NewService(database, "wave-lang.dev")
+	notifications := notificationdomain.NewService(database)
+	service.SetNotificationService(notifications)
 	post, err := service.CreatePost(author, community.CreatePostInput{
 		SpaceID: "development", Title: "Wave compiler backend design", Body: "A mail-backed community post.", Tags: []string{"compiler", "design"},
 	})
@@ -55,6 +58,10 @@ func TestMailBackedPostReplyStayOutOfPersonalMailbox(t *testing.T) {
 	if len(replied.Replies) != 1 || replied.Replies[0].AuthorAccountID != commenter.ID {
 		t.Fatalf("replied=%#v", replied)
 	}
+	authorNotifications, unread, err := notifications.List(author.ID, 20)
+	if err != nil || unread != 1 || len(authorNotifications) != 1 || authorNotifications[0].Kind != "community.reply" {
+		t.Fatalf("author notifications=%#v unread=%d err=%v", authorNotifications, unread, err)
+	}
 	nested, err := service.AddReply(author, community.CreateReplyInput{
 		ThreadID: post.Thread.ID, ParentMessageID: replied.Replies[0].ID, Body: "This reply belongs below the comment.",
 	})
@@ -63,6 +70,10 @@ func TestMailBackedPostReplyStayOutOfPersonalMailbox(t *testing.T) {
 	}
 	if len(nested.Replies) != 2 || nested.Replies[1].ParentMessageID != replied.Replies[0].ID {
 		t.Fatalf("nested reply parent was not preserved: %#v", nested.Replies)
+	}
+	commenterNotifications, unread, err := notifications.List(commenter.ID, 20)
+	if err != nil || unread != 1 || len(commenterNotifications) != 1 || commenterNotifications[0].Kind != "community.reply" {
+		t.Fatalf("commenter notifications=%#v unread=%d err=%v", commenterNotifications, unread, err)
 	}
 
 	score, err := service.Vote(commenter.ID, post.Thread.ID, "thread", post.Thread.ID, 1)

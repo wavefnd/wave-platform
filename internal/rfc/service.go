@@ -9,6 +9,7 @@ import (
 	"github.com/wavefnd/wave-platform/internal/account"
 	"github.com/wavefnd/wave-platform/internal/audit"
 	"github.com/wavefnd/wave-platform/internal/identifier"
+	notificationdomain "github.com/wavefnd/wave-platform/internal/notification"
 	"github.com/wavefnd/wave-platform/internal/permission"
 	"github.com/wavefnd/wave-platform/internal/storage"
 )
@@ -26,11 +27,12 @@ var validStatuses = map[string]bool{
 }
 
 type Service struct {
-	repository  *Repository
-	accounts    *account.Repository
-	permissions *permission.Repository
-	audit       *audit.Repository
-	now         func() time.Time
+	repository    *Repository
+	accounts      *account.Repository
+	permissions   *permission.Repository
+	audit         *audit.Repository
+	notifications *notificationdomain.Service
+	now           func() time.Time
 }
 
 func NewService(database *storage.Database) *Service {
@@ -39,6 +41,10 @@ func NewService(database *storage.Database) *Service {
 }
 
 func (service *Service) Repository() *Repository { return service.repository }
+
+func (service *Service) SetNotificationService(notifications *notificationdomain.Service) {
+	service.notifications = notifications
+}
 
 func (service *Service) CanMaintain(accountID string) (bool, error) {
 	owner, err := service.permissions.HasRole(accountID, "platform-owner")
@@ -119,6 +125,12 @@ func (service *Service) UpdateStatus(actorID string, number uint64, status strin
 	if err := service.appendAudit(actorID, number, "rfc.status."+status); err != nil {
 		return Proposal{}, err
 	}
+	if service.notifications != nil {
+		actor, _ := service.accounts.Account(actorID)
+		_, _ = service.notifications.Notify(notificationdomain.Input{RecipientAccountID: item.AuthorAccountID,
+			ActorAccountID: actorID, ActorName: actor.DisplayName, Kind: "rfc.status", Subject: item.Title,
+			Detail: status, URL: fmt.Sprintf("/rfcs/%d", number)})
+	}
 	return service.repository.Proposal(number)
 }
 
@@ -127,7 +139,8 @@ func (service *Service) AddComment(actorID string, number uint64, input CommentI
 	if err != nil {
 		return Comment{}, err
 	}
-	if _, err := service.repository.Proposal(number); err != nil {
+	proposal, err := service.repository.Proposal(number)
+	if err != nil {
 		return Comment{}, err
 	}
 	body := strings.TrimSpace(strings.ReplaceAll(input.Body, "\r\n", "\n"))
@@ -145,6 +158,11 @@ func (service *Service) AddComment(actorID string, number uint64, input CommentI
 	}
 	if err := service.appendAudit(actorID, number, "rfc.comment"); err != nil {
 		return Comment{}, err
+	}
+	if service.notifications != nil {
+		_, _ = service.notifications.Notify(notificationdomain.Input{RecipientAccountID: proposal.AuthorAccountID,
+			ActorAccountID: author.ID, ActorName: author.DisplayName, Kind: "rfc.comment", Subject: proposal.Title,
+			URL: fmt.Sprintf("/rfcs/%d", number)})
 	}
 	return item, nil
 }

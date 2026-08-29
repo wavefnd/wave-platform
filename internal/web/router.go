@@ -15,6 +15,7 @@ import (
 	"github.com/wavefnd/wave-platform/internal/gitmirror"
 	mailingdomain "github.com/wavefnd/wave-platform/internal/mailinglist"
 	mediadomain "github.com/wavefnd/wave-platform/internal/media"
+	notificationdomain "github.com/wavefnd/wave-platform/internal/notification"
 	patchdomain "github.com/wavefnd/wave-platform/internal/patcharchive"
 	"github.com/wavefnd/wave-platform/internal/platformstats"
 	questiondomain "github.com/wavefnd/wave-platform/internal/question"
@@ -47,6 +48,7 @@ func NewRouter(
 	patchService *patchdomain.Service,
 	rfcService *rfcdomain.Service,
 	mailingListService *mailingdomain.Service,
+	notificationService *notificationdomain.Service,
 	editorEngine editor.Engine,
 ) http.Handler {
 	mux := http.NewServeMux()
@@ -71,6 +73,7 @@ func NewRouter(
 	patchesHandler := handler.PatchesHandler{Service: patchService, Auth: authHandler}
 	rfcHandler := handler.RFCHandler{Service: rfcService, Auth: authHandler}
 	mailingListHandler := handler.MailingListHandler{Service: mailingListService, Auth: authHandler}
+	notificationHandler := handler.NotificationHandler{Service: notificationService, Auth: authHandler}
 	editorHandler := handler.EditorHandler{Engine: editorEngine, Auth: authHandler}
 	usersHandler := handler.UsersHandler{Community: communityRepository, Questions: questionRepository, Auth: authHandler}
 	seoHandler := NewSEOHandler(publicURL, documentRepository, blogService, communityRepository, questionRepository, rfcService)
@@ -125,6 +128,9 @@ func NewRouter(
 	mux.HandleFunc("GET /api/v1/mailing-lists/{list}/threads/{thread}", mailingListHandler.Thread)
 	mux.HandleFunc("POST /api/v1/mailing-lists/{list}/threads/{thread}/messages", mailingListHandler.Reply)
 	mux.HandleFunc("POST /api/v1/mailing-lists/{list}/subscription", mailingListHandler.Subscription)
+	mux.HandleFunc("GET /api/v1/notifications", notificationHandler.List)
+	mux.HandleFunc("POST /api/v1/notifications/read-all", notificationHandler.MarkAllRead)
+	mux.HandleFunc("POST /api/v1/notifications/{notification}/read", notificationHandler.MarkRead)
 	mux.HandleFunc("POST /api/v1/editor/transform", editorHandler.Transform)
 	mux.HandleFunc("GET /api/v1/platform/stats", statsHandler.Get)
 	mux.HandleFunc("GET /api/v1/platform/preferences", adminHandler.PlatformPreferences)

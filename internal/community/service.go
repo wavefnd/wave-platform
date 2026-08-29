@@ -15,6 +15,7 @@ import (
 	"github.com/wavefnd/wave-platform/internal/audit"
 	"github.com/wavefnd/wave-platform/internal/identifier"
 	maildomain "github.com/wavefnd/wave-platform/internal/mail"
+	notificationdomain "github.com/wavefnd/wave-platform/internal/notification"
 	"github.com/wavefnd/wave-platform/internal/permission"
 	"github.com/wavefnd/wave-platform/internal/storage"
 	webhookdomain "github.com/wavefnd/wave-platform/internal/webhook"
@@ -34,13 +35,14 @@ var (
 )
 
 type Service struct {
-	repository *Repository
-	mail       *maildomain.Repository
-	audit      *audit.Repository
-	permission *permission.Repository
-	webhooks   *webhookdomain.Service
-	mailDomain string
-	now        func() time.Time
+	repository    *Repository
+	mail          *maildomain.Repository
+	audit         *audit.Repository
+	permission    *permission.Repository
+	webhooks      *webhookdomain.Service
+	notifications *notificationdomain.Service
+	mailDomain    string
+	now           func() time.Time
 }
 
 func NewService(database *storage.Database, mailDomain string) *Service {
@@ -51,6 +53,10 @@ func NewService(database *storage.Database, mailDomain string) *Service {
 
 func (service *Service) SetWebhookService(webhooks *webhookdomain.Service) {
 	service.webhooks = webhooks
+}
+
+func (service *Service) SetNotificationService(notifications *notificationdomain.Service) {
+	service.notifications = notifications
 }
 
 func (service *Service) CreatePost(actor account.Account, input CreatePostInput) (ThreadView, error) {
@@ -177,6 +183,21 @@ func (service *Service) AddReply(actor account.Account, input CreateReplyInput) 
 		return ThreadView{}, err
 	}
 	_ = service.auditEvent(actor.ID, "community/thread/"+thread.ID, "community.reply")
+	if service.notifications != nil {
+		path := "/community/thread/" + thread.ID
+		if space.PostingPolicy == "owner" {
+			path = "/lunastev/thread/" + thread.ID
+		} else if space.ID == "showcase" {
+			path = "/community/showcase/" + thread.ID
+		}
+		if subscribers, subscriberErr := service.repository.Subscribers(thread.ID); subscriberErr == nil {
+			for _, accountID := range subscribers {
+				_, _ = service.notifications.Notify(notificationdomain.Input{RecipientAccountID: accountID,
+					ActorAccountID: actor.ID, ActorName: actor.DisplayName, Kind: "community.reply",
+					Subject: root.Subject, URL: path})
+			}
+		}
+	}
 	return service.repository.ViewFor(thread.ID, actor.ID)
 }
 

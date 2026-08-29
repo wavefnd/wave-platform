@@ -6,6 +6,7 @@ import { useI18n, type Locale } from '../../i18n'
 import { useAuthStore } from '../../stores/auth'
 import DiscordMark from '../icons/DiscordMark.vue'
 import GitHubMark from '../icons/GitHubMark.vue'
+import NotificationMenu from './NotificationMenu.vue'
 import ThemeSelector from './ThemeSelector.vue'
 
 const { locale, setLocale, t } = useI18n()
@@ -43,6 +44,7 @@ onBeforeUnmount(() => {
 <template>
   <div class="platform-account">
     <ThemeSelector />
+    <NotificationMenu v-if="auth.account" />
     <a class="external-icon-link" href="https://github.com/wavefnd/Wave" target="_blank" rel="noopener noreferrer" :aria-label="t('nav.github')" :title="t('nav.github')">
       <GitHubMark :size="17" />
     </a>

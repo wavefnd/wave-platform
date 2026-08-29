@@ -14,6 +14,7 @@ import (
 	"github.com/wavefnd/wave-platform/internal/audit"
 	"github.com/wavefnd/wave-platform/internal/identifier"
 	maildomain "github.com/wavefnd/wave-platform/internal/mail"
+	notificationdomain "github.com/wavefnd/wave-platform/internal/notification"
 	"github.com/wavefnd/wave-platform/internal/storage"
 )
 
@@ -26,16 +27,21 @@ var (
 var tagPattern = regexp.MustCompile(`^[\p{L}\p{N}][\p{L}\p{N}-]{0,29}$`)
 
 type Service struct {
-	repository *Repository
-	mail       *maildomain.Repository
-	audit      *audit.Repository
-	mailDomain string
-	now        func() time.Time
+	repository    *Repository
+	mail          *maildomain.Repository
+	audit         *audit.Repository
+	notifications *notificationdomain.Service
+	mailDomain    string
+	now           func() time.Time
 }
 
 func NewService(database *storage.Database, mailDomain string) *Service {
 	return &Service{repository: NewRepository(database), mail: maildomain.NewRepository(database),
 		audit: audit.NewRepository(database), mailDomain: strings.ToLower(strings.TrimSpace(mailDomain)), now: time.Now}
+}
+
+func (service *Service) SetNotificationService(notifications *notificationdomain.Service) {
+	service.notifications = notifications
 }
 
 func (service *Service) Create(actor account.Account, input CreateInput) (View, error) {
@@ -114,6 +120,11 @@ func (service *Service) Answer(actor account.Account, input AnswerInput) (View, 
 		}
 	}
 	_ = service.auditEvent(actor.ID, "question/"+value.ID+"/answer/"+message.ID, "question.answer")
+	if service.notifications != nil {
+		_, _ = service.notifications.Notify(notificationdomain.Input{RecipientAccountID: root.AuthorAccountID,
+			ActorAccountID: actor.ID, ActorName: actor.DisplayName, Kind: "question.answer", Subject: root.Subject,
+			URL: "/questions/" + value.ID})
+	}
 	return service.repository.View(value.ID, actor.ID)
 }
 
@@ -160,6 +171,7 @@ func (service *Service) Accept(actor account.Account, questionID, answerID strin
 		return View{}, ErrForbidden
 	}
 	answerID = strings.TrimSpace(answerID)
+	acceptedAuthorID := ""
 	if answerID != "" {
 		answer, err := service.mail.Message(answerID)
 		if err != nil || answer.ThreadID != value.ID || answer.ID == value.RootMessageID {
@@ -167,6 +179,7 @@ func (service *Service) Accept(actor account.Account, questionID, answerID strin
 		}
 		value.AcceptedMessageID = answer.ID
 		value.Status = "resolved"
+		acceptedAuthorID = answer.AuthorAccountID
 	} else {
 		value.AcceptedMessageID = ""
 		messages, err := service.mail.MessagesByThread(root.ThreadID)
@@ -182,6 +195,11 @@ func (service *Service) Accept(actor account.Account, questionID, answerID strin
 		return View{}, err
 	}
 	_ = service.auditEvent(actor.ID, "question/"+value.ID, "question.accept")
+	if service.notifications != nil && acceptedAuthorID != "" {
+		_, _ = service.notifications.Notify(notificationdomain.Input{RecipientAccountID: acceptedAuthorID,
+			ActorAccountID: actor.ID, ActorName: actor.DisplayName, Kind: "question.accepted", Subject: root.Subject,
+			URL: "/questions/" + value.ID})
+	}
 	return service.repository.View(value.ID, actor.ID)
 }
 

@@ -224,6 +224,27 @@ a:hover { color: var(--wave-link-hover); }
 .platform-account .theme-toggle { display: grid; width: 32px; flex: 0 0 auto; place-items: center; padding: 0; }
 .platform-account .external-icon-link { display: grid; width: 32px; flex: 0 0 auto; place-items: center; padding: 0; }
 
+.notification-menu { position: relative; }
+.platform-account .notification-trigger { position: relative; display: grid; width: 32px; flex: 0 0 auto; place-items: center; padding: 0; }
+.notification-badge { position: absolute; top: -4px; right: -5px; display: grid; min-width: 17px; height: 17px; place-items: center; padding: 0 4px; border: 2px solid var(--wave-bg-canvas); border-radius: 9px; background: var(--wave-danger); color: var(--wave-on-accent); font-size: 9px; font-weight: 700; line-height: 1; }
+.notification-panel { position: absolute; z-index: 70; top: calc(100% + 7px); right: 0; width: min(380px, calc(100vw - 24px)); max-height: min(560px, calc(100vh - 80px)); overflow: hidden; border: 1px solid var(--wave-border-strong); border-radius: var(--wave-radius-md); background: var(--wave-surface-raised); box-shadow: var(--wave-shadow-overlay); white-space: normal; }
+.notification-panel > header { display: flex; min-height: 48px; align-items: center; justify-content: space-between; gap: 12px; padding: 9px 12px; border-bottom: 1px solid var(--wave-border); }
+.notification-panel > header strong { color: var(--wave-text); font-size: 14px; }
+.platform-account .notification-panel > header button { display: flex; min-height: 30px; align-items: center; gap: 5px; padding: 5px 7px; color: var(--wave-text-secondary); font-size: 12px; }
+.platform-account .notification-panel > header button:hover { background: var(--wave-surface-hover); color: var(--wave-text); }
+.notification-state { margin: 0; padding: 30px 18px; color: var(--wave-text-secondary); font-size: 13px; text-align: center; }
+.notification-list { max-height: min(500px, calc(100vh - 130px)); overflow-y: auto; margin: 0; padding: 0; list-style: none; }
+.notification-list li { border-bottom: 1px solid var(--wave-border); }
+.notification-list li:last-child { border-bottom: 0; }
+.notification-list li.unread { background: var(--wave-surface-selected); }
+.platform-account .notification-list a { display: flex; min-height: 82px; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 14px; border: 0; border-radius: 0; color: var(--wave-text); }
+.platform-account .notification-list a:hover { background: var(--wave-surface-hover); }
+.notification-copy { display: grid; min-width: 0; gap: 3px; }
+.notification-copy strong { color: var(--wave-text); font-size: 12px; }
+.notification-copy > span { overflow: hidden; color: var(--wave-text-secondary); font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
+.notification-copy small { color: var(--wave-text-muted); font-size: 11px; }
+.notification-unread-dot { width: 7px; height: 7px; flex: 0 0 auto; border-radius: 50%; background: var(--wave-accent); }
+
 .platform-account a:hover {
   border-color: var(--wave-border);
   background: var(--wave-bg-subtle);
@@ -545,6 +566,7 @@ a:hover { color: var(--wave-link-hover); }
   .platform-switcher-row .mobile-platform-account { display: flex; flex-wrap: wrap; justify-content: flex-start; gap: 5px; padding: 10px 12px 12px; border-top: 1px solid var(--wave-border); background: var(--wave-bg-subtle); }
   .mobile-platform-account .account-address { max-width: 120px; }
   .mobile-platform-account .account-create { display: inline-flex; }
+	.mobile-platform-account .notification-panel { position: fixed; top: 66px; right: 12px; left: 12px; width: auto; max-height: calc(100vh - 78px); }
   .portal-width,
   .community-width,
   .docs-width,

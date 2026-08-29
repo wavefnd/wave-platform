@@ -24,6 +24,7 @@ import (
 	"github.com/wavefnd/wave-platform/internal/mailruntime"
 	mediadomain "github.com/wavefnd/wave-platform/internal/media"
 	"github.com/wavefnd/wave-platform/internal/mediapolicy"
+	notificationdomain "github.com/wavefnd/wave-platform/internal/notification"
 	patchdomain "github.com/wavefnd/wave-platform/internal/patcharchive"
 	"github.com/wavefnd/wave-platform/internal/platformstats"
 	questiondomain "github.com/wavefnd/wave-platform/internal/question"
@@ -134,6 +135,11 @@ func New(configPath string) (*Application, error) {
 	communityService.SetWebhookService(webhookService)
 	questionRepository := questiondomain.NewRepository(database)
 	questionService := questiondomain.NewService(database, cfg.Identity.MailDomain)
+	notificationService := notificationdomain.NewService(database)
+	rfcService.SetNotificationService(notificationService)
+	blogService.SetNotificationService(notificationService)
+	communityService.SetNotificationService(notificationService)
+	questionService.SetNotificationService(notificationService)
 	var sourceAnalyzer sourceanalysis.Analyzer
 	var mediaPlanner mediapolicy.Planner
 	var nativeMediaPolicy *waveruntime.NativeMediaPolicy
@@ -234,6 +240,7 @@ func New(configPath string) (*Application, error) {
 		patchService,
 		rfcService,
 		mailingListService,
+		notificationService,
 		editorEngine,
 	)
 

@@ -7,6 +7,7 @@ import (
 
 	"github.com/wavefnd/wave-platform/internal/account"
 	"github.com/wavefnd/wave-platform/internal/audit"
+	notificationdomain "github.com/wavefnd/wave-platform/internal/notification"
 	"github.com/wavefnd/wave-platform/internal/storage"
 )
 
@@ -135,6 +136,8 @@ func TestArticleCommentsArePublicModeratableAndRateLimited(t *testing.T) {
 		}
 	}
 	service := NewService(database)
+	notifications := notificationdomain.NewService(database)
+	service.SetNotificationService(notifications)
 	service.now = func() time.Time { return now }
 	post, err := service.Save("owner", Input{Slug: "compiler-notes", Category: "article", Title: "Compiler notes",
 		Summary: "An engineering update", Content: "## Parser", Status: "published", CommentPolicy: "open"})
@@ -150,6 +153,10 @@ func TestArticleCommentsArePublicModeratableAndRateLimited(t *testing.T) {
 	}
 	if comment.AuthorName != "Wave Member" || comment.Status != "visible" {
 		t.Fatalf("comment=%#v", comment)
+	}
+	items, unread, err := notifications.List("owner", 20)
+	if err != nil || unread != 1 || len(items) != 1 || items[0].Kind != "blog.comment" || items[0].URL != "/blog/compiler-notes" {
+		t.Fatalf("notifications=%#v unread=%d err=%v", items, unread, err)
 	}
 	if _, err := service.AddComment("member", post.Slug, CommentInput{Body: "A second comment."}); !errors.Is(err, ErrCommentRateLimited) {
 		t.Fatalf("rate-limit error=%v", err)

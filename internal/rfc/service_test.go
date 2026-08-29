@@ -7,6 +7,7 @@ import (
 
 	"github.com/wavefnd/wave-platform/internal/account"
 	"github.com/wavefnd/wave-platform/internal/audit"
+	notificationdomain "github.com/wavefnd/wave-platform/internal/notification"
 	"github.com/wavefnd/wave-platform/internal/permission"
 	"github.com/wavefnd/wave-platform/internal/storage"
 )
@@ -28,6 +29,8 @@ func TestRFCProposalDiscussionAndIndependentMaintainerRole(t *testing.T) {
 	_ = permissions.Assign(permission.Assignment{AccountID: "admin", RoleID: "platform-admin", Scope: "platform"})
 	_ = permissions.Assign(permission.Assignment{AccountID: "maintainer", RoleID: "rfc-maintainer", Scope: "rfc"})
 	service := NewService(database)
+	notifications := notificationdomain.NewService(database)
+	service.SetNotificationService(notifications)
 	service.now = func() time.Time { return now }
 
 	created, err := service.Create("author", ProposalInput{Title: "WebAssembly target support", Content: "## Motivation\n\nDefine an official WebAssembly target and stable host ABI."})
@@ -58,5 +61,13 @@ func TestRFCProposalDiscussionAndIndependentMaintainerRole(t *testing.T) {
 	events, err := audit.NewRepository(database).Events(10)
 	if err != nil || len(events) != 3 || events[0].Action != "rfc.comment" || events[1].Action != "rfc.status.discussion" || events[2].Action != "rfc.create" {
 		t.Fatalf("events=%#v err=%v", events, err)
+	}
+	items, unread, err := notifications.List("author", 20)
+	kinds := map[string]bool{}
+	for _, item := range items {
+		kinds[item.Kind] = true
+	}
+	if err != nil || unread != 2 || len(items) != 2 || !kinds["rfc.comment"] || !kinds["rfc.status"] {
+		t.Fatalf("notifications=%#v unread=%d err=%v", items, unread, err)
 	}
 }
