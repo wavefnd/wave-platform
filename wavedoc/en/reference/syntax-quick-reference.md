@@ -13,13 +13,13 @@ summary: Frequently used declarations, control flow, types, pointers, and FFI sy
 
 ```wave
 var value: i32 = 1;
-var inferred = value + 1;
+var next: i32 = value + 1;
 const LIMIT: i32 = 64;
 static total: i64 = 0;
 type Identifier = u64;
 ```
 
-`var` is the local form and can use an explicit or inferred type. `const` and `static` are top-level declarations.
+`var` is the local form and requires an explicit type. `const` and `static` are top-level declarations.
 
 ## Functions
 

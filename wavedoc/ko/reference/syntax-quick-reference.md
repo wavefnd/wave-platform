@@ -13,13 +13,13 @@ summary: 자주 쓰는 선언, 제어 흐름, 타입, 포인터와 FFI 문법을
 
 ```wave
 var value: i32 = 1;
-var inferred = value + 1;
+var next: i32 = value + 1;
 const LIMIT: i32 = 64;
 static total: i64 = 0;
 type Identifier = u64;
 ```
 
-`var`는 지역, `const`/`static`은 최상위 선언입니다. 지역 변수의 타입을 생략하면 초깃값에서 추론합니다.
+`var`는 지역, `const`/`static`은 최상위 선언입니다. 지역 변수는 타입을 명시적으로 선언합니다.
 
 ## 함수
 

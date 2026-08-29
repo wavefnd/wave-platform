@@ -37,7 +37,7 @@ wavec build main.wave -o app
 
 ## 문장의 기본 형태
 
-Wave의 함수 인자와 반환값은 타입을 명시합니다. 지역 변수는 타입을 직접 적거나 초깃값에서 추론할 수 있습니다.
+Wave의 함수 인자와 반환값은 타입을 명시합니다. 지역 변수도 변수 이름 뒤에 타입을 명시적으로 선언합니다.
 
 ```wave
 fun add(left: i32, right: i32) -> i32 {
@@ -47,13 +47,13 @@ fun add(left: i32, right: i32) -> i32 {
 
 fun main() {
     var count: i32 = 1;
-    var next = count + 1;
+    var next: i32 = count + 1;
     count += 1;
     println("count = {}, next = {}", count, next);
 }
 ```
 
-`var`는 지역 변수를 선언하는 문법입니다. `var name: Type = value;`는 타입을 직접 지정하고, `var name = value;`는 초깃값의 타입을 사용합니다. `const`와 `static`은 최상위 선언입니다.
+`var`는 지역 변수를 선언하는 문법입니다. 지역 선언은 `var name: Type = value;` 형식으로 변수의 타입을 명시합니다. `const`와 `static`은 최상위 선언입니다.
 
 ## 콘솔 입출력
 

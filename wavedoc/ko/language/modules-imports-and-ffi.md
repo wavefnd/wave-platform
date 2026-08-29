@@ -71,8 +71,8 @@ wavec --dep math=/absolute/path/to/math build main.wave
 import("add")::{sum, Point};
 
 fun main() {
-    var total = sum(2, 3);
-    var point = Point { x: 0, y: 0 };
+    var total: i32 = sum(2, 3);
+    var point: Point = Point { x: 0, y: 0 };
 }
 ```
 

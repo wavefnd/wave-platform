@@ -37,7 +37,7 @@ Hosted executables normally start at `main`. Freestanding builds can select anot
 
 ## Basic statement style
 
-Wave keeps function signatures explicit. Local variables can state their type or infer it from an initializer.
+Wave keeps function signatures explicit. Local variables declare their type after the variable name.
 
 ```wave
 fun add(left: i32, right: i32) -> i32 {
@@ -47,13 +47,13 @@ fun add(left: i32, right: i32) -> i32 {
 
 fun main() {
     var count: i32 = 1;
-    var next = count + 1;
+    var next: i32 = count + 1;
     count += 1;
     println("count = {}, next = {}", count, next);
 }
 ```
 
-`var` is the syntax for declaring a local variable. In `var next = count + 1;`, the type of `next` is inferred from the initializer. `const` and `static` are top-level declarations.
+`var` is the syntax for declaring a local variable. Local declarations use `var name: Type = value;` to state the variable type explicitly. `const` and `static` are top-level declarations.
 
 ## Console I/O
 

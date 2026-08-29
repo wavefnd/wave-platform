@@ -14,23 +14,21 @@ summary: Local bindings, top-level constants and static storage, built-in types,
 ```wave
 var count: i32 = 1;
 var limit: i32 = 10;
-var index = count + 1;
+var index: i32 = count + 1;
 ```
 
 | Declaration | Meaning |
 | --- | --- |
 | `var` | Declares a local variable whose value can be reassigned |
 
-`var` is the syntax for declaring local variables.
-
-A type can be written after the variable name, or inferred from an initializer:
+`var` is the syntax for declaring local variables. Each local declaration states its type after the variable name:
 
 ```wave
 var capacity: i64 = 4096;
-var doubled = capacity * 2;
+var doubled: i64 = capacity * 2;
 ```
 
-Use `var name: Type;` when declaring storage without an initializer. Inferred declarations require an initializer whose type can be determined from the expression.
+Use `var name: Type;` when declaring storage without an initializer, and `var name: Type = expression;` when providing an initial value.
 
 ## Top-level storage declarations
 

@@ -13,7 +13,7 @@ summary: Wave's principles for explicit low-level control, static typing, native
 
 Wave aims to keep systems-level control visible in source code. That direction appears in several concrete facilities:
 
-- Types are explicit at function and data boundaries; initialized variables can infer their type from the expression on the right.
+- Types are explicit at function and data boundaries, including local variable declarations.
 - `ptr<T>`, `&`, and `deref` make addresses and memory accesses explicit.
 - C ABI boundaries are declared with `extern(c)` and `export(c)`.
 - `wavec` exposes target, CPU-feature, linker, and freestanding-build controls.

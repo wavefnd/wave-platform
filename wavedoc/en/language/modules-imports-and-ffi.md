@@ -50,8 +50,8 @@ import("math::vector::ops");
 The package root loads `src/lib.wave` (or `lib.wave`). A package module such as `math::vector::ops` loads `src/vector/ops.wave` (or `vector/ops.wave`). Public declarations are accessed through the import namespace:
 
 ```wave
-var sum = math::add(1, 2);
-var unit = math::vector::ops::normalize(value);
+var sum: i32 = math::add(1, 2);
+var unit: Vector = math::vector::ops::normalize(value);
 ```
 
 Provide external package locations with dependency options:
@@ -69,7 +69,7 @@ Use `as` to choose a shorter or unambiguous namespace:
 
 ```wave
 import("./geometry_helpers" as geometry);
-var area = geometry::area(width, height);
+var area: f64 = geometry::area(width, height);
 ```
 
 Use a selective import to bring named public declarations into the importing module:
@@ -77,8 +77,8 @@ Use a selective import to bring named public declarations into the importing mod
 ```wave
 import("math")::{add, Point};
 
-var sum = add(1, 2);
-var origin = Point { x: 0, y: 0 };
+var sum: i32 = add(1, 2);
+var origin: Point = Point { x: 0, y: 0 };
 ```
 
 An import alias and a selective import are separate forms and cannot be combined.
