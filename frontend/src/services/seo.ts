@@ -177,6 +177,7 @@ export function applyPageSEO(options: PageSEO) {
       ...options.schema, '@id': `${canonical}#article`, url: canonical,
       mainEntityOfPage: { '@id': page['@id'] },
       publisher: options.schema.publisher ?? { '@id': organization['@id'] },
+      inLanguage: options.schema.inLanguage ?? options.locale,
       image: image ? [image] : options.schema.image,
     }
     if (!article.image) delete article.image

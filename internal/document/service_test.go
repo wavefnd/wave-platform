@@ -59,6 +59,13 @@ func TestOfficialDocumentationUsesStableLanguageVocabulary(t *testing.T) {
 			"`usz`",
 			"**Wave Explicit Memory Type Model**",
 		},
+		"ja": {
+			"`var` はローカル変数を宣言する構文です。",
+			"`i8`、`i16`、`i32`、`i64`、`i128`",
+			"`isz`",
+			"`usz`",
+			"**Wave Explicit Memory Type Model**",
+		},
 	}
 	for locale, phrases := range expected {
 		var combined strings.Builder
@@ -103,6 +110,20 @@ func TestOfficialDocumentationUsesStableLanguageVocabulary(t *testing.T) {
 		"ko/language/modules-imports-and-ffi": {
 			"로컬 파일 경로는 `./`로 시작",
 		},
+		"ja/language/declarations-and-types": {
+			"型エイリアスは、別の型に読みやすい代替名を付けます。",
+			"`isz` と `usz` は、ターゲットのアドレス空間に合わせた大きさ",
+		},
+		"ja/language/explicit-memory-type-model": {
+			"`null` は、値を指していないポインタを表します。",
+			"言語レベルの明示的なメモリ型",
+		},
+		"ja/language/console-io-and-formatting": {
+			"配列と構造体はフォーマット引数にできません。",
+		},
+		"ja/language/modules-imports-and-ffi": {
+			"ローカルモジュールには `./` で始まるパスを使います。",
+		},
 	}
 	for _, document := range documents {
 		key := document.Locale + "/" + document.Path
@@ -122,15 +143,16 @@ func TestSeedOfficialPublishesSupportedDocumentationLocales(t *testing.T) {
 	t.Cleanup(func() { _ = database.Close() })
 
 	count, err := SeedOfficial(database)
-	if err != nil || count != 61 {
+	if err != nil || count != 87 {
 		t.Fatalf("seed count=%d err=%v", count, err)
 	}
 	repository := NewRepository(database)
 	expectedTitles := map[string]string{
 		"en": "Pointers and explicit memory access",
 		"ko": "포인터와 명시적 메모리 접근",
+		"ja": "ポインタと明示的なメモリアクセス",
 	}
-	for _, locale := range []string{"en", "ko"} {
+	for _, locale := range []string{"en", "ko", "ja"} {
 		items, err := repository.Summaries(locale)
 		if err != nil || len(items) != 27 {
 			t.Fatalf("%s summaries=%d err=%v", locale, len(items), err)
@@ -146,7 +168,7 @@ func TestSeedOfficialPublishesSupportedDocumentationLocales(t *testing.T) {
 			t.Fatal("published revision did not preserve the Markdown authoring source")
 		}
 	}
-	for _, locale := range []string{"ja", "zh", "es", "de", "ru", "id", "vi"} {
+	for _, locale := range []string{"zh", "es", "de", "ru", "id", "vi"} {
 		items, err := repository.Summaries(locale)
 		if err != nil || len(items) != 1 || items[0].Path != "getting-started/overview" {
 			t.Fatalf("%s summaries=%#v err=%v", locale, items, err)
@@ -175,7 +197,7 @@ func TestOfficialInstallDocumentsIncludeWindowsInstaller(t *testing.T) {
 		t.Fatal(err)
 	}
 	repository := NewRepository(database)
-	for _, locale := range []string{"en", "ko"} {
+	for _, locale := range []string{"en", "ko", "ja"} {
 		install, err := repository.Published(locale, "getting-started/install")
 		if err != nil {
 			t.Fatal(err)

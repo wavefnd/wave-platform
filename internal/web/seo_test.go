@@ -184,8 +184,15 @@ func TestDocumentationSEOUsesCanonicalLocalePaths(t *testing.T) {
 	if article["inLanguage"] != "ko" || article["dateModified"] == "" {
 		t.Fatalf("localized article schema = %#v", article)
 	}
+	japanese := seo.HTMLMetadata(httptest.NewRequest(http.MethodGet, "/docs/ja/language/explicit-memory-type-model", nil))
+	if !strings.Contains(japanese, `rel="canonical" href="https://wave.example/docs/ja/language/explicit-memory-type-model"`) {
+		t.Fatalf("Japanese localized canonical is missing: %s", japanese)
+	}
+	if graphNode(t, metadataGraph(t, japanese), "TechArticle")["inLanguage"] != "ja" {
+		t.Fatal("Japanese article schema must identify its content language")
+	}
 
-	fallback := seo.HTMLMetadata(httptest.NewRequest(http.MethodGet, "/docs/ja/language/explicit-memory-type-model", nil))
+	fallback := seo.HTMLMetadata(httptest.NewRequest(http.MethodGet, "/docs/zh/language/explicit-memory-type-model", nil))
 	if !strings.Contains(fallback, `rel="canonical" href="https://wave.example/docs/en/language/explicit-memory-type-model"`) {
 		t.Fatalf("English fallback canonical is missing: %s", fallback)
 	}
