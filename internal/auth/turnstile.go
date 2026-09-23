@@ -65,7 +65,7 @@ func (verifier TurnstileVerifier) Verify(ctx context.Context, token, remoteIP, a
 	if err := json.NewDecoder(response.Body).Decode(&result); err != nil || !result.Success {
 		return ErrChallengeFailed
 	}
-	if result.Action != "" && action != "" && result.Action != action {
+	if action != "" && result.Action != action {
 		return ErrChallengeFailed
 	}
 	return nil

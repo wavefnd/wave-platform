@@ -29,6 +29,22 @@ func TestTurnstileVerifierChecksAction(t *testing.T) {
 	if err := verifier.Verify(context.Background(), "token", "127.0.0.1", "register"); err == nil {
 		t.Fatal("action mismatch should fail")
 	}
+	if err := verifier.Verify(context.Background(), "token", "127.0.0.1", ""); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestTurnstileVerifierRejectsOmittedAction(t *testing.T) {
+	client := &http.Client{Transport: roundTripFunc(func(request *http.Request) (*http.Response, error) {
+		return &http.Response{StatusCode: http.StatusOK, Header: make(http.Header), Body: io.NopCloser(strings.NewReader(`{"success":true}`))}, nil
+	})}
+	verifier := TurnstileVerifier{SiteKey: "site", Secret: "secret", Endpoint: "https://turnstile.test/verify", Client: client}
+	if err := verifier.Verify(context.Background(), "token", "127.0.0.1", "login"); err == nil {
+		t.Fatal("omitted action should fail when an action is expected")
+	}
+	if err := verifier.Verify(context.Background(), "token", "127.0.0.1", ""); err != nil {
+		t.Fatal(err)
+	}
 }
 
 func TestTurnstileDisabledDoesNotCallNetwork(t *testing.T) {
