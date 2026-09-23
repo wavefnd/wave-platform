@@ -153,15 +153,28 @@ func integerMetadata(metadata map[string]string, key string) (int, error) {
 func markdownHeadings(markdown string) []Block {
 	scanner := bufio.NewScanner(bytes.NewBufferString(markdown))
 	result := make([]Block, 0, 8)
-	inFence := false
+	var fence byte
+	fenceLength := 0
 	occurrences := make(map[string]int)
 	for scanner.Scan() {
 		line := scanner.Text()
-		if strings.HasPrefix(strings.TrimSpace(line), "```") {
-			inFence = !inFence
+		trimmed := strings.TrimLeft(line, " ")
+		if len(line)-len(trimmed) <= 3 && len(trimmed) >= 3 && (trimmed[0] == '`' || trimmed[0] == '~') {
+			length := 1
+			for length < len(trimmed) && trimmed[length] == trimmed[0] {
+				length++
+			}
+			if fence != 0 {
+				if trimmed[0] == fence && length >= fenceLength && strings.Trim(trimmed[length:], " ") == "" {
+					fence = 0
+				}
+			} else if length >= 3 && (trimmed[0] != '`' || !strings.ContainsRune(trimmed[length:], '`')) {
+				fence = trimmed[0]
+				fenceLength = length
+			}
 			continue
 		}
-		if inFence {
+		if fence != 0 {
 			continue
 		}
 		marks := 0

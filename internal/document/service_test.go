@@ -1,6 +1,7 @@
 package document
 
 import (
+	"reflect"
 	"strings"
 	"testing"
 
@@ -208,5 +209,36 @@ func TestOfficialInstallDocumentsIncludeWindowsInstaller(t *testing.T) {
 		if !strings.Contains(install.Markdown, "vex --version") || !strings.Contains(install.Markdown, "VexVersion") {
 			t.Fatalf("%s Vex installation guidance is missing", locale)
 		}
+	}
+}
+
+func TestMarkdownHeadingsExcludeFencedCode(t *testing.T) {
+	cases := []struct {
+		name string
+		code string
+	}{
+		{"backticks", "```wave\n## 소개\n```"},
+		{"tildes", "~~~wave\n## 소개\n~~~"},
+		{"shorter backticks", "````wave\n```\n## 소개\n````"},
+		{"shorter tildes", "~~~~wave\n~~~\n## 소개\n~~~~"},
+		{"tildes inside backticks", "```wave\n~~~\n## 소개\n```"},
+		{"backticks inside tildes", "~~~wave\n```\n## 소개\n~~~"},
+		{"backtick closing text", "```wave\n```text\n## 소개\n```"},
+		{"tilde closing text", "~~~wave\n~~~text\n## 소개\n~~~"},
+		{"tab after closing fence", "~~~wave\n~~~\t\n## 소개\n~~~"},
+		{"longer closing fence", "~~~wave\n## 소개\n~~~~~"},
+		{"indented fence", "   ~~~wave\n## 소개\n  ~~~  "},
+	}
+	want := []Block{
+		{Kind: "heading", Anchor: "소개", Level: 2, Text: "소개"},
+		{Kind: "heading", Anchor: "소개-1", Level: 3, Text: "소개"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			markdown := "## 소개\n\n" + tc.code + "\n\n### 소개\n"
+			if got := markdownHeadings(markdown); !reflect.DeepEqual(got, want) {
+				t.Fatalf("markdownHeadings() = %#v, want %#v", got, want)
+			}
+		})
 	}
 }
