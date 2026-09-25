@@ -14,6 +14,8 @@ frontend-build:
 test:
 	GOCACHE=$(GOCACHE) go test ./...
 	cd frontend && npm run typecheck
+	cd frontend && npm run test:docs
+	cd frontend && npm run test:seo
 
 build: frontend-build
 	mkdir -p bin

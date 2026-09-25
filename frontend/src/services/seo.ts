@@ -73,32 +73,40 @@ function schemaType(service: Service, detail: boolean): string {
   return 'WebPage'
 }
 
-function canonicalURL(pathname: string): string {
+// Canonical absolute URL for a site path. Content metadata resolves its
+// preview image against this value so the client agrees with the server.
+export function canonicalURL(pathname: string): string {
   const value = new URL(pathname || '/', window.location.origin)
   value.search = ''
   value.hash = ''
   return value.toString()
 }
 
-function absoluteURL(value: string): string {
-  if (!value.trim()) return ''
+// Resolves against the document that owns the value, never the site origin:
+// internal/web/seo.go ignores anything that is not absolute HTTP(S).
+function absoluteURL(value: string, base: string): string {
+  // net/url trims surrounding whitespace and rejects control characters before
+  // parsing, so mirroring both keeps the client from resolving an image the
+  // server dropped.
+  const trimmed = value.trim()
+  if (!trimmed || /[\u0000-\u001f\u007f]/.test(trimmed)) return ''
   try {
-    const parsed = new URL(value, window.location.origin)
+    const parsed = new URL(trimmed, base)
     return ['http:', 'https:'].includes(parsed.protocol) ? parsed.toString() : ''
   } catch {
     return ''
   }
 }
 
-function schemaImage(schema?: Record<string, unknown>): string {
+function schemaImage(schema: Record<string, unknown> | undefined, base: string): string {
   const image = schema?.image
-  if (typeof image === 'string') return absoluteURL(image)
+  if (typeof image === 'string') return absoluteURL(image, base)
   if (Array.isArray(image)) {
     const first = image.find((value) => typeof value === 'string')
-    return typeof first === 'string' ? absoluteURL(first) : ''
+    return typeof first === 'string' ? absoluteURL(first, base) : ''
   }
   if (image && typeof image === 'object' && typeof (image as Record<string, unknown>).url === 'string') {
-    return absoluteURL(String((image as Record<string, unknown>).url))
+    return absoluteURL(String((image as Record<string, unknown>).url), base)
   }
   return ''
 }
@@ -108,7 +116,7 @@ export function applyPageSEO(options: PageSEO) {
   const robots = options.noIndex ? 'noindex, nofollow, noarchive' : 'index, follow, max-image-preview:large'
   const schemaName = String(options.schema?.['@type'] ?? '')
   const openGraphType = ['Article', 'TechArticle', 'BlogPosting', 'DiscussionForumPosting'].includes(schemaName) ? 'article' : 'website'
-  const image = absoluteURL(options.image ?? '') || schemaImage(options.schema)
+  const image = absoluteURL(options.image ?? '', canonical) || schemaImage(options.schema, canonical)
   document.title = options.title
   document.documentElement.lang = options.locale
   upsertMeta('meta[name="description"]', { name: 'description', content: options.description })
@@ -224,9 +232,19 @@ export function plainText(value: string): string {
     .trim()
 }
 
-export function firstMarkdownImage(value: string): { url: string, alt: string } | null {
-  const match = value.match(/!\[([^\]]*)\]\((?:<([^>]+)>|([^\s)]+))(?:\s+["'][^)]*["'])?\)/)
+// Kept in sync with markdownImagePattern in internal/web/seo.go. The whitespace
+// class is spelled out because JS \s also matches Unicode spaces such as U+00A0
+// and U+3000 while Go's \s is the ASCII set; a pattern that matches on only one
+// side lets the client drop a preview image the server rendered.
+const markdownImagePattern = /!\[([^\]]*)\]\((?:<([^>]+)>|([^ \t\n\f\r)]+))(?:[ \t\n\f\r]+["'][^)]*["'])?\)/
+
+// Resolves the first Markdown image against the article canonical, mirroring
+// markdownImage in internal/web/seo.go. Base must be the canonical URL of the
+// document, because a relative path resolved against the site origin produces
+// a different image than the one the server rendered.
+export function firstMarkdownImage(value: string, base: string): { url: string, alt: string } | null {
+  const match = value.match(markdownImagePattern)
   if (!match) return null
-  const url = absoluteURL(match[2] || match[3] || '')
+  const url = absoluteURL(match[2] || match[3] || '', base)
   return url ? { url, alt: match[1].trim() } : null
 }

@@ -8,7 +8,8 @@
     "build": "vue-tsc --noEmit && vite build",
     "preview": "vite preview",
     "typecheck": "vue-tsc --noEmit",
-    "test:docs": "node --experimental-strip-types --test tests/document-navigation.test.ts"
+    "test:docs": "node --experimental-strip-types --test tests/document-navigation.test.ts",
+    "test:seo": "node --experimental-strip-types --test tests/seo-image.test.ts"
   },
   "dependencies": {
 	"@wavefnd/editor": "file:../editor",

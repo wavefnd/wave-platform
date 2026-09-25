@@ -6,7 +6,7 @@ import MarkdownContent from '../components/MarkdownContent.vue'
 import PlatformWaveEditor from '../components/editor/PlatformWaveEditor.vue'
 import { useI18n } from '../i18n'
 import { addBlogComment, getBlogComments, getBlogPost, getBlogPosts, setBlogCommentStatus, type BlogComment, type BlogPost, type BlogPostSummary } from '../services/http'
-import { applyPageSEO, firstMarkdownImage, plainTextDescription } from '../services/seo'
+import { applyPageSEO, canonicalURL, firstMarkdownImage, plainTextDescription } from '../services/seo'
 import { useAuthStore } from '../stores/auth'
 import UiInlineState from '../ui/UiInlineState.vue'
 import '../ui/blog.css'
@@ -210,7 +210,10 @@ watchEffect(() => {
 	const canonicalPath = release ? `/releases/${encodeURIComponent(post.value.slug)}` : route.path
 	const sectionName = release ? 'Releases' : post.value.category === 'roadmap' ? 'Roadmap' : 'Blog'
 	const sectionPath = release ? '/releases' : '/blog'
-	const image = firstMarkdownImage(post.value.content)
+	// Relative preview images follow the article canonical, so a release article
+	// reached through its legacy /blog/<slug> URL still resolves against
+	// /releases/<slug> exactly like the server-rendered metadata.
+	const image = firstMarkdownImage(post.value.content, canonicalURL(canonicalPath))
 	applyPageSEO({
 		title: `${post.value.title} · ${release ? 'Wave Releases' : 'Wave Blog'}`,
 		description: plainTextDescription(post.value.summary || post.value.content, post.value.title),
