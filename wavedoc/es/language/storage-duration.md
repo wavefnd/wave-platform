@@ -45,7 +45,7 @@ Se puede asignar un nuevo valor a una variable local declarada como `var`. Las c
 
 `const` y `static` son declaraciones de nivel superior. El cuerpo de la función y la inicialización `for` utilizan la declaración local `var`.
 
-## Esperanza de vida y consejos
+## Tiempo de vida y punteros
 
 Puede obtener la dirección de una variable local como `&`, pero el tipo `ptr<T>` no rastrea la vida útil real del almacenamiento al que apunta el puntero. Al pasar una dirección de almacenamiento local fuera de una función, la estructura del programa debe garantizar directamente que la dirección siga siendo válida.
 

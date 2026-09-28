@@ -45,7 +45,7 @@ Einer lokalen Variablen, die als `var` deklariert ist, kann ein neuer Wert zugew
 
 `const` und `static` sind Deklarationen der obersten Ebene. Der Funktionskörper und die `for`-Initialisierung verwenden die lokale Deklaration `var`.
 
-## Lebensdauer und Hinweise
+## Lebensdauer und Zeiger
 
 Sie können die Adresse einer lokalen Variablen als `&` erhalten, aber der Typ `ptr<T>` verfolgt nicht die tatsächliche Lebensdauer des Speichers, auf den der Zeiger zeigt. Bei der Übergabe einer lokalen Speicheradresse aus einer Funktion muss die Programmstruktur direkt sicherstellen, dass die Adresse gültig bleibt.
 
