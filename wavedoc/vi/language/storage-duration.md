@@ -11,7 +11,7 @@ summary: Phân biệt giữa phạm vi và khả năng ghi của var, const và 
 
 ## Ý nghĩa của từng tuyên bố
 
-|định dạng|Vị trí được phép|gửi lại|sử dụng|
+|định dạng|Vị trí được phép|gán lại|sử dụng|
 | --- | --- | --- | --- |
 | `var` |Chức năng/khối|có thể|Các biến cục bộ có thể thay đổi phổ biến|
 | `const` |hàng đầu|Không thể|Khai báo hằng số toàn cầu|

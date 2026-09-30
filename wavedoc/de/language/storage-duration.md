@@ -11,7 +11,7 @@ summary: Unterscheiden Sie zwischen dem Umfang und der Beschreibbarkeit von var,
 
 ## Bedeutung jeder Erklärung
 
-|formatieren|Zulässiger Standort|erneut einreichen|Benutzen|
+|formatieren|Zulässiger Standort|Neuzuweisung|Benutzen|
 | --- | --- | --- | --- |
 | `var` |Funktion/Block|möglich|Gemeinsame veränderbare lokale Variablen|
 | `const` |oben|Unmöglich|Globale Konstantendeklaration|

@@ -11,7 +11,7 @@ summary: Distinga entre el alcance y la capacidad de escritura de var, const y s
 
 ## Significado de cada declaración
 
-|formato|Ubicación permitida|reenviar|uso|
+|formato|Ubicación permitida|reasignación|uso|
 | --- | --- | --- | --- |
 | `var` |Función/bloque|posible|Variables locales mutables comunes|
 | `const` |arriba|Imposible|Declaración constante global|

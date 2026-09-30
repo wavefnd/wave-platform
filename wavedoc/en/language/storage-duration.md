@@ -11,7 +11,7 @@ summary: Distinguish between the scope and writability of var, const and static.
 
 ## Meaning of each declaration
 
-|format|Allowed Location|resubmit|Use|
+|format|Allowed Location|reassignment|Use|
 | --- | --- | --- | --- |
 | `var` |Function/block|possible|Common mutable local variables|
 | `const` |top|Impossible|Global constant declaration|

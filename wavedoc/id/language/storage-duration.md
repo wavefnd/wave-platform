@@ -11,7 +11,7 @@ summary: Bedakan antara cakupan dan kemampuan menulis var, const dan static.
 
 ## Arti setiap deklarasi
 
-|memformat|Lokasi yang Diizinkan|kirim ulang|Gunakan|
+|memformat|Lokasi yang Diizinkan|penugasan ulang|Gunakan|
 | --- | --- | --- | --- |
 | `var` |Fungsi/blok|mungkin|Variabel lokal umum yang bisa berubah|
 | `const` |atas|Tidak mungkin|Deklarasi konstanta global|
