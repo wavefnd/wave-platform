@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
+# Wave installer channel policy: versioned-only-v1
 
 WAVE_VERSION=""
 VEX_VERSION="${VEX_VERSION:-}"
@@ -22,7 +23,14 @@ fail() {
     exit 1
 }
 
+reject_nightly() {
+    case "$(printf '%s' "$1" | LC_ALL=C tr '[:upper:]' '[:lower:]')" in
+        nightly|vnightly) fail "Nightly requires manual download: https://github.com/wavefnd/Wave/releases/tag/nightly" ;;
+    esac
+}
+
 normalize_version() {
+    reject_nightly "$1"
     case "$1" in
         v*) printf "%s" "$1" ;;
         *) printf "v%s" "$1" ;;
@@ -30,20 +38,27 @@ normalize_version() {
 }
 
 validate_version() {
+    reject_nightly "$1"
     [[ "$1" =~ ^v[0-9A-Za-z][0-9A-Za-z._+-]*$ ]] || fail "Invalid version tag: $1"
 }
 
 resolve_latest_version() {
     local repository="$1"
-    local response
-    local version
-
-    response="$(curl -fsSL -H "Accept: application/vnd.github+json" "https://api.github.com/repos/${repository}/releases?per_page=1")" \
-        || fail "Unable to query releases for ${repository}."
-    version="$(awk -F '"' '/"tag_name":/ { print $4; exit }' <<< "$response")"
-    [[ -n "$version" ]] || fail "Unable to resolve the latest release for ${repository}."
-    validate_version "$version"
-    printf "%s" "$version"
+    local response version page=1
+    while :; do
+        response="$(curl -fsSL -H "Accept: application/vnd.github+json" "https://api.github.com/repos/${repository}/releases?per_page=100&page=${page}")" \
+            || fail "Unable to query releases for ${repository}."
+        # Keep versioned prereleases eligible; only the rolling Nightly channel
+        # is excluded. Paginate when the current page contains no usable tag.
+        version="$(awk -F '"' '/^[[:space:]]*"tag_name":/ { tag=tolower($4); if (tag != "nightly" && tag != "vnightly") { print $4; exit } }' <<< "$response")"
+        if [[ -n "$version" ]]; then
+            validate_version "$version"
+            printf '%s' "$version"
+            return
+        fi
+        [[ "$response" == *'"tag_name"'* ]] || fail "No versioned release is available for ${repository}."
+        page=$((page + 1))
+    done
 }
 
 sha256_file() {

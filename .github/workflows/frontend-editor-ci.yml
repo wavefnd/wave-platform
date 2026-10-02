@@ -27,6 +27,15 @@ jobs:
             editor/package-lock.json
             frontend/package-lock.json
 
+      - name: Check versioned-only shell installer
+        run: |
+          bash frontend/tests/install_checksum_test.sh
+          bash frontend/tests/install_nightly_test.sh
+
+      - name: Check versioned-only PowerShell installer
+        shell: pwsh
+        run: ./frontend/tests/install_nightly_test.ps1
+
       - name: Build frontend Docker stage
         run: docker build --target frontend-builder --progress=plain .
 

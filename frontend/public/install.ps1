@@ -4,6 +4,7 @@ param(
     [switch]$Latest
 )
 
+# Wave installer channel policy: versioned-only-v1
 $ErrorActionPreference = "Stop"
 
 $WaveRepo = "wavefnd/Wave"
@@ -24,7 +25,14 @@ function Fail($Message) {
     exit 1
 }
 
+function Reject-Nightly($Value) {
+    if ($Value -match '^v?nightly$') {
+        Fail "Nightly requires manual download: https://github.com/wavefnd/Wave/releases/tag/nightly"
+    }
+}
+
 function Normalize-Version($Value) {
+    Reject-Nightly $Value
     if ([string]::IsNullOrWhiteSpace($Value)) {
         return ""
     }
@@ -35,23 +43,29 @@ function Normalize-Version($Value) {
 }
 
 function Assert-Version($Value) {
+    Reject-Nightly $Value
     if ($Value -notmatch '^v[0-9A-Za-z][0-9A-Za-z._+-]*$') {
         Fail "Invalid version tag: $Value"
     }
 }
 
 function Resolve-LatestVersion($Repository) {
-    $releases = Invoke-RestMethod -Headers @{ Accept = "application/vnd.github+json" } -Uri "https://api.github.com/repos/$Repository/releases?per_page=1"
-    if ($releases -is [array]) {
-        $release = $releases[0]
-    } else {
-        $release = $releases
+    $page = 1
+    while ($true) {
+        $response = Invoke-RestMethod -Headers @{ Accept = "application/vnd.github+json" } -Uri "https://api.github.com/repos/$Repository/releases?per_page=100&page=$page"
+        $releases = @($response)
+        foreach ($release in $releases) {
+            if ($null -eq $release -or $release.draft -or $release.tag_name -match '^v?nightly$') {
+                continue
+            }
+            Assert-Version $release.tag_name
+            return $release.tag_name
+        }
+        if ($releases.Count -eq 0) {
+            Fail "No versioned release is available for $Repository."
+        }
+        $page++
     }
-    if ($null -eq $release -or [string]::IsNullOrWhiteSpace($release.tag_name)) {
-        Fail "Unable to resolve the latest release for $Repository."
-    }
-    Assert-Version $release.tag_name
-    return $release.tag_name
 }
 
 function Get-PublishedHash($SumsPath, $FileName) {
