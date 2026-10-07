@@ -34,7 +34,7 @@ overflowで実行を中断する言語のフロントエンドは、checked操�
 
 ```text
 module {
-  format_version 3
+  format_version 4
   semantics_version 1
   target "x86_64-whale-linux"
   datalayout { ptr=64, endian=little }
@@ -205,7 +205,7 @@ fn main() {
 
 ```text
 module {
-  format_version 3
+  format_version 4
   semantics_version 1
   target "x86_64-whale-linux"
   datalayout { ptr=64, endian=little }

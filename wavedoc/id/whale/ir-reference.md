@@ -43,7 +43,7 @@ Output printer IR:
 
 ```text
 module {
-  format_version 3
+  format_version 4
   semantics_version 1
   target "x86_64-whale-linux"
   datalayout { ptr=64, endian=little }
@@ -126,7 +126,7 @@ fn main() {
 
 ```text
 module {
-  format_version 3
+  format_version 4
   semantics_version 1
   target "x86_64-whale-linux"
   datalayout { ptr=64, endian=little }
@@ -198,7 +198,7 @@ Select memilih salah satu nilai yang sudah dihitung. Itu tidak menghilangkan per
 
 ## Departemen Verifikasi trap
 
-IR yang salah ditolak saat verifikasi. Pelanggaran kondisi eksekusi subset yang didukung menghasilkan trap terdefinisi. Parser/verifikator mempertahankan legacy `undef` untuk kompatibilitas lowering, tetapi interpreter menolaknya secara eksplisit; penyimpanan belum diinisialisasi tidak dijadikan nol. Pelacakan inisialisasi belum selesai. Error builder terpisah dari trap eksekusi.
+IR tidak sah adalah kesalahan verifikasi. Verifier menolak legacy `undef`; hasilkan ulang dari AST. Deklarasi tanpa inisialisasi memakai format 4 `uninit` dan pembacaan aktual yang diperiksa, tanpa penggantian nol atau nilai sembarang. Pelanggaran syarat runtime menghasilkan trap terdefinisi dengan lokasi IR.
 
 `InterpreterTrap` melaporkan alasan, langkah yang dijalankan dan `ExecutionSite`: ID fungsi, ID blok, indeks instruksi mulai nol dan ID hasil opsional. Indeks terminator berada setelah instruksi. CLI juga menyebut file masukan. Typed IR belum memiliki span sumber, jadi ini lokasi IR, bukan nomor baris sumber. Trap mengembalikan error dan menghentikan eksekusi selanjutnya; pustaka tidak menghentikan proses host.
 
@@ -210,17 +210,17 @@ AST dan typed IR masing-masing menggunakan format version dan semantics version 
 
 Bilangan bulat diteruskan sebagai nomor string lebar bit·signedness·. Konstanta floating point dilewatkan sebagai string bit lebar dan tepat. Teks round-trip di IR harus mempertahankan nama·ID·tipe·konstan·urutan·properti·metadata. Spasi dan penempatan komentar tidak dapat dipertahankan.
 
-Kontrak AST JSON berikut serta pembacaan, verifikasi dan pencetakan bolak-balik typed IR format 3 tersedia.
+Kontrak AST JSON berikut serta pembacaan, verifikasi dan pencetakan bolak-balik typed IR format 4 tersedia.
 
 ### Identitas tercetak dan nama dalam tanda kutip
 
-Typed IR format 3 mencetak fungsi sebagai `@fN`, global sebagai `@gN`, nilai sebagai `%vN`, dan blok sebagai `%bN`. ID fungsi dan global berada dalam lingkup modul; ID nilai dan blok berada dalam fungsi yang memuatnya. ID yang diberikan dipertahankan, termasuk celah nomornya. Nama dalam tanda kutip hanya keterangan, bukan dasar penyelesaian referensi. Fungsi menyatakan `entry %bN` secara eksplisit tanpa bergantung pada urutan penyimpanan blok.
+Typed IR format 4 mencetak fungsi sebagai `@fN`, global sebagai `@gN`, nilai sebagai `%vN`, dan blok sebagai `%bN`. ID fungsi dan global berada dalam lingkup modul; ID nilai dan blok berada dalam fungsi yang memuatnya. ID yang diberikan dipertahankan, termasuk celah nomornya. Nama dalam tanda kutip hanya keterangan, bukan dasar penyelesaian referensi. Fungsi menyatakan `entry %bN` secara eksplisit tanpa bergantung pada urutan penyimpanan blok.
 
 Modul lengkap berikut diverifikasi dan dicetak melalui API IR Rust. Kedua blok cabang bernama `"branch"`, tetapi ID membedakan definisi dan masukan phi.
 
 ```text
 module {
-  format_version 3
+  format_version 4
   semantics_version 1
   target "x86_64-whale-linux"
   datalayout { ptr=64, endian=little }
@@ -252,7 +252,7 @@ Semua bidang nama dan string memakai tanda kutip ganda: target, nama fungsi, glo
 "line\ncolumn\tquote\"slash\\한글"
 ```
 
-Keluaran format 2 harus dimigrasikan secara manual ke ID eksplisit, ID parameter, nama bertanda kutip dan referensi masuk. Pembaca hanya menerima format 3 dengan semantics version 1 dan tidak mengonversi format 2 otomatis. AST JSON format 2 merupakan kontrak terpisah.
+Pembaca menerima typed IR formats 3 dan 4 dengan semantics version 1 dan selalu mencetak format 4. `uninit` memerlukan format 4. Instruksi format 3 yang sah tetap terbaca, tetapi legacy `undef` adalah kesalahan verifikasi dalam kedua format dan harus dihasilkan ulang dari AST. Teks format 2 memerlukan migrasi manual ke ID eksplisit, nama bertanda kutip dan referensi masuk. AST JSON memiliki format 2 tersendiri.
 
 ### Membaca dan memverifikasi IR teks
 
@@ -284,13 +284,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let canonical = print_module(&module);
     let reread = parse_module_with_limits(&canonical, limits)?;
     assert_eq!(print_module(&reread), canonical);
-    let invalid = source.replacen("format_version 3", "format_version 99", 1);
+    let invalid = source.replacen("format_version 4", "format_version 99", 1);
     assert!(parse_module_with_limits(&invalid, limits).is_err());
     Ok(())
 }
 ```
 
-Batas juga dapat diberikan kepada `verify_module_with_limits`, `ConstExpr::evaluate_with_limits`, `validate_signature_with_limits` dan `ModuleBuilder::declare_function_with_limits`. Traversal tipe iteratif mendahului clone, perbandingan dan diagnostik rekursif; konstanta dievaluasi dengan stack kerja. Pohon Rust yang dipinjam beserta Drop tetap dimiliki pemanggil. Pohon sembarang yang belum diverifikasi masih memiliki clone/Drop rekursif; signature milik API deklarasi checked yang ditolak dibuang iteratif. Pembaca mempertahankan legacy `undef` untuk kompatibilitas lowering yang ada. Pelacakan inisialisasi, pemeriksaan akses memori, metadata pointer dan eksekusi native tetap merupakan fitur terpisah yang belum selesai.
+Batas juga dapat diberikan kepada `verify_module_with_limits`, `ConstExpr::evaluate_with_limits`, `validate_signature_with_limits` dan `ModuleBuilder::declare_function_with_limits`. Traversal tipe iteratif mendahului clone, perbandingan dan diagnostik rekursif; konstanta dievaluasi dengan stack kerja. Pohon Rust yang dipinjam beserta Drop tetap dimiliki pemanggil. Pohon sembarang yang belum diverifikasi masih memiliki clone/Drop rekursif; signature milik API deklarasi checked yang ditolak dibuang iteratif. IR tidak sah adalah kesalahan verifikasi. Verifier menolak legacy `undef`; hasilkan ulang dari AST. Deklarasi tanpa inisialisasi memakai format 4 `uninit` dan pembacaan aktual yang diperiksa, tanpa penggantian nol atau nilai sembarang. Pelanggaran syarat runtime menghasilkan trap terdefinisi dengan lokasi IR.
 
 ### Versi yang ditentukan AST JSON
 
@@ -342,7 +342,7 @@ cargo run --locked --features socket-cli -- ir lower program.json
 
 ```text
 module {
-  format_version 3
+  format_version 4
   semantics_version 1
   target "x86_64-whale-linux"
   datalayout { ptr=64, endian=little }
@@ -364,7 +364,7 @@ Bilangan bulat `value` adalah string desimal. Signed Angka digunakan setelah min
 
 [Skema JSON lengkap](https://github.com/wavefnd/Whale/blob/master/ir/schema/ast-v2.schema.json) menentukan bentuk, bidang yang wajib diisi, dan varian. Pemeriksaan rentang/jenis dan deteksi kunci duplikat juga berlaku. Subset penurun skalar mencakup literal, variabel/konstanta, tambah/sub/mul, perbandingan, penugasan, jika/sementara, kembali dan putus/lanjutkan. Referensi fungsi, panggilan langsung dan panggilan tidak langsung didukung; ekspresi agregat tidak didukung. `Opaque` dapat diwakili dalam skema tetapi tidak didukung oleh penurunan.
 
-Migrasi memerlukan pembungkusan Program lama tanpa envelope dan penggantian angka JSON dengan string integer desimal atau string bit float. Masukan tanpa versi ditolak. Format 1 harus dimigrasikan ke format 2 dengan menambahkan `program.declarations` (array kosong bila tidak dipakai) dan `convention`/`linkage` eksplisit pada definisi. Versinya independen: AST format 2, typed IR format 3 dan semantics version 1.
+Migrasi memerlukan pembungkusan Program lama tanpa envelope dan penggantian angka JSON dengan string integer desimal atau string bit float. Masukan tanpa versi ditolak. Format 1 harus dimigrasikan ke format 2 dengan menambahkan `program.declarations` (array kosong bila tidak dipakai) dan `convention`/`linkage` eksplisit pada definisi. Versinya independen: AST format 2, typed IR format 4 dan semantics version 1.
 
 ### Masukan yang ditolak dan pemulihan CLI
 
@@ -396,7 +396,7 @@ Perintah keluar dengan status bukan nol dan tidak membuat keluaran baru atau men
 
 ## Interpreter bilangan bulat skalar
 
-Build bawaan menjalankan fungsi terverifikasi dengan konvensi Whale, parameter integer/Bool dan hasil integer/Bool atau void. Mendukung konstanta dan deklarasi konstanta, mov, aritmetika dan perbandingan integer, cast integer, pasangan checked dan extract, select, phi, cabang, switch, return, trap_if dan trap. Memori, float, panggilan, alamat, aggregate umum dan legacy `undef` tidak dapat dijalankan. Seluruh modul diverifikasi dahulu; semua blok fungsi yang dipilih, termasuk yang tidak terjangkau, harus berada dalam subset. Fungsi lain hanya perlu lolos verifikasi. Contoh lowering Wave yang memakai memori belum dapat dijalankan.
+Interpreter bawaan menjalankan integer/Bool, alur kontrol, alokasi stack, penyimpanan dan pembacaan pointer data, typed GEP, memcpy dan memset. Pembacaan pasangan checked tidak memeriksa padding. Alamat berupa nilai sintetis 64 bit, tanpa dereferensi memori host. Argumen dan hasil tetap integer/Bool atau void; float, panggilan, pointer fungsi, nilai agregat umum, alamat global dan eksekusi native belum didukung. Alokasi stack hidup sampai fungsi kembali. Akhir masa hidup leksikal, penerusan pointer melalui panggilan/hasil, adaptor memori asing dan native shadow metadata memerlukan implementasi lanjutan.
 
 Nilai bawaan `InterpreterOptions::max_steps` adalah 1,000,000. Setiap instruksi yang dijalankan, termasuk phi, dan setiap terminator menghabiskan satu langkah. Nol berhenti sebelum operasi pertama; loop tanpa akhir mengembalikan `InterpreterError::StepLimit`. `ir_limits` membatasi verifikasi secara terpisah. Aritmetika tanpa penggunaan tetap dijalankan dan dapat trap. Overflow checked adalah hasil Bool; hanya trap_if eksplisit yang menjadikannya trap.
 
@@ -404,7 +404,7 @@ Simpan modul lengkap ini sebagai `swap-loop.wir`. Entry tetap eksplisit meskipun
 
 ```text
 module {
-  format_version 3
+  format_version 4
   semantics_version 1
   target "x86_64-whale-linux"
   datalayout { ptr=64, endian=little }

@@ -33,7 +33,7 @@ Modul berikut dikonfigurasi sebagai builder dan lolos verifikasi. `store` sebelu
 
 ```text
 module {
-  format_version 3
+  format_version 4
   semantics_version 1
   target "x86_64-whale-linux"
   datalayout { ptr=64, endian=little }
@@ -52,7 +52,7 @@ module {
 }
 ```
 
-`alloca` membuat penyimpanan i32, `store` menulis 42, dan `load` menentukan nilai yang akan dikembalikan. Ini adalah keluaran dari printer IR yang diketik, bukan jejak eksekusi asli. Penyelarasan 3 adalah kesalahan validasi. Menghapus penyimpanan akan memerlukan jebakan baca yang tidak diinisialisasi dalam model memori ini, namun pelacakan inisialisasi dan pemeriksaan jebakan runtime terkait belum diterapkan. Melewati pemverifikasi saat ini saja tidak berarti bahwa pembacaan ini aman.
+Simpan modul lengkap ini sebagai `initialized.wir`; eksekusi mencetak `i32 42`. Menghapus store menyebabkan trap pembacaan belum diinisialisasi pada load. Alignment 3 adalah kesalahan verifikasi. Nol fisik dari alloca bukan inisialisasi.
 
 ## Perbandingan dengan aritmatika pointer
 
@@ -127,3 +127,79 @@ String adalah string byte yang tidak dapat diubah dengan panjang tertentu. Pengk
 Oleh karena itu, panjang string byte yang terdiri dari `A`, NUL, dan `B` adalah 3. Tidak dapat digunakan untuk konversi string C eksplisit, yang menolak NUL internal. Frontend tidak boleh memotongnya secara diam-diam menjadi `A`.
 
 Eksternal C·Alamat Mentah·Perakitan Inline adalah batas kontrak terpisah. Pemeriksaan runtime memori jejak tidak dijamin mendeteksi semua perilaku yang salah dalam kode eksternal.
+
+## Eksekusi memori stack terlacak
+
+Interpreter bawaan menjalankan integer/Bool, alur kontrol, alokasi stack, penyimpanan dan pembacaan pointer data, typed GEP, memcpy dan memset. Pembacaan pasangan checked tidak memeriksa padding. Alamat berupa nilai sintetis 64 bit, tanpa dereferensi memori host. Argumen dan hasil tetap integer/Bool atau void; float, panggilan, pointer fungsi, nilai agregat umum, alamat global dan eksekusi native belum didukung. Alokasi stack hidup sampai fungsi kembali. Akhir masa hidup leksikal, penerusan pointer melalui panggilan/hasil, adaptor memori asing dan native shadow metadata memerlukan implementasi lanjutan.
+
+`--max-memory` mengatur anggaran byte alokasi logis, bawaan 64 MiB. `InterpreterOptions::memory_limits` juga membatasi jumlah alokasi 16384, metadata byte pointer 262144 fragmen dan kerja byte/metadata 256 Mi unit. Batas terlampaui mengembalikan `MemoryLimit` dengan lokasi IR, terpisah dari trap program. Verifikasi juga menolak overflow ukuran penyimpanan yang diketahui untuk target keluaran sebelum eksekusi.
+
+```shell
+whale ir run initialized.wir --function @f0
+```
+
+```text
+i32 42
+```
+
+## Salinan byte dan reset inisialisasi
+
+Simpan modul lengkap berikut sebagai `tracked-memory.wir`. @f0 menyalin byte pointer serta metadata terpisah, lalu membaca 42. Pada @f1, uninit menandai rentang penyimpanan tipe belum diinisialisasi dan menghapus metadata pointer tanpa mengubah byte yang ada. memcpy dapat menyalin byte belum diinisialisasi; pembacaan nilai tujuan berikutnya memeriksa statusnya. Salinan parsial mempertahankan wewenang hanya jika kedelapan fragmen metadata konsisten tersedia. Menulis bit identik dengan integer atau memset tidak memulihkan wewenang.
+
+memcpy/memset berpanjang nol berhasil tanpa pemeriksaan akses atau alignment, termasuk pointer null dan one-past. memcpy tumpang tindih yang tidak kosong menghasilkan trap. memset menginisialisasi byte tertulis dan menghapus metadata pointer-nya. Penyimpanan Bool harus 0 atau 1; membaca representasi lain menghasilkan trap.
+
+```text
+module {
+  format_version 4
+  semantics_version 1
+  target "x86_64-whale-linux"
+  datalayout { ptr=64, endian=little }
+
+  declare @f0 "copied_pointer": whale () -> u32, linkage internal
+  declare @f1 "uninitialized": whale () -> u32, linkage internal
+
+  fn @f0 "copied_pointer"() -> u32, entry %b0 {
+  %b0 "entry":
+    %v0: ptr<u32> = alloca u32, align 4
+    %v1: u32 = const u32 42
+    store u32 %v1, ptr<u32> %v0, align 4
+    %v2: ptr<ptr<u32>> = alloca ptr<u32>, align 8
+    %v3: ptr<ptr<u32>> = alloca ptr<u32>, align 8
+    store ptr<u32> %v0, ptr<ptr<u32>> %v2, align 8
+    %v4: ptr<u8> = bitcast ptr<ptr<u32>> %v2 to ptr<u8>
+    %v5: ptr<u8> = bitcast ptr<ptr<u32>> %v3 to ptr<u8>
+    %v6: u64 = const u64 8
+    memcpy ptr<u8> %v5, ptr<u8> %v4, u64 %v6, align 8
+    %v7: ptr<u32> = load ptr<u32>, ptr<ptr<u32>> %v3, align 8
+    %v8: u32 = load u32, ptr<u32> %v7, align 4
+    ret u32 %v8
+  }
+
+  fn @f1 "uninitialized"() -> u32, entry %b0 {
+  %b0 "entry":
+    %v0: ptr<u32> = alloca u32, align 4
+    uninit u32, ptr<u32> %v0, align 4
+    %v1: u32 = load u32, ptr<u32> %v0, align 4
+    ret u32 %v1
+  }
+
+}
+```
+
+```shell
+whale ir run tracked-memory.wir --function @f0
+whale ir run tracked-memory.wir --function @f1
+```
+
+```text
+u32 42
+Error: tracked-memory.wir: trap at @f1 %b0 instruction 2 (%v1): uninitialized byte at allocation offset 0 (after 3 steps)
+```
+
+## Kewajiban verifikasi, lowering dan eksekusi
+
+| Tahap | Kewajiban |
+| --- | --- |
+| Verifier | Periksa operand/tipe pointer, bentuk alignment dan ukuran penyimpanan target; tolak undef. |
+| O0 lowering | Pertahankan uninit di deklarasi yang dieksekusi, simpan nilai awal dan pertahankan pembacaan. |
+| Runtime | Periksa identitas alokasi, generasi/masa hidup, rentang, izin, alignment, overflow alamat dan inisialisasi; teruskan status salinan. |

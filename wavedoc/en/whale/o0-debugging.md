@@ -50,7 +50,7 @@ The following module passes verification and shows the current printer represent
 
 ```text
 module {
-  format_version 3
+  format_version 4
   semantics_version 1
   target "x86_64-whale-linux"
   datalayout { ptr=64, endian=little }
@@ -85,3 +85,48 @@ The debug interface uses DWARF 5 for function records, source lines, basic local
 The AMD64 profile retains frame pointers and does not use the red zone. Call-frame information supports stack inspection; it does not imply support for exception unwinding. Traps terminate execution without guaranteeing destructors or unwinding.
 
 DWARF emission and native execution availability are listed in the [toolchain overview](overview). O1 and higher optimization behavior is outside this O0 reference.
+
+## Repeated declarations in loops
+
+Save this complete module as `initialization-loop.wir`. Although the first iteration stores 42, the second declaration resets initialization with uninit, so its read traps. O0 lowering keeps uninit at the executed declaration even when alloca is in the entry block. Unused executed reads still check initialization; retained unreachable blocks do not execute.
+
+```text
+module {
+  format_version 4
+  semantics_version 1
+  target "x86_64-whale-linux"
+  datalayout { ptr=64, endian=little }
+
+  declare @f0 "redeclaration": whale () -> u32, linkage internal
+
+  fn @f0 "redeclaration"() -> u32, entry %b0 {
+  %b0 "entry":
+    %v0: ptr<u32> = alloca u32, align 4
+    %v1: u32 = const u32 0
+    %v2: u32 = const u32 1
+    %v3: u32 = const u32 42
+    br label %b1
+  %b1 "declaration":
+    %v4: u32 = phi u32 [ %v1, %b0 ], [ %v6, %b2 ]
+    uninit u32, ptr<u32> %v0, align 4
+    %v5: bool = icmp eq u32 %v4, %v1
+    cbr bool %v5, label %b2, label %b3
+  %b2 "first_iteration":
+    store u32 %v3, ptr<u32> %v0, align 4
+    %v6: u32 = add u32 %v4, %v2
+    br label %b1
+  %b3 "second_iteration":
+    %v7: u32 = load u32, ptr<u32> %v0, align 4
+    ret u32 %v7
+  }
+
+}
+```
+
+```shell
+whale ir run initialization-loop.wir --function @f0
+```
+
+```text
+Error: initialization-loop.wir: trap at @f0 %b3 instruction 0 (%v7): uninitialized byte at allocation offset 0 (after 17 steps)
+```

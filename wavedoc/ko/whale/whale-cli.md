@@ -52,7 +52,7 @@ whale object input.bin -o output.o
 
 ## 텍스트 IR 검증과 출력
 
-기본 빌드에서 형식 3 typed IR을 읽고 검증할 수 있습니다. [IR 참조](ir-reference)의 전체 예제를 `answer.wir`로 저장하세요. `print`는 검증 후 표준 IR을 출력하며, 오류 시 기존 파일을 보존합니다. 실행이나 native 코드 생성은 수행하지 않습니다.
+기본 빌드에서 형식 4 typed IR을 읽고 검증할 수 있습니다. [IR 참조](ir-reference)의 전체 예제를 `answer.wir`로 저장하세요. `print`는 검증 후 표준 IR을 출력하며, 오류 시 기존 파일을 보존합니다. 실행이나 native 코드 생성은 수행하지 않습니다.
 
 ```shell
 whale ir verify answer.wir
@@ -83,4 +83,22 @@ whale ir run swap-loop.wir --function @f7 --arg 3 --max-steps 100
 
 ```text
 i32 22
+```
+
+## 추적 스택 메모리 실행
+
+기본 인터프리터는 정수·Bool, 제어 흐름, 스택 할당, 데이터 포인터 저장·읽기, typed GEP, memcpy·memset을 실행합니다. checked 쌍의 값 읽기는 패딩을 제외합니다. 주소는 호스트 메모리를 가리키지 않는 합성 64비트 주소입니다. 함수 인자·반환은 정수·Bool 또는 void로 제한되며 float, 호출, 함수 포인터, 일반 aggregate 값, 전역 주소, native 실행은 미지원입니다. 스택 할당은 함수 반환까지 살아 있습니다. 블록별 수명 종료, 호출·반환의 포인터 전달, 외부 메모리 어댑터와 native shadow metadata는 후속 구현이 필요합니다.
+
+`--max-memory`는 논리적 할당 바이트 한도를 지정하며 기본값은 64 MiB입니다. `InterpreterOptions::memory_limits`는 할당 수 16384, 포인터 바이트 메타데이터 262144개, 바이트·메타데이터 작업량 256 Mi 단위도 제한합니다. 한도 초과는 IR 위치를 가진 `MemoryLimit` 오류이고 프로그램 trap과 별개입니다. 검증기는 출력 타깃의 알려진 저장 크기 overflow도 실행 전에 거부합니다.
+
+[메모리 모델](memory-model): `tracked-memory.wir`.
+
+```shell
+whale ir run tracked-memory.wir --function @f0 --max-memory 20
+whale ir run tracked-memory.wir --function @f0 --max-memory 3
+```
+
+```text
+u32 42
+Error: tracked-memory.wir: interpreter memory Bytes limit 3 reached at @f0 %b0 instruction 0 (%v0)
 ```

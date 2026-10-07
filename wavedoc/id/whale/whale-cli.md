@@ -52,7 +52,7 @@ Perintah `object` menempatkan byte mentah di bagian ELF64 `.text` dan menambahka
 
 ## Verifikasi dan pencetakan IR teks
 
-Build bawaan membaca dan memverifikasi typed IR format 3. Simpan contoh lengkap di [referensi IR](ir-reference) sebagai `answer.wir`. `print` memverifikasi sebelum mencetak bentuk kanonis dan mempertahankan file lama jika gagal. Perintah ini tidak menjalankan IR atau menghasilkan kode native.
+Build bawaan membaca dan memverifikasi typed IR format 4. Simpan contoh lengkap di [referensi IR](ir-reference) sebagai `answer.wir`. `print` memverifikasi sebelum mencetak bentuk kanonis dan mempertahankan file lama jika gagal. Perintah ini tidak menjalankan IR atau menghasilkan kode native.
 
 ```shell
 whale ir verify answer.wir
@@ -83,4 +83,22 @@ whale ir run swap-loop.wir --function @f7 --arg 3 --max-steps 100
 
 ```text
 i32 22
+```
+
+## Eksekusi memori stack terlacak
+
+Interpreter bawaan menjalankan integer/Bool, alur kontrol, alokasi stack, penyimpanan dan pembacaan pointer data, typed GEP, memcpy dan memset. Pembacaan pasangan checked tidak memeriksa padding. Alamat berupa nilai sintetis 64 bit, tanpa dereferensi memori host. Argumen dan hasil tetap integer/Bool atau void; float, panggilan, pointer fungsi, nilai agregat umum, alamat global dan eksekusi native belum didukung. Alokasi stack hidup sampai fungsi kembali. Akhir masa hidup leksikal, penerusan pointer melalui panggilan/hasil, adaptor memori asing dan native shadow metadata memerlukan implementasi lanjutan.
+
+`--max-memory` mengatur anggaran byte alokasi logis, bawaan 64 MiB. `InterpreterOptions::memory_limits` juga membatasi jumlah alokasi 16384, metadata byte pointer 262144 fragmen dan kerja byte/metadata 256 Mi unit. Batas terlampaui mengembalikan `MemoryLimit` dengan lokasi IR, terpisah dari trap program. Verifikasi juga menolak overflow ukuran penyimpanan yang diketahui untuk target keluaran sebelum eksekusi.
+
+[Model memori](memory-model): `tracked-memory.wir`.
+
+```shell
+whale ir run tracked-memory.wir --function @f0 --max-memory 20
+whale ir run tracked-memory.wir --function @f0 --max-memory 3
+```
+
+```text
+u32 42
+Error: tracked-memory.wir: interpreter memory Bytes limit 3 reached at @f0 %b0 instruction 0 (%v0)
 ```

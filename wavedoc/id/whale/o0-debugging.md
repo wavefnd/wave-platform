@@ -50,7 +50,7 @@ Di bawah ini adalah keluaran printer saat ini untuk modul yang lolos verifikasi.
 
 ```text
 module {
-  format_version 3
+  format_version 4
   semantics_version 1
   target "x86_64-whale-linux"
   datalayout { ptr=64, endian=little }
@@ -85,3 +85,48 @@ Antarmuka debug menggunakan informasi fungsi, baris sumber, variabel lokal defau
 Profil AMD64 mempertahankan penunjuk bingkai dan tidak menggunakan red zone. Informasi bingkai panggilan digunakan untuk pemeriksaan tumpukan dan tidak menyiratkan dukungan untuk pengecualian unwinding. trap menghentikan eksekusi tanpa menjamin destruktor atau unwinding.
 
 Silakan merujuk ke [Ikhtisar rantai alat](overview) untuk ketersediaan keluaran DWARF dan eksekusi native. Perilaku O1 dan optimasi di atas berada di luar cakupan referensi O0 ini.
+
+## Deklarasi berulang dalam loop
+
+Simpan modul lengkap ini sebagai `initialization-loop.wir`. Walau iterasi pertama menyimpan 42, uninit deklarasi kedua mereset inisialisasi sehingga pembacaan menghasilkan trap. O0 mempertahankan uninit pada deklarasi yang dieksekusi meskipun alloca di blok masuk. Pembacaan tak terpakai yang dieksekusi tetap diperiksa; blok tak terjangkau yang dipertahankan tidak dieksekusi.
+
+```text
+module {
+  format_version 4
+  semantics_version 1
+  target "x86_64-whale-linux"
+  datalayout { ptr=64, endian=little }
+
+  declare @f0 "redeclaration": whale () -> u32, linkage internal
+
+  fn @f0 "redeclaration"() -> u32, entry %b0 {
+  %b0 "entry":
+    %v0: ptr<u32> = alloca u32, align 4
+    %v1: u32 = const u32 0
+    %v2: u32 = const u32 1
+    %v3: u32 = const u32 42
+    br label %b1
+  %b1 "declaration":
+    %v4: u32 = phi u32 [ %v1, %b0 ], [ %v6, %b2 ]
+    uninit u32, ptr<u32> %v0, align 4
+    %v5: bool = icmp eq u32 %v4, %v1
+    cbr bool %v5, label %b2, label %b3
+  %b2 "first_iteration":
+    store u32 %v3, ptr<u32> %v0, align 4
+    %v6: u32 = add u32 %v4, %v2
+    br label %b1
+  %b3 "second_iteration":
+    %v7: u32 = load u32, ptr<u32> %v0, align 4
+    ret u32 %v7
+  }
+
+}
+```
+
+```shell
+whale ir run initialization-loop.wir --function @f0
+```
+
+```text
+Error: initialization-loop.wir: trap at @f0 %b3 instruction 0 (%v7): uninitialized byte at allocation offset 0 (after 17 steps)
+```

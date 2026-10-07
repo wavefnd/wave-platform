@@ -52,7 +52,7 @@ Lệnh `object` đặt các byte thô vào phần ELF64 `.text` và thêm biểu
 
 ## Kiểm tra và in IR văn bản
 
-Bản dựng mặc định đọc và kiểm tra typed IR format 3. Lưu ví dụ đầy đủ trong [tham chiếu IR](ir-reference) thành `answer.wir`. `print` kiểm tra trước khi in dạng chuẩn và giữ tệp cũ khi thất bại. Nó không thực thi IR hay sinh mã native.
+Bản dựng mặc định đọc và kiểm tra typed IR format 4. Lưu ví dụ đầy đủ trong [tham chiếu IR](ir-reference) thành `answer.wir`. `print` kiểm tra trước khi in dạng chuẩn và giữ tệp cũ khi thất bại. Nó không thực thi IR hay sinh mã native.
 
 ```shell
 whale ir verify answer.wir
@@ -83,4 +83,22 @@ whale ir run swap-loop.wir --function @f7 --arg 3 --max-steps 100
 
 ```text
 i32 22
+```
+
+## Thực thi bộ nhớ ngăn xếp được theo dõi
+
+Bộ thông dịch mặc định thực thi số nguyên/Bool, luồng điều khiển, cấp phát ngăn xếp, lưu và đọc con trỏ dữ liệu, typed GEP, memcpy và memset. Đọc cặp checked bỏ qua padding. Địa chỉ là giá trị tổng hợp 64 bit, không giải tham chiếu bộ nhớ máy chủ. Đối số và kết quả vẫn giới hạn ở số nguyên/Bool hoặc void; float, lời gọi, con trỏ hàm, giá trị aggregate tổng quát, địa chỉ global và thực thi native chưa hỗ trợ. Cấp phát ngăn xếp tồn tại đến khi hàm trả về. Kết thúc vòng đời theo phạm vi, truyền con trỏ qua lời gọi/kết quả, bộ chuyển đổi bộ nhớ ngoài và native shadow metadata cần triển khai tiếp.
+
+`--max-memory` đặt ngân sách byte cấp phát logic, mặc định 64 MiB. `InterpreterOptions::memory_limits` còn giới hạn 16384 cấp phát, 262144 mảnh metadata byte con trỏ và 256 Mi đơn vị công việc byte/metadata. Vượt giới hạn trả về `MemoryLimit` có vị trí IR, tách biệt với trap của chương trình. Kiểm tra cũng từ chối overflow kích thước lưu trữ đã biết của đích đầu ra trước khi thực thi.
+
+[Mô hình bộ nhớ](memory-model): `tracked-memory.wir`.
+
+```shell
+whale ir run tracked-memory.wir --function @f0 --max-memory 20
+whale ir run tracked-memory.wir --function @f0 --max-memory 3
+```
+
+```text
+u32 42
+Error: tracked-memory.wir: interpreter memory Bytes limit 3 reached at @f0 %b0 instruction 0 (%v0)
 ```

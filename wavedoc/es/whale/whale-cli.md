@@ -52,7 +52,7 @@ El comando `object` coloca bytes sin procesar en una sección ELF64 `.text` y ag
 
 ## Verificación e impresión de IR textual
 
-La compilación predeterminada lee y verifica typed IR format 3. Guarde el ejemplo completo de la [referencia IR](ir-reference) como `answer.wir`. `print` verifica antes de imprimir el formato canónico y conserva el archivo existente si falla. No ejecuta IR ni genera código native.
+La compilación predeterminada lee y verifica typed IR format 4. Guarde el ejemplo completo de la [referencia IR](ir-reference) como `answer.wir`. `print` verifica antes de imprimir el formato canónico y conserva el archivo existente si falla. No ejecuta IR ni genera código native.
 
 ```shell
 whale ir verify answer.wir
@@ -83,4 +83,22 @@ whale ir run swap-loop.wir --function @f7 --arg 3 --max-steps 100
 
 ```text
 i32 22
+```
+
+## Ejecución de memoria de pila rastreada
+
+El intérprete predeterminado ejecuta enteros/Bool, control de flujo, asignaciones de pila, almacenamiento y lectura de punteros de datos, typed GEP, memcpy y memset. Las lecturas de pares checked excluyen el relleno. Las direcciones son valores sintéticos de 64 bits, sin desreferenciar memoria del anfitrión. Los argumentos y retornos siguen limitados a enteros/Bool o void; float, llamadas, punteros de función, valores agregados generales, direcciones globales y ejecución native no están soportados. La pila vive hasta el retorno. El fin de vida léxico, la transferencia de punteros en llamadas/retornos, adaptadores de memoria externa y native shadow metadata requieren implementación posterior.
+
+`--max-memory` fija el presupuesto de bytes lógicos asignados, por defecto 64 MiB. `InterpreterOptions::memory_limits` también limita a 16384 asignaciones, 262144 fragmentos de metadatos de bytes de puntero y 256 Mi unidades de trabajo de bytes/metadatos. Superar un límite devuelve `MemoryLimit` con ubicación IR, separado de un trap del programa. La verificación rechaza además el overflow de tamaños de almacenamiento conocidos del destino antes de ejecutar.
+
+[Modelo de memoria](memory-model): `tracked-memory.wir`.
+
+```shell
+whale ir run tracked-memory.wir --function @f0 --max-memory 20
+whale ir run tracked-memory.wir --function @f0 --max-memory 3
+```
+
+```text
+u32 42
+Error: tracked-memory.wir: interpreter memory Bytes limit 3 reached at @f0 %b0 instruction 0 (%v0)
 ```

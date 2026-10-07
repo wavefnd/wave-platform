@@ -33,7 +33,7 @@ Mô-đun sau được định cấu hình là builder và đã vượt qua trìn
 
 ```text
 module {
-  format_version 3
+  format_version 4
   semantics_version 1
   target "x86_64-whale-linux"
   datalayout { ptr=64, endian=little }
@@ -52,7 +52,7 @@ module {
 }
 ```
 
-`alloca` tạo bộ lưu trữ i32, `store` ghi 42 và `load` xác định giá trị cần trả về. Đây là đầu ra từ máy in IR đã nhập chứ không phải dấu vết thực thi gốc. Căn chỉnh 3 là lỗi xác thực. Việc xóa cửa hàng sẽ yêu cầu bẫy đọc chưa được khởi tạo trong mô hình bộ nhớ này, nhưng tính năng theo dõi khởi tạo và kiểm tra bẫy thời gian chạy tương ứng vẫn chưa được triển khai. Việc vượt qua trình xác minh hiện tại không chứng minh rằng lần đọc này là an toàn.
+Lưu mô-đun đầy đủ này thành `initialized.wir`; thực thi in `i32 42`. Bỏ store khiến load trap do chưa khởi tạo. Alignment 3 là lỗi kiểm tra. Byte không vật lý từ alloca không có nghĩa đã khởi tạo.
 
 ## So sánh với số học con trỏ
 
@@ -127,3 +127,79 @@ Chuỗi là một chuỗi byte bất biến có độ dài được chỉ địn
 Do đó, độ dài của chuỗi byte bao gồm `A`, NUL và `B` là 3. Không thể sử dụng cho các chuyển đổi chuỗi C rõ ràng, từ chối NUL nội bộ. Giao diện người dùng không được cắt ngắn phần này thành `A`.
 
 Bên ngoài C·Địa chỉ thô·Hội nội tuyến là ranh giới hợp đồng riêng biệt. Việc kiểm tra thời gian chạy của bộ nhớ theo dõi không được đảm bảo để phát hiện tất cả hành vi không chính xác trong mã bên ngoài.
+
+## Thực thi bộ nhớ ngăn xếp được theo dõi
+
+Bộ thông dịch mặc định thực thi số nguyên/Bool, luồng điều khiển, cấp phát ngăn xếp, lưu và đọc con trỏ dữ liệu, typed GEP, memcpy và memset. Đọc cặp checked bỏ qua padding. Địa chỉ là giá trị tổng hợp 64 bit, không giải tham chiếu bộ nhớ máy chủ. Đối số và kết quả vẫn giới hạn ở số nguyên/Bool hoặc void; float, lời gọi, con trỏ hàm, giá trị aggregate tổng quát, địa chỉ global và thực thi native chưa hỗ trợ. Cấp phát ngăn xếp tồn tại đến khi hàm trả về. Kết thúc vòng đời theo phạm vi, truyền con trỏ qua lời gọi/kết quả, bộ chuyển đổi bộ nhớ ngoài và native shadow metadata cần triển khai tiếp.
+
+`--max-memory` đặt ngân sách byte cấp phát logic, mặc định 64 MiB. `InterpreterOptions::memory_limits` còn giới hạn 16384 cấp phát, 262144 mảnh metadata byte con trỏ và 256 Mi đơn vị công việc byte/metadata. Vượt giới hạn trả về `MemoryLimit` có vị trí IR, tách biệt với trap của chương trình. Kiểm tra cũng từ chối overflow kích thước lưu trữ đã biết của đích đầu ra trước khi thực thi.
+
+```shell
+whale ir run initialized.wir --function @f0
+```
+
+```text
+i32 42
+```
+
+## Sao chép byte và đặt lại khởi tạo
+
+Lưu mô-đun đầy đủ dưới đây thành `tracked-memory.wir`. @f0 sao chép byte con trỏ và metadata riêng, rồi đọc 42. Trong @f1, uninit đánh dấu vùng lưu trữ của kiểu chưa khởi tạo và xóa metadata con trỏ mà không đổi byte hiện có. memcpy có thể sao chép byte chưa khởi tạo; lần đọc giá trị đích sau đó kiểm tra trạng thái. Sao chép từng phần chỉ giữ quyền khi đủ tám mảnh metadata nhất quán. Ghi bit giống nhau bằng số nguyên hoặc memset không phục hồi quyền.
+
+memcpy/memset dài bằng không thành công mà không kiểm tra truy cập hoặc alignment, kể cả con trỏ null và one-past. memcpy chồng lấn không rỗng gây trap. memset khởi tạo byte đã ghi và xóa metadata con trỏ của chúng. Bool phải lưu là 0 hoặc 1; đọc biểu diễn khác gây trap.
+
+```text
+module {
+  format_version 4
+  semantics_version 1
+  target "x86_64-whale-linux"
+  datalayout { ptr=64, endian=little }
+
+  declare @f0 "copied_pointer": whale () -> u32, linkage internal
+  declare @f1 "uninitialized": whale () -> u32, linkage internal
+
+  fn @f0 "copied_pointer"() -> u32, entry %b0 {
+  %b0 "entry":
+    %v0: ptr<u32> = alloca u32, align 4
+    %v1: u32 = const u32 42
+    store u32 %v1, ptr<u32> %v0, align 4
+    %v2: ptr<ptr<u32>> = alloca ptr<u32>, align 8
+    %v3: ptr<ptr<u32>> = alloca ptr<u32>, align 8
+    store ptr<u32> %v0, ptr<ptr<u32>> %v2, align 8
+    %v4: ptr<u8> = bitcast ptr<ptr<u32>> %v2 to ptr<u8>
+    %v5: ptr<u8> = bitcast ptr<ptr<u32>> %v3 to ptr<u8>
+    %v6: u64 = const u64 8
+    memcpy ptr<u8> %v5, ptr<u8> %v4, u64 %v6, align 8
+    %v7: ptr<u32> = load ptr<u32>, ptr<ptr<u32>> %v3, align 8
+    %v8: u32 = load u32, ptr<u32> %v7, align 4
+    ret u32 %v8
+  }
+
+  fn @f1 "uninitialized"() -> u32, entry %b0 {
+  %b0 "entry":
+    %v0: ptr<u32> = alloca u32, align 4
+    uninit u32, ptr<u32> %v0, align 4
+    %v1: u32 = load u32, ptr<u32> %v0, align 4
+    ret u32 %v1
+  }
+
+}
+```
+
+```shell
+whale ir run tracked-memory.wir --function @f0
+whale ir run tracked-memory.wir --function @f1
+```
+
+```text
+u32 42
+Error: tracked-memory.wir: trap at @f1 %b0 instruction 2 (%v1): uninitialized byte at allocation offset 0 (after 3 steps)
+```
+
+## Trách nhiệm kiểm tra, lowering và thực thi
+
+| Giai đoạn | Trách nhiệm |
+| --- | --- |
+| Verifier | Kiểm tra toán hạng/kiểu con trỏ, dạng alignment và kích thước lưu trữ đích; từ chối undef. |
+| O0 lowering | Giữ uninit tại khai báo được thực thi, lưu giá trị khởi tạo và giữ lần đọc. |
+| Runtime | Kiểm tra danh tính cấp phát, thế hệ/vòng đời, phạm vi, quyền, alignment, overflow địa chỉ và khởi tạo; truyền trạng thái sao chép. |

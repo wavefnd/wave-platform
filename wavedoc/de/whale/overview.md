@@ -43,9 +43,9 @@ Das Referenzdokument definiert die semantischen Regeln für Whale. Verfügbare F
 | --- | --- | --- |
 |Assembler|Erstellen Sie ein verschiebbares Objekt ELF64 aus der Baugruppe AMD64|Unvollständige Abdeckung von Befehlen und Anweisungen|
 |Objektbibliothek|Objektzusammensetzung, payload ohne BSS, Zielvalidierung, AMD64 ELF64 Serialisierung und wählbare Wave Datensatzimplementierung zur Überprüfung der Größe.|Verschiebbare Objekte sind keine ausführbaren Dateien|
-| IR | Konstruktion, Druck, signaturgeprüfte direkte/indirekte Aufrufe, versionierte AST-Senkung, Zielvalidierung und geprüfte Typlayouts | AST format 2 / typed IR format 3, bitgenaue Konstanten sowie Textlesen, Prüfung und Round trips verfügbar; Maschinenaufrufausgabe fehlt weiterhin |
+| IR | Konstruktion, Druck, signaturgeprüfte direkte/indirekte Aufrufe, versionierte AST-Senkung, Zielvalidierung und geprüfte Typlayouts | AST format 2 / typed IR format 4, bitgenaue Konstanten sowie Textlesen, Prüfung und Round trips verfügbar; Maschinenaufrufausgabe fehlt weiterhin |
 |Linker|Symbolinterpretation, Überprüfung des Eingabeziels, Überprüfung der Platzierung von Datei-/Speicherabschnitten|Die Anwendung einer vollständigen Verschiebung und die Ausgabe ausführbarer Dateien werden nicht unterstützt.|
-|Ausführen und Debuggen| Skalare Ganzzahl-/Bool-Ausführung und begrenzte Schleifen | Speicher, float, Aufrufe, native-Codegenerierung und DWARF fehlen noch |
+| Ausführung und Debugging | Ganzzahlen/Bool, Kontrollfluss, verfolgter Stapelspeicher und Initialisierungsprüfung | Float, Aufrufe, globale Adressen, native Codeerzeugung und DWARF fehlen |
 
 Für verifizierte IR- und Trace-Speicher gelten Regeln, die undefiniertes Verhalten verbieten. Die experimentelle Implementierung implementiert noch nicht alle Laufzeitprüfungen in der Speicher-/Ausführungsreferenzdokumentation.
 

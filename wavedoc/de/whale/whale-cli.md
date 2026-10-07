@@ -52,7 +52,7 @@ Der Befehl `object` platziert Rohbytes in einem ELF64-Abschnitt `.text` und füg
 
 ## Text-IR prüfen und ausgeben
 
-Der Standardbuild liest und prüft typed IR format 3. Speichern Sie das vollständige Beispiel aus der [IR-Referenz](ir-reference) als `answer.wir`. `print` prüft vor der kanonischen Ausgabe und bewahrt bei Fehlern eine bestehende Datei. Es führt IR nicht aus und erzeugt keinen nativen Code.
+Der Standardbuild liest und prüft typed IR format 4. Speichern Sie das vollständige Beispiel aus der [IR-Referenz](ir-reference) als `answer.wir`. `print` prüft vor der kanonischen Ausgabe und bewahrt bei Fehlern eine bestehende Datei. Es führt IR nicht aus und erzeugt keinen nativen Code.
 
 ```shell
 whale ir verify answer.wir
@@ -83,4 +83,22 @@ whale ir run swap-loop.wir --function @f7 --arg 3 --max-steps 100
 
 ```text
 i32 22
+```
+
+## Ausführung mit verfolgtem Stapelspeicher
+
+Der Standardinterpreter führt Ganzzahlen/Bool, Kontrollfluss, Stapelzuweisungen, Datenzeigerspeicherung und -lesen, typed GEP, memcpy und memset aus. Beim Lesen von checked-Paaren wird Padding ausgeschlossen. Adressen sind synthetische 64-Bit-Werte ohne Zugriff auf Hostspeicher. Argumente und Rückgaben bleiben Ganzzahlen/Bool oder void; float, Aufrufe, Funktionszeiger, allgemeine Aggregatwerte, globale Adressen und native Ausführung fehlen. Stapelzuweisungen leben bis zur Rückgabe. Lexikalisches Lebensdauerende, Zeigerübergabe bei Aufrufen/Rückgaben, Fremdspeicheradapter und native shadow metadata müssen noch implementiert werden.
+
+`--max-memory` begrenzt logische Zuweisungsbytes, standardmäßig 64 MiB. `InterpreterOptions::memory_limits` begrenzt außerdem Zuweisungen auf 16384, Zeigerbyte-Metadaten auf 262144 Fragmente und Byte-/Metadatenarbeit auf 256 Mi Einheiten. Überschreitungen liefern `MemoryLimit` mit IR-Position, getrennt von Programm-Traps. Die Prüfung lehnt auch bekannten Speichergrößen-overflow des Ausgabeziels vor Ausführung ab.
+
+[Speichermodell](memory-model): `tracked-memory.wir`.
+
+```shell
+whale ir run tracked-memory.wir --function @f0 --max-memory 20
+whale ir run tracked-memory.wir --function @f0 --max-memory 3
+```
+
+```text
+u32 42
+Error: tracked-memory.wir: interpreter memory Bytes limit 3 reached at @f0 %b0 instruction 0 (%v0)
 ```

@@ -43,7 +43,7 @@ La impresora genera IR:
 
 ```text
 module {
-  format_version 3
+  format_version 4
   semantics_version 1
   target "x86_64-whale-linux"
   datalayout { ptr=64, endian=little }
@@ -126,7 +126,7 @@ fn main() {
 
 ```text
 module {
-  format_version 3
+  format_version 4
   semantics_version 1
   target "x86_64-whale-linux"
   datalayout { ptr=64, endian=little }
@@ -198,7 +198,7 @@ Select selecciona uno de los valores ya calculados. No omite el cálculo de ning
 
 ## Departamento de Verificación trap
 
-El IR incorrecto se rechaza en la verificación. Las condiciones de ejecución del subconjunto admitido producen traps definidos. El parser/verificador conserva legacy `undef` por compatibilidad con lowering existente, pero el intérprete lo rechaza explícitamente; no convierte memoria sin inicializar en cero. El seguimiento de inicialización sigue pendiente. Los errores del builder son distintos de los traps de ejecución.
+IR mal formado es un error de verificación. El verificador rechaza legacy `undef`; regenere desde AST. Una declaración sin inicializador usa `uninit` de format 4 y lecturas comprobadas, sin sustituir por cero ni valores arbitrarios. Las condiciones de ejecución violadas producen traps definidos con ubicación IR.
 
 `InterpreterTrap` informa del motivo, pasos ejecutados y `ExecutionSite`: ID de función, ID de bloque, índice de instrucción desde cero e ID opcional del resultado. El terminator sigue a las instrucciones. El CLI indica también el archivo. El IR aún no lleva spans de fuente: son posiciones IR, no números de línea. El trap devuelve un error y detiene la ejecución posterior; la biblioteca no aborta el proceso anfitrión.
 
@@ -210,7 +210,7 @@ AST y typed IR utilizan el format version respectivo y el semantics version com�
 
 Los números enteros se pasan como ancho de bits·signedness·números de cadena. Las constantes de punto flotante se pasan como una cadena de bits exacta y de ancho. El texto round-trip en IR debe conservar el nombre·ID·tipo·constante·secuencia·propiedad·metadatos. Los espacios y la ubicación de comentarios no están sujetos a conservación.
 
-Están disponibles el contrato AST JSON siguiente y la lectura, verificación e impresión de ida y vuelta de typed IR format 3.
+Están disponibles el contrato AST JSON siguiente y la lectura, verificación e impresión de ida y vuelta de typed IR format 4.
 
 ### Identidades impresas y nombres entre comillas
 
@@ -220,7 +220,7 @@ Este módulo completo se verificó e imprimió con la API Rust de IR. Ambos bloq
 
 ```text
 module {
-  format_version 3
+  format_version 4
   semantics_version 1
   target "x86_64-whale-linux"
   datalayout { ptr=64, endian=little }
@@ -252,7 +252,7 @@ Todos los nombres y cadenas usan comillas dobles: destino, nombres de funciones,
 "line\ncolumn\tquote\"slash\\한글"
 ```
 
-La salida format 2 debe migrarse manualmente a IDs explícitos, IDs de parámetros, nombres entre comillas y una referencia de entrada. El lector solo acepta format 3 con semantics version 1 y no convierte format 2 automáticamente. AST JSON format 2 tiene un contrato independiente.
+El lector acepta typed IR formats 3 y 4 con semantics version 1 y siempre imprime format 4. `uninit` exige format 4. Las instrucciones válidas de format 3 siguen siendo legibles, pero legacy `undef` es error de verificación en ambos formatos y debe regenerarse desde AST. El texto format 2 exige migración manual a IDs explícitos, nombres entre comillas y referencias de entrada. AST JSON mantiene su format 2 independiente.
 
 ### Lectura y verificación de IR textual
 
@@ -284,13 +284,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let canonical = print_module(&module);
     let reread = parse_module_with_limits(&canonical, limits)?;
     assert_eq!(print_module(&reread), canonical);
-    let invalid = source.replacen("format_version 3", "format_version 99", 1);
+    let invalid = source.replacen("format_version 4", "format_version 99", 1);
     assert!(parse_module_with_limits(&invalid, limits).is_err());
     Ok(())
 }
 ```
 
-También puede pasar límites a `verify_module_with_limits`, `ConstExpr::evaluate_with_limits`, `validate_signature_with_limits` y `ModuleBuilder::declare_function_with_limits`. El recorrido iterativo precede al clone, comparación y diagnóstico recursivos; las constantes se evalúan con una pila de trabajo. Los árboles Rust prestados y su Drop siguen siendo responsabilidad del llamador. Los árboles arbitrarios no verificados conservan clone/Drop recursivos; la firma propia rechazada por la API de declaración checked se libera iterativamente. El lector conserva legacy `undef` para compatibilidad con lowering existente. El seguimiento de inicialización, comprobaciones de acceso a memoria, metadatos de punteros y ejecución native siguen pendientes por separado.
+También puede pasar límites a `verify_module_with_limits`, `ConstExpr::evaluate_with_limits`, `validate_signature_with_limits` y `ModuleBuilder::declare_function_with_limits`. El recorrido iterativo precede al clone, comparación y diagnóstico recursivos; las constantes se evalúan con una pila de trabajo. Los árboles Rust prestados y su Drop siguen siendo responsabilidad del llamador. Los árboles arbitrarios no verificados conservan clone/Drop recursivos; la firma propia rechazada por la API de declaración checked se libera iterativamente. IR mal formado es un error de verificación. El verificador rechaza legacy `undef`; regenere desde AST. Una declaración sin inicializador usa `uninit` de format 4 y lecturas comprobadas, sin sustituir por cero ni valores arbitrarios. Las condiciones de ejecución violadas producen traps definidos con ubicación IR.
 
 ### Versión especificada AST JSON
 
@@ -342,7 +342,7 @@ cargo run --locked --features socket-cli -- ir lower program.json
 
 ```text
 module {
-  format_version 3
+  format_version 4
   semantics_version 1
   target "x86_64-whale-linux"
   datalayout { ptr=64, endian=little }
@@ -364,7 +364,7 @@ El número entero `value` es una cadena decimal. Signed Se utiliza un número de
 
 [El esquema JSON completo](https://github.com/wavefnd/Whale/blob/master/ir/schema/ast-v2.schema.json) especifica formas, campos obligatorios y variantes. También se aplican comprobaciones de rango/tipo y detección de claves duplicadas. El subconjunto de reducción escalar incluye literales, variables/constantes, agregar/sub/mul, comparaciones, asignación, si/mientras, regresar y romper/continuar. Se admiten referencias de funciones, llamadas directas y llamadas indirectas; Las expresiones agregadas no son compatibles. `Opaque` se puede representar en el esquema, pero no se puede reducir.
 
-La migración exige envolver el antiguo Program sin envelope y sustituir los números JSON por cadenas decimales de enteros o cadenas de bits flotantes. Se rechazan entradas sin versión. El formato 1 debe migrarse al 2 añadiendo `program.declarations` (un array vacío si no se usa) y `convention`/`linkage` explícitos en las definiciones. Las versiones son independientes: AST format 2, typed IR format 3 y semantics version 1.
+La migración exige envolver el antiguo Program sin envelope y sustituir los números JSON por cadenas decimales de enteros o cadenas de bits flotantes. Se rechazan entradas sin versión. El formato 1 debe migrarse al 2 añadiendo `program.declarations` (un array vacío si no se usa) y `convention`/`linkage` explícitos en las definiciones. Las versiones son independientes: AST format 2, typed IR format 4 y semantics version 1.
 
 ### Entrada rechazada y recuperación CLI
 
@@ -396,7 +396,7 @@ El comando sale con un estado distinto de cero y no crea nuevos resultados ni so
 
 ## Intérprete de enteros escalares
 
-La compilación predeterminada ejecuta una función verificada con convención Whale, parámetros enteros/Bool y retorno entero/Bool o void. Admite constantes y declaraciones constantes, mov, aritmética y comparaciones enteras, casts enteros, pares checked y extract, select, phi, ramas, switch, return, trap_if y trap. Memoria, float, llamadas, direcciones, agregados generales y legacy `undef` no se ejecutan. Se verifica todo el módulo; todos los bloques de la función elegida, incluso los inalcanzables, deben pertenecer al subconjunto. Las otras funciones solo necesitan pasar la verificación. Los ejemplos de lowering de Wave que usan memoria aún no se ejecutan.
+El intérprete predeterminado ejecuta enteros/Bool, control de flujo, asignaciones de pila, almacenamiento y lectura de punteros de datos, typed GEP, memcpy y memset. Las lecturas de pares checked excluyen el relleno. Las direcciones son valores sintéticos de 64 bits, sin desreferenciar memoria del anfitrión. Los argumentos y retornos siguen limitados a enteros/Bool o void; float, llamadas, punteros de función, valores agregados generales, direcciones globales y ejecución native no están soportados. La pila vive hasta el retorno. El fin de vida léxico, la transferencia de punteros en llamadas/retornos, adaptadores de memoria externa y native shadow metadata requieren implementación posterior.
 
 `InterpreterOptions::max_steps` vale 1,000,000 por defecto. Cada instrucción ejecutada, incluida phi, y cada terminator consumen un paso. Cero detiene antes de la primera operación; un bucle infinito devuelve `InterpreterError::StepLimit`. `ir_limits` limita la verificación por separado. La aritmética sin usos también se ejecuta y puede producir trap. El overflow checked es un resultado Bool; solo un trap_if explícito lo convierte en trap.
 
@@ -404,7 +404,7 @@ Guarde este módulo completo como `swap-loop.wir`. La entrada es explícita aunq
 
 ```text
 module {
-  format_version 3
+  format_version 4
   semantics_version 1
   target "x86_64-whale-linux"
   datalayout { ptr=64, endian=little }

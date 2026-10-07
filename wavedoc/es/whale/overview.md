@@ -43,9 +43,9 @@ El documento de referencia define las reglas semánticas para Whale. Las funcion
 | --- | --- | --- |
 |ensamblador|Cree ELF64 objeto reubicable a partir del ensamblaje AMD64|Cobertura incompleta de comandos y directivas.|
 |biblioteca de objetos|Composición de objetos, payload sin BSS, validación de objetivos, AMD64 ELF64 serialización e implementación de registro Wave seleccionable para verificar el tamaño.|Los objetos reubicables no son ejecutables.|
-| IR | Construcción, impresión, llamadas directas/indirectas con verificación de firma, reducción de versiones AST, validación de objetivos y diseños tipográficos verificados | AST format 2 / typed IR format 3, constantes de bits exactos y lectura, verificación e ida y vuelta de texto disponibles; la emisión de llamadas máquina sigue pendiente |
+| IR | Construcción, impresión, llamadas directas/indirectas con verificación de firma, reducción de versiones AST, validación de objetivos y diseños tipográficos verificados | AST format 2 / typed IR format 4, constantes de bits exactos y lectura, verificación e ida y vuelta de texto disponibles; la emisión de llamadas máquina sigue pendiente |
 |enlazador|Interpretación de símbolos, verificación de objetivos de entrada, inspección de ubicación de sección de archivo/memoria|No se admite la aplicación de reubicación completa ni la generación de archivos ejecutables.|
-|Ejecución y depuración| Ejecución de enteros/Bool escalares y bucles limitados | Memoria, float, llamadas, código native y DWARF aún no disponibles |
+| Ejecución y depuración | Enteros/Bool, control de flujo, pila rastreada y comprobación de inicialización | Float, llamadas, direcciones globales, generación native y DWARF no soportados |
 
 Las reglas que prohíben el comportamiento indefinido se aplican a las memorias de rastreo y IR verificadas. La implementación experimental aún no implementa todas las comprobaciones de tiempo de ejecución en la documentación de referencia de memoria/ejecución.
 

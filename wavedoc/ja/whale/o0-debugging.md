@@ -50,7 +50,7 @@ return・break・continue 後の文章も連結されていないブロックに
 
 ```text
 module {
-  format_version 3
+  format_version 4
   semantics_version 1
   target "x86_64-whale-linux"
   datalayout { ptr=64, endian=little }
@@ -85,3 +85,48 @@ module {
 AMD64プロファイルはフレームポインタを保持し、redzoneを使用しません。呼び出しフレーム情報はスタック調査に使用され、例外unwindingサポートを意味しません。 trapはデストラクタやunwindingを保証せずに実行を終了します。
 
 DWARF出力とnative実行の提供可否は[ツールチェーンの概要](overview)を参照してください。 O1以上最適化の動作は、このO0参照の範囲外です。
+
+## ループ内で繰り返される宣言
+
+この完全なモジュールを `initialization-loop.wir` に保存してください。最初の反復で42を保存しても、次の宣言のuninitで初期化状態が消えるため読取りはtrapです。O0 loweringはallocaを入口に置いてもuninitを実行される宣言位置に残します。未使用の読取りも実行時に検査し、保存された到達不能ブロックは実行しません。
+
+```text
+module {
+  format_version 4
+  semantics_version 1
+  target "x86_64-whale-linux"
+  datalayout { ptr=64, endian=little }
+
+  declare @f0 "redeclaration": whale () -> u32, linkage internal
+
+  fn @f0 "redeclaration"() -> u32, entry %b0 {
+  %b0 "entry":
+    %v0: ptr<u32> = alloca u32, align 4
+    %v1: u32 = const u32 0
+    %v2: u32 = const u32 1
+    %v3: u32 = const u32 42
+    br label %b1
+  %b1 "declaration":
+    %v4: u32 = phi u32 [ %v1, %b0 ], [ %v6, %b2 ]
+    uninit u32, ptr<u32> %v0, align 4
+    %v5: bool = icmp eq u32 %v4, %v1
+    cbr bool %v5, label %b2, label %b3
+  %b2 "first_iteration":
+    store u32 %v3, ptr<u32> %v0, align 4
+    %v6: u32 = add u32 %v4, %v2
+    br label %b1
+  %b3 "second_iteration":
+    %v7: u32 = load u32, ptr<u32> %v0, align 4
+    ret u32 %v7
+  }
+
+}
+```
+
+```shell
+whale ir run initialization-loop.wir --function @f0
+```
+
+```text
+Error: initialization-loop.wir: trap at @f0 %b3 instruction 0 (%v7): uninitialized byte at allocation offset 0 (after 17 steps)
+```

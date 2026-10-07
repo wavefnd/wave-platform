@@ -33,7 +33,7 @@ BSS의 물리적인 바이트가 0이라는 사실만으로 IR 변수의 초기�
 
 ```text
 module {
-  format_version 3
+  format_version 4
   semantics_version 1
   target "x86_64-whale-linux"
   datalayout { ptr=64, endian=little }
@@ -52,7 +52,7 @@ module {
 }
 ```
 
-`alloca`는 i32 저장 공간을 만들고, `store`는 42를 쓰며, `load`는 반환할 값을 정의합니다. 이 코드는 typed IR 프린터 출력이며 native 실행 기록이 아닙니다. 정렬을 3으로 바꾸면 검증 오류입니다. Store를 제거하면 이 메모리 모델에서는 미초기화 읽기 trap이 필요하지만, 초기화 추적과 해당 런타임 trap 검사는 아직 제공되지 않습니다. 현재 검증기를 통과했다는 사실만으로 그러한 읽기가 안전하다고 판단해서는 안 됩니다.
+이 전체 모듈을 `initialized.wir`로 저장하여 실행하면 `i32 42`를 출력합니다. store를 삭제하면 load에서 미초기화 trap이 발생합니다. 정렬 3은 검증 오류입니다. alloca의 물리적인 0은 초기화 상태가 아닙니다.
 
 ## 포인터 산술과 비교
 
@@ -127,3 +127,79 @@ standalone array placement alignment: 16
 따라서 `A`, NUL, `B`로 구성된 바이트열의 길이는 3입니다. 내부 NUL을 거부하는 명시적 C 문자열 변환에는 사용할 수 없습니다. 프런트엔드가 이를 조용히 `A`로 잘라서는 안 됩니다.
 
 외부 C·원시 주소·인라인 어셈블리는 별도 계약 경계입니다. 추적 메모리의 런타임 검사가 외부 코드의 모든 잘못된 동작까지 검출한다고 보장하지 않습니다.
+
+## 추적 스택 메모리 실행
+
+기본 인터프리터는 정수·Bool, 제어 흐름, 스택 할당, 데이터 포인터 저장·읽기, typed GEP, memcpy·memset을 실행합니다. checked 쌍의 값 읽기는 패딩을 제외합니다. 주소는 호스트 메모리를 가리키지 않는 합성 64비트 주소입니다. 함수 인자·반환은 정수·Bool 또는 void로 제한되며 float, 호출, 함수 포인터, 일반 aggregate 값, 전역 주소, native 실행은 미지원입니다. 스택 할당은 함수 반환까지 살아 있습니다. 블록별 수명 종료, 호출·반환의 포인터 전달, 외부 메모리 어댑터와 native shadow metadata는 후속 구현이 필요합니다.
+
+`--max-memory`는 논리적 할당 바이트 한도를 지정하며 기본값은 64 MiB입니다. `InterpreterOptions::memory_limits`는 할당 수 16384, 포인터 바이트 메타데이터 262144개, 바이트·메타데이터 작업량 256 Mi 단위도 제한합니다. 한도 초과는 IR 위치를 가진 `MemoryLimit` 오류이고 프로그램 trap과 별개입니다. 검증기는 출력 타깃의 알려진 저장 크기 overflow도 실행 전에 거부합니다.
+
+```shell
+whale ir run initialized.wir --function @f0
+```
+
+```text
+i32 42
+```
+
+## 바이트 복사와 초기화 해제
+
+다음 전체 모듈을 `tracked-memory.wir`로 저장하세요. @f0는 포인터 바이트와 별도 메타데이터를 함께 복사하여 42를 읽습니다. @f1의 uninit은 해당 타입의 저장 범위를 미초기화로 표시하고 포인터 메타데이터를 지우며, 원래 바이트는 바꾸지 않습니다. 초기화되지 않은 바이트도 memcpy로 복사할 수 있지만 목적지에서 값을 읽으면 검사합니다. 부분 복사한 포인터는 일관된 8개 바이트의 메타데이터가 모두 모여야 접근 권한을 보존합니다. 정수나 memset으로 같은 비트를 써도 권한을 복원하지 않습니다.
+
+길이가 0인 memcpy·memset은 접근·정렬 검사 없이 성공하며 null·one-past에도 사용할 수 있습니다. 0이 아닌 겹치는 memcpy는 trap입니다. memset은 쓴 바이트를 초기화하고 해당 포인터 메타데이터를 지웁니다. Bool 저장 바이트는 0 또는 1이어야 하며 다른 값의 읽기는 trap입니다.
+
+```text
+module {
+  format_version 4
+  semantics_version 1
+  target "x86_64-whale-linux"
+  datalayout { ptr=64, endian=little }
+
+  declare @f0 "copied_pointer": whale () -> u32, linkage internal
+  declare @f1 "uninitialized": whale () -> u32, linkage internal
+
+  fn @f0 "copied_pointer"() -> u32, entry %b0 {
+  %b0 "entry":
+    %v0: ptr<u32> = alloca u32, align 4
+    %v1: u32 = const u32 42
+    store u32 %v1, ptr<u32> %v0, align 4
+    %v2: ptr<ptr<u32>> = alloca ptr<u32>, align 8
+    %v3: ptr<ptr<u32>> = alloca ptr<u32>, align 8
+    store ptr<u32> %v0, ptr<ptr<u32>> %v2, align 8
+    %v4: ptr<u8> = bitcast ptr<ptr<u32>> %v2 to ptr<u8>
+    %v5: ptr<u8> = bitcast ptr<ptr<u32>> %v3 to ptr<u8>
+    %v6: u64 = const u64 8
+    memcpy ptr<u8> %v5, ptr<u8> %v4, u64 %v6, align 8
+    %v7: ptr<u32> = load ptr<u32>, ptr<ptr<u32>> %v3, align 8
+    %v8: u32 = load u32, ptr<u32> %v7, align 4
+    ret u32 %v8
+  }
+
+  fn @f1 "uninitialized"() -> u32, entry %b0 {
+  %b0 "entry":
+    %v0: ptr<u32> = alloca u32, align 4
+    uninit u32, ptr<u32> %v0, align 4
+    %v1: u32 = load u32, ptr<u32> %v0, align 4
+    ret u32 %v1
+  }
+
+}
+```
+
+```shell
+whale ir run tracked-memory.wir --function @f0
+whale ir run tracked-memory.wir --function @f1
+```
+
+```text
+u32 42
+Error: tracked-memory.wir: trap at @f1 %b0 instruction 2 (%v1): uninitialized byte at allocation offset 0 (after 3 steps)
+```
+
+## 검증·lowering·실행의 책임
+
+| 단계 | 책임 |
+| --- | --- |
+| Verifier | 피연산자·포인터 타입, 정렬 형태, 출력 타깃 저장 크기를 검사하고 undef를 거부합니다. |
+| O0 lowering | 실제 선언 지점에 uninit, 초기값에 store를 두고 읽기를 보존합니다. |
+| Runtime | 할당 정체성·세대·수명·범위·권한·정렬·주소 overflow·초기화를 검사하고 복사 상태를 전달합니다. |

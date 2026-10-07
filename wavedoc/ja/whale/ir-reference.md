@@ -43,7 +43,7 @@ fn main() {
 
 ```text
 module {
-  format_version 3
+  format_version 4
   semantics_version 1
   target "x86_64-whale-linux"
   datalayout { ptr=64, endian=little }
@@ -126,7 +126,7 @@ fn main() {
 
 ```text
 module {
-  format_version 3
+  format_version 4
   semantics_version 1
   target "x86_64-whale-linux"
   datalayout { ptr=64, endian=little }
@@ -198,7 +198,7 @@ Selectは、すでに計算された値の1つを選択します。どちらの�
 
 ## 検証課 trap
 
-不正な IR は検証で拒否します。サポートするインタプリタ部分集合の実行条件違反は定義済み trap です。既存 lowering との互換性のためパーサー・検証器は legacy `undef` を保存しますが、インタプリタは明示的に拒否します。未初期化領域を 0 に置き換えず、初期化追跡は未完成です。builder エラーは実行 trap とは別です。
+不正なIRは検証エラーです。検証器はlegacy `undef`を拒否するのでASTから再生成してください。初期化なしの宣言にはformat 4の`uninit`と実際の読取り検査を使用し、0や任意値には置換しません。実行条件違反はIR位置付きの定義されたtrapです。
 
 現在の `InterpreterTrap` は理由、実行段階数、`ExecutionSite` を返します。位置は関数 ID、ブロック ID、0 始まりの命令インデックス、任意の結果値 ID です。terminator は命令列の直後のインデックスです。CLI は入力ファイルも表示します。typed IR にソース span はまだなく、これはソース行番号ではなく IR 位置です。trap はエラーを返して後続実行を停止し、ライブラリはホストプロセスを終了しません。
 
@@ -210,17 +210,17 @@ ASTとtypedIRはそれぞれのformatversionと共通semanticsversion読む方�
 
 整数はビット幅・signedness・文字列数で渡します。浮動小数点定数は幅と正確なビット列で渡されます。テキストIRのround-tripは、名前・ID・タイプ・定数・順序・属性・メタデータを保存する必要があります。スペースとコメントの配置は保存対象ではありません。
 
-以下の AST JSON 契約と typed IR format 3 の読み取り・検証・往復出力を利用できます。
+以下の AST JSON 契約と typed IR format 4 の読み取り・検証・往復出力を利用できます。
 
 ### 出力される識別子と引用符付きの名前
 
-typed IR format 3 は関数を `@fN`、グローバルを `@gN`、値を `%vN`、ブロックを `%bN` で出力します。関数・グローバル ID はモジュールに、値・ブロック ID は所属する関数に属します。番号に空きがあっても指定された ID を保存します。引用符付きの名前は説明用であり、参照の解決には使いません。関数はブロックの保存順序とは独立に `entry %bN` を明示します。
+typed IR format 4 は関数を `@fN`、グローバルを `@gN`、値を `%vN`、ブロックを `%bN` で出力します。関数・グローバル ID はモジュールに、値・ブロック ID は所属する関数に属します。番号に空きがあっても指定された ID を保存します。引用符付きの名前は説明用であり、参照の解決には使いません。関数はブロックの保存順序とは独立に `entry %bN` を明示します。
 
 次の完全なモジュールは Rust IR API で検証して出力しました。両方の分岐ブロックは `"branch"` という名前ですが、ID が定義と phi 入力を区別します。
 
 ```text
 module {
-  format_version 3
+  format_version 4
   semantics_version 1
   target "x86_64-whale-linux"
   datalayout { ptr=64, endian=little }
@@ -252,7 +252,7 @@ module {
 "line\ncolumn\tquote\"slash\\한글"
 ```
 
-format 2 の出力は明示的な ID、パラメータ ID、引用符付きの名前、入口参照へ手動で移行してください。読み取りは format 3 と semantics version 1 のみ対応し、format 2 を自動変換しません。AST JSON format 2 は別の契約です。
+読取りはtyped IR format 3・4とsemantics version 1に対応し、出力は常にformat 4です。`uninit`はformat 4でのみ使用できます。既存の有効なformat 3命令は読めますが、legacy `undef`は両形式で検証エラーとなりASTから再生成が必要です。format 2のテキストは明示ID・引用名・入口参照への手動移行が必要です。AST JSONは独立したformat 2です。
 
 ### テキスト IR の読み取りと検証
 
@@ -284,13 +284,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let canonical = print_module(&module);
     let reread = parse_module_with_limits(&canonical, limits)?;
     assert_eq!(print_module(&reread), canonical);
-    let invalid = source.replacen("format_version 3", "format_version 99", 1);
+    let invalid = source.replacen("format_version 4", "format_version 99", 1);
     assert!(parse_module_with_limits(&invalid, limits).is_err());
     Ok(())
 }
 ```
 
-`verify_module_with_limits`、`ConstExpr::evaluate_with_limits`、`validate_signature_with_limits`、`ModuleBuilder::declare_function_with_limits` にも制限を渡せます。型は再帰的 clone・比較・診断の前に反復走査し、定数式は作業スタックで評価します。借用した Rust の木の所有権と Drop は呼び出し側にあります。任意の未検証の木の clone/Drop は再帰的なままですが、checked 宣言 API が所有する拒否された署名は反復的に解放します。既存 lowering との互換性のため legacy `undef` を保存します。初期化追跡、メモリアクセス検査、ポインタメタデータ、native 実行は別の未完成機能です。
+`verify_module_with_limits`、`ConstExpr::evaluate_with_limits`、`validate_signature_with_limits`、`ModuleBuilder::declare_function_with_limits` にも制限を渡せます。型は再帰的 clone・比較・診断の前に反復走査し、定数式は作業スタックで評価します。借用した Rust の木の所有権と Drop は呼び出し側にあります。任意の未検証の木の clone/Drop は再帰的なままですが、checked 宣言 API が所有する拒否された署名は反復的に解放します。 不正なIRは検証エラーです。検証器はlegacy `undef`を拒否するのでASTから再生成してください。初期化なしの宣言にはformat 4の`uninit`と実際の読取り検査を使用し、0や任意値には置換しません。実行条件違反はIR位置付きの定義されたtrapです。
 
 ### バージョンが指定された AST JSON
 
@@ -342,7 +342,7 @@ cargo run --locked --features socket-cli -- ir lower program.json
 
 ```text
 module {
-  format_version 3
+  format_version 4
   semantics_version 1
   target "x86_64-whale-linux"
   datalayout { ptr=64, endian=little }
@@ -396,7 +396,7 @@ Failed to parse socket JSON: unsupported AST format_version 99; expected 2
 
 ## スカラー整数インタプリタ
 
-デフォルトビルドは整数・Bool 引数と整数・Bool または void 戻り値を持つ検証済み Whale 呼出規約の関数を実行します。定数と定数宣言、mov、整数演算・比較・cast、checked ペアと extract、select、phi、分岐、switch、return、trap_if、trap をサポートします。メモリ、float、呼出し、アドレス、一般 aggregate、legacy `undef` の実行は未対応です。モジュール全体を先に検証し、選択した関数は到達不能なブロックもこの部分集合に属する必要があります。他の関数は検証だけが必要です。メモリを使う Wave lowering の例はまだ実行できません。
+標準インタープリタは整数・Bool、制御フロー、スタック割り当て、データポインタの保存と読取り、typed GEP、memcpy・memsetを実行します。checked ペアの読取りではパディングを除外します。アドレスは合成64ビット値で、ホストメモリを参照しません。引数と戻り値は整数・Boolまたはvoidに限定され、float、呼出し、関数ポインタ、一般aggregate値、グローバルアドレス、native実行は未対応です。割り当ては関数のreturnまで有効です。字句スコープの寿命終了、呼出し・returnでのポインタ転送、外部メモリアダプタ、native shadow metadataは今後の実装です。
 
 `InterpreterOptions::max_steps` の既定値は 1,000,000 です。phi を含む実行命令と terminator はそれぞれ一段階を消費します。0 なら最初の操作の前に停止し、無限分岐ループは `InterpreterError::StepLimit` を返します。`ir_limits` は検証量を別に制限します。未使用の算術も実行され trap し得ます。checked overflow は Bool 結果であり、明示的 trap_if がある場合だけ trap になります。
 
@@ -404,7 +404,7 @@ Failed to parse socket JSON: unsupported AST format_version 99; expected 2
 
 ```text
 module {
-  format_version 3
+  format_version 4
   semantics_version 1
   target "x86_64-whale-linux"
   datalayout { ptr=64, endian=little }

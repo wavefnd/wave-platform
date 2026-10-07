@@ -43,7 +43,7 @@ Der Drucker gibt IR aus:
 
 ```text
 module {
-  format_version 3
+  format_version 4
   semantics_version 1
   target "x86_64-whale-linux"
   datalayout { ptr=64, endian=little }
@@ -126,7 +126,7 @@ fn main() {
 
 ```text
 module {
-  format_version 3
+  format_version 4
   semantics_version 1
   target "x86_64-whale-linux"
   datalayout { ptr=64, endian=little }
@@ -198,7 +198,7 @@ Select wählt einen der bereits berechneten Werte aus. Die Berechnung beider Ein
 
 ## Verifizierungsabteilung trap
 
-Fehlerhafte IR wird bei der Prüfung abgelehnt. Verletzungen von Ausführungsbedingungen im unterstützten Teilumfang liefern definierte traps. Parser und Prüfer erhalten legacy `undef` für bestehendes lowering, der Interpreter lehnt es ausdrücklich ab; uninitialisierter Speicher wird nicht zu null. Initialisierungsverfolgung bleibt offen. Builder-Fehler sind von Ausführungs-traps getrennt.
+Ungültige IR ist ein Prüfungsfehler. Der Prüfer lehnt legacy `undef` ab; erzeugen Sie die IR erneut aus AST. Deklarationen ohne Initialisierung verwenden format 4 `uninit` und geprüfte tatsächliche Lesezugriffe, ohne Null- oder beliebige Ersatzwerte. Laufzeitverletzungen erzeugen definierte Traps mit IR-Position.
 
 `InterpreterTrap` meldet Grund, ausgeführte Schritte und `ExecutionSite`: Funktions-ID, Block-ID, Anweisungsindex ab null und optionale Ergebniswert-ID. Der terminator folgt den Anweisungen. Die CLI nennt auch die Eingabedatei. Typed IR trägt noch keine Quell-spans; dies sind IR-Positionen, keine Quellzeilennummern. Ein trap liefert einen Fehler und stoppt nachfolgende Ausführung; die Bibliothek beendet nicht den Hostprozess.
 
@@ -210,17 +210,17 @@ AST und typed IR verwenden das entsprechende format version und das gemeinsame s
 
 Ganzzahlen werden als Bitbreite·signedness·String-Zahlen übergeben. Gleitkommakonstanten werden als Breite und genaue Bitfolge übergeben. Der Text round-trip in IR muss den Namen·ID·Typ·Konstante·Sequenz·Eigenschaft·Metadaten beibehalten. Leerzeichen und Kommentarplatzierung unterliegen nicht der Aufbewahrung.
 
-Der folgende AST-JSON-Vertrag sowie Lesen, Prüfen und Round-trip-Ausgabe von typed IR format 3 sind verfügbar.
+Der folgende AST-JSON-Vertrag sowie Lesen, Prüfen und Round-trip-Ausgabe von typed IR format 4 sind verfügbar.
 
 ### Ausgegebene Identitäten und Namen in Anführungszeichen
 
-Typed IR format 3 gibt Funktionen als `@fN`, globale Werte als `@gN`, Werte als `%vN` und Blöcke als `%bN` aus. Funktions- und globale IDs gehören zum Modul; Wert- und Block-IDs zur jeweiligen Funktion. Vorgegebene IDs bleiben einschließlich Nummernlücken erhalten. Namen in Anführungszeichen dienen der Beschreibung, nicht der Referenzauflösung. Jede Funktion nennt ausdrücklich `entry %bN`, unabhängig von der Speicherreihenfolge ihrer Blöcke.
+Typed IR format 4 gibt Funktionen als `@fN`, globale Werte als `@gN`, Werte als `%vN` und Blöcke als `%bN` aus. Funktions- und globale IDs gehören zum Modul; Wert- und Block-IDs zur jeweiligen Funktion. Vorgegebene IDs bleiben einschließlich Nummernlücken erhalten. Namen in Anführungszeichen dienen der Beschreibung, nicht der Referenzauflösung. Jede Funktion nennt ausdrücklich `entry %bN`, unabhängig von der Speicherreihenfolge ihrer Blöcke.
 
 Dieses vollständige Modul wurde über die Rust-IR-API geprüft und ausgegeben. Beide Verzweigungsblöcke heißen `"branch"`; ihre IDs unterscheiden Definitionen und phi-Eingaben.
 
 ```text
 module {
-  format_version 3
+  format_version 4
   semantics_version 1
   target "x86_64-whale-linux"
   datalayout { ptr=64, endian=little }
@@ -252,7 +252,7 @@ Alle Namen und Zeichenketten stehen in doppelten Anführungszeichen: Ziel, Funkt
 "line\ncolumn\tquote\"slash\\한글"
 ```
 
-Format-2-Ausgaben müssen manuell auf ausdrückliche IDs, Parameter-IDs, zitierte Namen und eine Eintrittsreferenz umgestellt werden. Der Leser akzeptiert nur format 3 mit semantics version 1 und konvertiert format 2 nicht automatisch. AST JSON format 2 hat einen eigenen Vertrag.
+Der Leser akzeptiert typed IR formats 3 und 4 mit semantics version 1 und schreibt immer format 4. `uninit` erfordert format 4. Gültige bisherige format-3-Anweisungen bleiben lesbar; legacy `undef` ist in beiden Formaten ein Prüfungsfehler und muss aus AST neu erzeugt werden. Format-2-Text benötigt manuelle Migration zu expliziten IDs, zitierten Namen und Eintrittsreferenzen. AST JSON hat sein separates format 2.
 
 ### Text-IR lesen und prüfen
 
@@ -284,13 +284,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let canonical = print_module(&module);
     let reread = parse_module_with_limits(&canonical, limits)?;
     assert_eq!(print_module(&reread), canonical);
-    let invalid = source.replacen("format_version 3", "format_version 99", 1);
+    let invalid = source.replacen("format_version 4", "format_version 99", 1);
     assert!(parse_module_with_limits(&invalid, limits).is_err());
     Ok(())
 }
 ```
 
-Limits gelten auch für `verify_module_with_limits`, `ConstExpr::evaluate_with_limits`, `validate_signature_with_limits` und `ModuleBuilder::declare_function_with_limits`. Iterative Typprüfung erfolgt vor rekursivem clone, Vergleich und Diagnose; Konstanten werden mit einem Arbeitsstack ausgewertet. Geliehene Rust-Bäume samt Drop bleiben beim Aufrufer. Beliebige ungeprüfte Bäume haben weiterhin rekursives clone/Drop; die von der checked-Deklarations-API besessene abgelehnte Signatur wird iterativ freigegeben. Legacy `undef` bleibt für bestehendes lowering erhalten. Initialisierungsverfolgung, Speicherzugriffsprüfungen, Zeigermetadaten und native Ausführung sind getrennte offene Funktionen.
+Limits gelten auch für `verify_module_with_limits`, `ConstExpr::evaluate_with_limits`, `validate_signature_with_limits` und `ModuleBuilder::declare_function_with_limits`. Iterative Typprüfung erfolgt vor rekursivem clone, Vergleich und Diagnose; Konstanten werden mit einem Arbeitsstack ausgewertet. Geliehene Rust-Bäume samt Drop bleiben beim Aufrufer. Beliebige ungeprüfte Bäume haben weiterhin rekursives clone/Drop; die von der checked-Deklarations-API besessene abgelehnte Signatur wird iterativ freigegeben. Ungültige IR ist ein Prüfungsfehler. Der Prüfer lehnt legacy `undef` ab; erzeugen Sie die IR erneut aus AST. Deklarationen ohne Initialisierung verwenden format 4 `uninit` und geprüfte tatsächliche Lesezugriffe, ohne Null- oder beliebige Ersatzwerte. Laufzeitverletzungen erzeugen definierte Traps mit IR-Position.
 
 ### Angegebene Version AST JSON
 
@@ -342,7 +342,7 @@ cargo run --locked --features socket-cli -- ir lower program.json
 
 ```text
 module {
-  format_version 3
+  format_version 4
   semantics_version 1
   target "x86_64-whale-linux"
   datalayout { ptr=64, endian=little }
@@ -364,7 +364,7 @@ Die Ganzzahl `value` ist eine Dezimalzeichenfolge. Signed Eine Zahl wird nach de
 
 [Das vollständige JSON Schema](https://github.com/wavefnd/Whale/blob/master/ir/schema/ast-v2.schema.json) spezifiziert Formen, erforderliche Felder und Varianten. Zusätzlich kommen Bereichs-/Typprüfungen und die Erkennung doppelter Schlüssel zum Einsatz. Die Teilmenge der Skalarreduzierung umfasst Literale, Variablen/Konstanten, Add/Sub/Mul, Vergleiche, Zuweisungen, If/While, Return und Break/Continue. Funktionsreferenzen, direkte Aufrufe und indirekte Aufrufe werden unterstützt; Aggregatausdrücke werden nicht unterstützt. `Opaque` ist im Schema darstellbar, wird jedoch durch Absenken nicht unterstützt.
 
-Für die Migration wird das alte nackte Program in einen Envelope eingebettet; JSON-Zahlen werden durch dezimale Ganzzahlzeichenketten oder Gleitkommabitzeichenketten ersetzt. Eingaben ohne Version werden abgelehnt. Format 1 muss auf Format 2 umgestellt werden: `program.declarations` (bei Nichtverwendung ein leeres Array) und ausdrückliche `convention`/`linkage` an Definitionen ergänzen. Die Versionen sind unabhängig: AST format 2, typed IR format 3 und semantics version 1.
+Für die Migration wird das alte nackte Program in einen Envelope eingebettet; JSON-Zahlen werden durch dezimale Ganzzahlzeichenketten oder Gleitkommabitzeichenketten ersetzt. Eingaben ohne Version werden abgelehnt. Format 1 muss auf Format 2 umgestellt werden: `program.declarations` (bei Nichtverwendung ein leeres Array) und ausdrückliche `convention`/`linkage` an Definitionen ergänzen. Die Versionen sind unabhängig: AST format 2, typed IR format 4 und semantics version 1.
 
 ### Abgelehnte Eingabe und CLI Wiederherstellung
 
@@ -396,7 +396,7 @@ Der Befehl wird mit einem Status ungleich Null beendet und erstellt keine neue A
 
 ## Interpreter für skalare Ganzzahlen
 
-Der Standardbuild führt verifizierte Funktionen mit Whale-Konvention, Ganzzahl-/Bool-Parametern und Ganzzahl-/Bool- oder void-Rückgabe aus. Unterstützt sind Konstanten und Konstantendeklarationen, mov, Ganzzahlarithmetik und Vergleiche, Ganzzahl-casts, checked-Paare und extract, select, phi, Verzweigungen, switch, return, trap_if und trap. Speicher, float, Aufrufe, Adressen, allgemeine Aggregate und legacy `undef` sind nicht ausführbar. Zuerst wird das gesamte Modul geprüft; alle Blöcke der gewählten Funktion, auch unerreichbare, müssen zum Teilumfang gehören. Andere Funktionen müssen nur die Prüfung bestehen. Wave-lowering-Beispiele mit Speicher sind noch nicht ausführbar.
+Der Standardinterpreter führt Ganzzahlen/Bool, Kontrollfluss, Stapelzuweisungen, Datenzeigerspeicherung und -lesen, typed GEP, memcpy und memset aus. Beim Lesen von checked-Paaren wird Padding ausgeschlossen. Adressen sind synthetische 64-Bit-Werte ohne Zugriff auf Hostspeicher. Argumente und Rückgaben bleiben Ganzzahlen/Bool oder void; float, Aufrufe, Funktionszeiger, allgemeine Aggregatwerte, globale Adressen und native Ausführung fehlen. Stapelzuweisungen leben bis zur Rückgabe. Lexikalisches Lebensdauerende, Zeigerübergabe bei Aufrufen/Rückgaben, Fremdspeicheradapter und native shadow metadata müssen noch implementiert werden.
 
 `InterpreterOptions::max_steps` ist standardmäßig 1,000,000. Jede ausgeführte Anweisung einschließlich phi und jeder terminator verbraucht einen Schritt. Null stoppt vor der ersten Operation; eine Endlosschleife gibt `InterpreterError::StepLimit` zurück. `ir_limits` begrenzt die Prüfung separat. Auch ungenutzte Arithmetik wird ausgeführt und kann trap auslösen. checked overflow liefert Bool; erst ein explizites trap_if löst einen trap aus.
 
@@ -404,7 +404,7 @@ Speichern Sie dieses vollständige Modul als `swap-loop.wir`. Der Einstieg ist e
 
 ```text
 module {
-  format_version 3
+  format_version 4
   semantics_version 1
   target "x86_64-whale-linux"
   datalayout { ptr=64, endian=little }

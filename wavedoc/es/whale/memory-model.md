@@ -33,7 +33,7 @@ El siguiente módulo se configuró como builder y pasó el verificador. `store` 
 
 ```text
 module {
-  format_version 3
+  format_version 4
   semantics_version 1
   target "x86_64-whale-linux"
   datalayout { ptr=64, endian=little }
@@ -52,7 +52,7 @@ module {
 }
 ```
 
-`alloca` crea i32 almacenamiento, `store` escribe 42 y `load` define el valor a devolver. Esto es una salida de la impresora IR escrita, no un seguimiento de ejecución nativo. Una alineación de 3 es un error de validación. Eliminar el almacén requeriría una captura de lectura no inicializada en este modelo de memoria, pero el seguimiento de inicialización y las comprobaciones de captura de tiempo de ejecución correspondientes aún no se han implementado. Pasar el verificador actual por sí solo no establece que esta lectura sea segura.
+Guarde este módulo completo como `initialized.wir`; al ejecutarlo imprime `i32 42`. Quitar store provoca un trap por lectura no inicializada en load. Alineación 3 es un error de verificación. Los ceros físicos de alloca no establecen inicialización.
 
 ## Comparación con la aritmética de punteros
 
@@ -127,3 +127,79 @@ Una cadena es una cadena inmutable de bytes con una longitud especificada. La co
 Por lo tanto, la longitud de la cadena de bytes que consta de `A`, NUL y `B` es 3. No se puede utilizar para conversiones de cadenas C explícitas, que rechazan el NUL interno. La interfaz no debería truncar esto silenciosamente a `A`.
 
 Externo C·Dirección sin formato·El ensamblaje en línea es un límite de contrato separado. No se garantiza que la inspección en tiempo de ejecución de la memoria de seguimiento detecte todos los comportamientos incorrectos en el código externo.
+
+## Ejecución de memoria de pila rastreada
+
+El intérprete predeterminado ejecuta enteros/Bool, control de flujo, asignaciones de pila, almacenamiento y lectura de punteros de datos, typed GEP, memcpy y memset. Las lecturas de pares checked excluyen el relleno. Las direcciones son valores sintéticos de 64 bits, sin desreferenciar memoria del anfitrión. Los argumentos y retornos siguen limitados a enteros/Bool o void; float, llamadas, punteros de función, valores agregados generales, direcciones globales y ejecución native no están soportados. La pila vive hasta el retorno. El fin de vida léxico, la transferencia de punteros en llamadas/retornos, adaptadores de memoria externa y native shadow metadata requieren implementación posterior.
+
+`--max-memory` fija el presupuesto de bytes lógicos asignados, por defecto 64 MiB. `InterpreterOptions::memory_limits` también limita a 16384 asignaciones, 262144 fragmentos de metadatos de bytes de puntero y 256 Mi unidades de trabajo de bytes/metadatos. Superar un límite devuelve `MemoryLimit` con ubicación IR, separado de un trap del programa. La verificación rechaza además el overflow de tamaños de almacenamiento conocidos del destino antes de ejecutar.
+
+```shell
+whale ir run initialized.wir --function @f0
+```
+
+```text
+i32 42
+```
+
+## Copias de bytes y reinicio de inicialización
+
+Guarde el siguiente módulo completo como `tracked-memory.wir`. @f0 copia bytes del puntero y sus metadatos separados, y lee 42. En @f1, uninit marca el rango de almacenamiento del tipo como no inicializado y borra metadatos de punteros sin cambiar los bytes existentes. memcpy puede copiar bytes no inicializados; la lectura posterior del destino comprueba su estado. Copias parciales conservan autoridad solo al reunir los ocho fragmentos coherentes. Escribir bits idénticos con enteros o memset no recupera autoridad.
+
+memcpy/memset de longitud cero tienen éxito sin acceso ni comprobación de alineación, incluso con null y one-past. memcpy no vacío con solapamiento provoca trap. memset inicializa los bytes escritos y borra sus metadatos de punteros. Bool debe almacenarse como 0 o 1; leer otra representación provoca trap.
+
+```text
+module {
+  format_version 4
+  semantics_version 1
+  target "x86_64-whale-linux"
+  datalayout { ptr=64, endian=little }
+
+  declare @f0 "copied_pointer": whale () -> u32, linkage internal
+  declare @f1 "uninitialized": whale () -> u32, linkage internal
+
+  fn @f0 "copied_pointer"() -> u32, entry %b0 {
+  %b0 "entry":
+    %v0: ptr<u32> = alloca u32, align 4
+    %v1: u32 = const u32 42
+    store u32 %v1, ptr<u32> %v0, align 4
+    %v2: ptr<ptr<u32>> = alloca ptr<u32>, align 8
+    %v3: ptr<ptr<u32>> = alloca ptr<u32>, align 8
+    store ptr<u32> %v0, ptr<ptr<u32>> %v2, align 8
+    %v4: ptr<u8> = bitcast ptr<ptr<u32>> %v2 to ptr<u8>
+    %v5: ptr<u8> = bitcast ptr<ptr<u32>> %v3 to ptr<u8>
+    %v6: u64 = const u64 8
+    memcpy ptr<u8> %v5, ptr<u8> %v4, u64 %v6, align 8
+    %v7: ptr<u32> = load ptr<u32>, ptr<ptr<u32>> %v3, align 8
+    %v8: u32 = load u32, ptr<u32> %v7, align 4
+    ret u32 %v8
+  }
+
+  fn @f1 "uninitialized"() -> u32, entry %b0 {
+  %b0 "entry":
+    %v0: ptr<u32> = alloca u32, align 4
+    uninit u32, ptr<u32> %v0, align 4
+    %v1: u32 = load u32, ptr<u32> %v0, align 4
+    ret u32 %v1
+  }
+
+}
+```
+
+```shell
+whale ir run tracked-memory.wir --function @f0
+whale ir run tracked-memory.wir --function @f1
+```
+
+```text
+u32 42
+Error: tracked-memory.wir: trap at @f1 %b0 instruction 2 (%v1): uninitialized byte at allocation offset 0 (after 3 steps)
+```
+
+## Obligaciones de verificación, lowering y ejecución
+
+| Etapa | Obligación |
+| --- | --- |
+| Verifier | Comprobar operandos/tipos de puntero, forma de alineación y tamaños del destino; rechazar undef. |
+| O0 lowering | Mantener uninit en la declaración ejecutada, almacenar inicializadores y conservar lecturas. |
+| Runtime | Comprobar identidad, generación/vida, rango, permisos, alineación, overflow de dirección e inicialización; transferir el estado copiado. |

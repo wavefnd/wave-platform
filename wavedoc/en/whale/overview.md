@@ -43,9 +43,9 @@ The reference document defines the semantic rules for Whale. Available features 
 | --- | --- | --- |
 |assembler|Create ELF64 relocatable object from assembly AMD64|Incomplete coverage of commands and directives|
 |object library|Object composition, payload without BSS, target validation, AMD64 ELF64 serialization and selectable Wave record implementation to check size.|Relocatable objects are not executables|
-| IR | Construction, printing, signature-checked direct/indirect calls, versioned AST lowering, target validation and checked type layouts | AST format 2 / typed IR format 3, bit-exact constants and text parsing, verification and round trips are available; machine call emission remains unavailable |
+| IR | Construction, printing, signature-checked direct/indirect calls, versioned AST lowering, target validation and checked type layouts | AST format 2 / typed IR format 4, bit-exact constants and text parsing, verification and round trips are available; machine call emission remains unavailable |
 |linker|Symbol interpretation, input target verification, file/memory section placement inspection|Applying full relocation and outputting executable files are not supported.|
-|Running and Debugging| Scalar integer/bool execution and bounded loops | Memory, float, calls, native code generation and DWARF remain unavailable |
+| Running and debugging | Integer/Bool, control flow, tracked stack memory and initialization checks | Float, calls, global addresses, native code generation and DWARF remain unsupported |
 
 Rules prohibiting undefined behavior apply to verified IR and trace memories. The experimental implementation does not yet implement all of the runtime checks in the memory/execution reference documentation.
 

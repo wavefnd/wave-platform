@@ -43,7 +43,7 @@ fn main() {
 
 ```text
 module {
-  format_version 3
+  format_version 4
   semantics_version 1
   target "x86_64-whale-linux"
   datalayout { ptr=64, endian=little }
@@ -126,7 +126,7 @@ fn main() {
 
 ```text
 module {
-  format_version 3
+  format_version 4
   semantics_version 1
   target "x86_64-whale-linux"
   datalayout { ptr=64, endian=little }
@@ -198,7 +198,7 @@ Select 选择已计算的值之一。它不会忽略任一输入的计算。例�
 
 ## 验证部trap
 
-非法 IR 在验证阶段拒绝。解释器支持子集中的执行条件违规会产生定义好的 trap。为兼容现有 lowering，解析器和验证器仍保留 legacy `undef`，但解释器显式拒绝它；不会把未初始化存储变成 0。初始化跟踪尚未完成。builder 错误与执行 trap 分开处理。
+错误IR是验证错误。验证器拒绝legacy `undef`，应从AST重新生成。未初始化声明使用format 4的`uninit`和实际读取检查，不替换为零或任意值。运行条件违反产生带IR位置的已定义trap。
 
 当前 `InterpreterTrap` 报告原因、已执行步数与 `ExecutionSite`：函数 ID、块 ID、从 0 开始的指令索引及可选结果值 ID。terminator 的索引紧接指令序列。CLI 诊断还显示输入文件。typed IR 尚无源码 span，因此这是 IR 位置而非源码行号。trap 返回错误并停止后续执行；库不会终止宿主进程。
 
@@ -210,17 +210,17 @@ AST 和 typed IR 使用各自的 format version 和通用 semantics version。�
 
 整数作为位宽·signedness·字符串数字传递。浮点常量作为宽度和精确位字符串传递。 IR 中的文本round-trip 必须保留名称·ID·类型·常量·序列·属性·元数据。空格和评论位置不受保留。
 
-可以使用下面的 AST JSON 契约以及 typed IR format 3 的读取、验证和往返打印。
+可以使用下面的 AST JSON 契约以及 typed IR format 4 的读取、验证和往返打印。
 
 ### 输出标识符与带引号的名称
 
-typed IR format 3 用 `@fN` 表示函数、`@gN` 表示全局变量、`%vN` 表示值、`%bN` 表示基本块。函数和全局 ID 属于模块；值和基本块 ID 属于所在函数。即使编号不连续，也保留提供的 ID。带引号的名称只是说明，不用于解析引用。函数明确记录 `entry %bN`，不依赖基本块的存储顺序。
+typed IR format 4 用 `@fN` 表示函数、`@gN` 表示全局变量、`%vN` 表示值、`%bN` 表示基本块。函数和全局 ID 属于模块；值和基本块 ID 属于所在函数。即使编号不连续，也保留提供的 ID。带引号的名称只是说明，不用于解析引用。函数明确记录 `entry %bN`，不依赖基本块的存储顺序。
 
 以下完整模块通过 Rust IR API 验证并输出。两个分支块都叫 `"branch"`，但 ID 可以区分定义和 phi 输入。
 
 ```text
 module {
-  format_version 3
+  format_version 4
   semantics_version 1
   target "x86_64-whale-linux"
   datalayout { ptr=64, endian=little }
@@ -252,7 +252,7 @@ module {
 "line\ncolumn\tquote\"slash\\한글"
 ```
 
-format 2 输出必须手动迁移为显式 ID、参数 ID、带引号的名称和入口引用。读取器只接受 format 3 和 semantics version 1，不会自动转换 format 2。AST JSON format 2 是独立契约。
+读取器接受typed IR format 3和4、semantics version 1，并始终输出format 4。`uninit`只允许在format 4中使用。原有有效format 3指令仍可读取，但legacy `undef`在两种格式中都是验证错误，必须从AST重新生成。format 2文本需要手动迁移为显式ID、带引号名称和入口引用。AST JSON使用独立的format 2。
 
 ### 读取并验证文本 IR
 
@@ -284,13 +284,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let canonical = print_module(&module);
     let reread = parse_module_with_limits(&canonical, limits)?;
     assert_eq!(print_module(&reread), canonical);
-    let invalid = source.replacen("format_version 3", "format_version 99", 1);
+    let invalid = source.replacen("format_version 4", "format_version 99", 1);
     assert!(parse_module_with_limits(&invalid, limits).is_err());
     Ok(())
 }
 ```
 
-还可向 `verify_module_with_limits`、`ConstExpr::evaluate_with_limits`、`validate_signature_with_limits` 和 `ModuleBuilder::declare_function_with_limits` 传入限制。在递归 clone、比较和诊断之前迭代遍历类型；常量表达式用工作栈求值。借用的 Rust 树及其 Drop 仍由调用者管理。任意未验证树的 clone/Drop 仍是递归的；checked 声明 API 拒绝的自有签名会迭代释放。为兼容现有 lowering，读取器保留 legacy `undef`。初始化跟踪、内存访问检查、指针元数据和 native 执行仍是单独的未完成能力。
+还可向 `verify_module_with_limits`、`ConstExpr::evaluate_with_limits`、`validate_signature_with_limits` 和 `ModuleBuilder::declare_function_with_limits` 传入限制。在递归 clone、比较和诊断之前迭代遍历类型；常量表达式用工作栈求值。借用的 Rust 树及其 Drop 仍由调用者管理。任意未验证树的 clone/Drop 仍是递归的；checked 声明 API 拒绝的自有签名会迭代释放。 错误IR是验证错误。验证器拒绝legacy `undef`，应从AST重新生成。未初始化声明使用format 4的`uninit`和实际读取检查，不替换为零或任意值。运行条件违反产生带IR位置的已定义trap。
 
 ### 指定版本 AST JSON
 
@@ -342,7 +342,7 @@ cargo run --locked --features socket-cli -- ir lower program.json
 
 ```text
 module {
-  format_version 3
+  format_version 4
   semantics_version 1
   target "x86_64-whale-linux"
   datalayout { ptr=64, endian=little }
@@ -396,7 +396,7 @@ Failed to parse socket JSON: unsupported AST format_version 99; expected 2
 
 ## 标量整数解释器
 
-默认构建执行已验证的 Whale 调用约定函数，参数为整数或 Bool，返回整数、Bool 或 void。支持常量与常量声明、mov、整数运算与比较、整数 cast、checked 对与 extract、select、phi、分支、switch、return、trap_if 和 trap。不支持执行内存、float、调用、地址、一般 aggregate 和 legacy `undef`。先验证整个模块；所选函数的每个块，包括不可达块，都必须属于该子集。其他函数只需通过验证。目前还不能执行使用内存的 Wave lowering 示例。
+默认解释器执行整数、Bool、控制流、栈分配、数据指针存取、typed GEP、memcpy和memset。checked二元组读取不检查填充字节。地址是合成的64位值，不会解引用主机内存。参数和返回仍限于整数、Bool或void；float、调用、函数指针、通用聚合值、全局地址及native执行不受支持。栈分配保持有效直到函数返回。词法生命周期结束、调用和返回中的指针传递、外部内存适配器及native shadow metadata仍需实现。
 
 `InterpreterOptions::max_steps` 默认为 1,000,000。每条执行指令（包括 phi）与每个 terminator 各消耗一步。限制为 0 时在首个操作前停止；无限分支循环返回 `InterpreterError::StepLimit`。`ir_limits` 单独限制验证工作量。未使用的算术也会执行并可能 trap。checked overflow 是 Bool 结果，只有显式 trap_if 才使其 trap。
 
@@ -404,7 +404,7 @@ Failed to parse socket JSON: unsupported AST format_version 99; expected 2
 
 ```text
 module {
-  format_version 3
+  format_version 4
   semantics_version 1
   target "x86_64-whale-linux"
   datalayout { ptr=64, endian=little }

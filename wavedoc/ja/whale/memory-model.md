@@ -33,7 +33,7 @@ BSSの物理バイトが0であるという事実だけで、IR変数の初期�
 
 ```text
 module {
-  format_version 3
+  format_version 4
   semantics_version 1
   target "x86_64-whale-linux"
   datalayout { ptr=64, endian=little }
@@ -52,7 +52,7 @@ module {
 }
 ```
 
-`alloca` は i32 ストレージを作成し、`store` は 42 を書き込み、`load` は返す値を定義します。これは、ネイティブの実行トレースではなく、入力された IR プリンターからの出力です。アラインメント 3 は検証エラーです。ストアを削除するには、このメモリ モデルでは初期化されていない読み取りトラップが必要ですが、初期化追跡と対応するランタイム トラップ チェックはまだ実装されていません。現在のベリファイアを単独で渡すだけでは、この読み取りが安全であるとは証明されません。
+この完全なモジュールを `initialized.wir` に保存すると実行結果は `i32 42` です。storeを削除するとloadで未初期化trapが発生します。整列3は検証エラーです。allocaの物理的な0は初期化を意味しません。
 
 ## ポインタ算術との比較
 
@@ -127,3 +127,79 @@ standalone array placement alignment: 16
 したがって、`A`、NUL、`B`からなるバイト列の長さは3です。内部NULを拒否する明示的なC文字列変換には使用できません。フロントエンドはこれを静かに`A`に切ってはいけません。
 
 外部C・生アドレス・インラインアセンブリは別途契約境界です。トレースメモリのランタイムチェックが外部コードのすべての誤動作まで検出されることを保証するものではありません。
+
+## 追跡スタックメモリの実行
+
+標準インタープリタは整数・Bool、制御フロー、スタック割り当て、データポインタの保存と読取り、typed GEP、memcpy・memsetを実行します。checked ペアの読取りではパディングを除外します。アドレスは合成64ビット値で、ホストメモリを参照しません。引数と戻り値は整数・Boolまたはvoidに限定され、float、呼出し、関数ポインタ、一般aggregate値、グローバルアドレス、native実行は未対応です。割り当ては関数のreturnまで有効です。字句スコープの寿命終了、呼出し・returnでのポインタ転送、外部メモリアダプタ、native shadow metadataは今後の実装です。
+
+`--max-memory`は論理的な割り当てバイトの上限で、標準は64 MiBです。`InterpreterOptions::memory_limits`は割り当て数16384、ポインタのバイトメタデータ262144個、バイト・メタデータ処理256 Mi単位も制限します。超過はプログラムtrapとは別のIR位置付き`MemoryLimit`エラーです。検証器は出力ターゲットの既知の保存サイズoverflowも実行前に拒否します。
+
+```shell
+whale ir run initialized.wir --function @f0
+```
+
+```text
+i32 42
+```
+
+## バイトコピーと初期化のリセット
+
+次の完全なモジュールを `tracked-memory.wir` に保存してください。@f0はポインタのバイトと別のメタデータをコピーして42を読みます。@f1のuninitは型の保存範囲を未初期化にし、ポインタメタデータを消去しますが、既存のバイトは変更しません。memcpyは未初期化バイトもコピーでき、後の宛先読取りで状態を検査します。分割コピーは一貫した8バイト分のメタデータが揃った場合のみアクセス権限を保持します。整数やmemsetで同じビットを書いても権限は復元しません。
+
+長さ0のmemcpy・memsetはアクセスや整列を検査せず成功し、nullやone-pastも使用できます。空でない重複memcpyはtrapです。memsetは書いたバイトを初期化し、そのポインタメタデータを消去します。Boolの保存値は0または1で、他の表現の読取りはtrapです。
+
+```text
+module {
+  format_version 4
+  semantics_version 1
+  target "x86_64-whale-linux"
+  datalayout { ptr=64, endian=little }
+
+  declare @f0 "copied_pointer": whale () -> u32, linkage internal
+  declare @f1 "uninitialized": whale () -> u32, linkage internal
+
+  fn @f0 "copied_pointer"() -> u32, entry %b0 {
+  %b0 "entry":
+    %v0: ptr<u32> = alloca u32, align 4
+    %v1: u32 = const u32 42
+    store u32 %v1, ptr<u32> %v0, align 4
+    %v2: ptr<ptr<u32>> = alloca ptr<u32>, align 8
+    %v3: ptr<ptr<u32>> = alloca ptr<u32>, align 8
+    store ptr<u32> %v0, ptr<ptr<u32>> %v2, align 8
+    %v4: ptr<u8> = bitcast ptr<ptr<u32>> %v2 to ptr<u8>
+    %v5: ptr<u8> = bitcast ptr<ptr<u32>> %v3 to ptr<u8>
+    %v6: u64 = const u64 8
+    memcpy ptr<u8> %v5, ptr<u8> %v4, u64 %v6, align 8
+    %v7: ptr<u32> = load ptr<u32>, ptr<ptr<u32>> %v3, align 8
+    %v8: u32 = load u32, ptr<u32> %v7, align 4
+    ret u32 %v8
+  }
+
+  fn @f1 "uninitialized"() -> u32, entry %b0 {
+  %b0 "entry":
+    %v0: ptr<u32> = alloca u32, align 4
+    uninit u32, ptr<u32> %v0, align 4
+    %v1: u32 = load u32, ptr<u32> %v0, align 4
+    ret u32 %v1
+  }
+
+}
+```
+
+```shell
+whale ir run tracked-memory.wir --function @f0
+whale ir run tracked-memory.wir --function @f1
+```
+
+```text
+u32 42
+Error: tracked-memory.wir: trap at @f1 %b0 instruction 2 (%v1): uninitialized byte at allocation offset 0 (after 3 steps)
+```
+
+## 検証・lowering・実行の責任
+
+| 段階 | 責任 |
+| --- | --- |
+| Verifier | オペランド・ポインタ型、整列の形式、出力ターゲットの保存サイズを検査し、undefを拒否します。 |
+| O0 lowering | 実行される宣言位置にuninit、初期値にstoreを置き、読取りを保持します。 |
+| Runtime | 割り当てID・世代・寿命・境界・権限・整列・アドレスoverflow・初期化を検査し、コピー状態を渡します。 |

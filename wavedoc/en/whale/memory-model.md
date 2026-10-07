@@ -33,7 +33,7 @@ The following builder-produced module passes verification. Its `store` precedes 
 
 ```text
 module {
-  format_version 3
+  format_version 4
   semantics_version 1
   target "x86_64-whale-linux"
   datalayout { ptr=64, endian=little }
@@ -52,7 +52,7 @@ module {
 }
 ```
 
-`alloca` creates an i32 slot; `store` writes 42, and `load` defines the returned value. This is typed IR printer output, not a native execution transcript. Changing an alignment to 3 is a verification error. Removing the store would require an uninitialized-read trap under this model; initialization tracking and enforcement of that runtime trap are not yet available. Do not use acceptance by today's verifier as evidence that such a read is safe.
+Save this complete module as `initialized.wir`; execution prints `i32 42`. Removing store traps at load on uninitialized storage. Alignment 3 is a verification error. Physical zero bytes from alloca do not establish initialization.
 
 ## Pointer arithmetic and comparison
 
@@ -127,3 +127,79 @@ A string is an immutable byte sequence with an explicit length. UTF-8 is the def
 The three-byte sequence `A`, NUL, `B` therefore has length three. It cannot be passed through the explicit C-string conversion, which rejects embedded NUL. A frontend must not silently truncate it to `A`.
 
 External C, raw addresses, and inline assembly are separate contract boundaries. Runtime checking of tracked memory does not guarantee detection of every invalid action performed by external code.
+
+## Tracked stack memory execution
+
+The default interpreter executes integer/Bool values, control flow, stack allocations, data-pointer storage and loads, typed GEP, memcpy and memset. Checked-pair reads exclude padding. Addresses are synthetic 64-bit values, never host-memory dereferences. Function arguments and returns remain integer/Bool or void; float, calls, function pointers, general aggregate values, global addresses and native execution are unsupported. Stack allocations live until function return. Lexical lifetime-end operations, pointer transfer through calls/returns, foreign-memory adapters and native shadow metadata require further implementation.
+
+`--max-memory` sets the logical allocation-byte budget, default 64 MiB. `InterpreterOptions::memory_limits` also limits allocation count to 16384, pointer-byte metadata to 262144 fragments, and byte/metadata work to 256 Mi units. Exceeding a budget returns an IR-located `MemoryLimit` error, separately from a program trap. Verification also rejects known output-target storage-size overflow before execution.
+
+```shell
+whale ir run initialized.wir --function @f0
+```
+
+```text
+i32 42
+```
+
+## Byte copies and initialization reset
+
+Save the following complete module as `tracked-memory.wir`. @f0 copies pointer bytes and separate metadata, then reads 42. In @f1, uninit marks the type storage range uninitialized and clears pointer metadata without changing existing bytes. memcpy can copy uninitialized bytes; a later destination value read checks their state. Split pointer copies preserve authority only when all eight consistent byte metadata fragments are present. Writing identical bits with integers or memset does not recover authority.
+
+Zero-length memcpy/memset succeeds without access or alignment checks, including null and one-past pointers. Nonempty overlapping memcpy traps. memset initializes written bytes and clears their pointer metadata. Bool storage must be 0 or 1; reading another representation traps.
+
+```text
+module {
+  format_version 4
+  semantics_version 1
+  target "x86_64-whale-linux"
+  datalayout { ptr=64, endian=little }
+
+  declare @f0 "copied_pointer": whale () -> u32, linkage internal
+  declare @f1 "uninitialized": whale () -> u32, linkage internal
+
+  fn @f0 "copied_pointer"() -> u32, entry %b0 {
+  %b0 "entry":
+    %v0: ptr<u32> = alloca u32, align 4
+    %v1: u32 = const u32 42
+    store u32 %v1, ptr<u32> %v0, align 4
+    %v2: ptr<ptr<u32>> = alloca ptr<u32>, align 8
+    %v3: ptr<ptr<u32>> = alloca ptr<u32>, align 8
+    store ptr<u32> %v0, ptr<ptr<u32>> %v2, align 8
+    %v4: ptr<u8> = bitcast ptr<ptr<u32>> %v2 to ptr<u8>
+    %v5: ptr<u8> = bitcast ptr<ptr<u32>> %v3 to ptr<u8>
+    %v6: u64 = const u64 8
+    memcpy ptr<u8> %v5, ptr<u8> %v4, u64 %v6, align 8
+    %v7: ptr<u32> = load ptr<u32>, ptr<ptr<u32>> %v3, align 8
+    %v8: u32 = load u32, ptr<u32> %v7, align 4
+    ret u32 %v8
+  }
+
+  fn @f1 "uninitialized"() -> u32, entry %b0 {
+  %b0 "entry":
+    %v0: ptr<u32> = alloca u32, align 4
+    uninit u32, ptr<u32> %v0, align 4
+    %v1: u32 = load u32, ptr<u32> %v0, align 4
+    ret u32 %v1
+  }
+
+}
+```
+
+```shell
+whale ir run tracked-memory.wir --function @f0
+whale ir run tracked-memory.wir --function @f1
+```
+
+```text
+u32 42
+Error: tracked-memory.wir: trap at @f1 %b0 instruction 2 (%v1): uninitialized byte at allocation offset 0 (after 3 steps)
+```
+
+## Verification, lowering and execution obligations
+
+| Stage | Obligation |
+| --- | --- |
+| Verifier | Check operands/pointee types, alignment shape and output-target storage sizes; reject undef. |
+| O0 lowering | Keep uninit at the executed declaration, store initializers and preserve reads. |
+| Runtime | Check allocation identity, generation/lifetime, range, permissions, alignment, address overflow and initialization; transfer copy state. |

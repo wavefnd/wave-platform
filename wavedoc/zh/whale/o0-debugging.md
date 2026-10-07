@@ -50,7 +50,7 @@ return·break·continue之后的句子也保持在不连接的块中。由于此
 
 ```text
 module {
-  format_version 3
+  format_version 4
   semantics_version 1
   target "x86_64-whale-linux"
   datalayout { ptr=64, endian=little }
@@ -85,3 +85,48 @@ module {
 AMD64 配置文件保留帧指针，并且不使用 red zone。调用帧信息用于堆栈检查，并不意味着支持异常unwinding。 trap 终止执行而不保证析构函数或 unwinding。
 
 有关DWARF输出和native执行的可用性，请参阅[工具链概述](overview)。 O1 及以上优化的行为超出了本 O0 参考的范围。
+
+## 循环中的重复声明
+
+将这个完整模块保存为 `initialization-loop.wir`。即使第一次迭代存储42，第二次声明的uninit也会重置初始化状态，所以读取会trap。O0 lowering即使把alloca放在入口块，也将uninit保留在实际声明位置。执行的未使用读取仍进行检查；保留的不可达块不执行。
+
+```text
+module {
+  format_version 4
+  semantics_version 1
+  target "x86_64-whale-linux"
+  datalayout { ptr=64, endian=little }
+
+  declare @f0 "redeclaration": whale () -> u32, linkage internal
+
+  fn @f0 "redeclaration"() -> u32, entry %b0 {
+  %b0 "entry":
+    %v0: ptr<u32> = alloca u32, align 4
+    %v1: u32 = const u32 0
+    %v2: u32 = const u32 1
+    %v3: u32 = const u32 42
+    br label %b1
+  %b1 "declaration":
+    %v4: u32 = phi u32 [ %v1, %b0 ], [ %v6, %b2 ]
+    uninit u32, ptr<u32> %v0, align 4
+    %v5: bool = icmp eq u32 %v4, %v1
+    cbr bool %v5, label %b2, label %b3
+  %b2 "first_iteration":
+    store u32 %v3, ptr<u32> %v0, align 4
+    %v6: u32 = add u32 %v4, %v2
+    br label %b1
+  %b3 "second_iteration":
+    %v7: u32 = load u32, ptr<u32> %v0, align 4
+    ret u32 %v7
+  }
+
+}
+```
+
+```shell
+whale ir run initialization-loop.wir --function @f0
+```
+
+```text
+Error: initialization-loop.wir: trap at @f0 %b3 instruction 0 (%v7): uninitialized byte at allocation offset 0 (after 17 steps)
+```

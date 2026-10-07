@@ -43,7 +43,7 @@ Máy in xuất ra IR:
 
 ```text
 module {
-  format_version 3
+  format_version 4
   semantics_version 1
   target "x86_64-whale-linux"
   datalayout { ptr=64, endian=little }
@@ -126,7 +126,7 @@ fn main() {
 
 ```text
 module {
-  format_version 3
+  format_version 4
   semantics_version 1
   target "x86_64-whale-linux"
   datalayout { ptr=64, endian=little }
@@ -198,7 +198,7 @@ Select chọn một trong các giá trị đã được tính toán. Nó không 
 
 ## Phòng Kiểm định trap
 
-IR sai bị từ chối khi xác minh. Vi phạm điều kiện chạy trong tập con được hỗ trợ tạo trap đã định nghĩa. Bộ phân tích và xác minh vẫn giữ legacy `undef` để tương thích lowering, nhưng trình thông dịch từ chối tường minh; không biến vùng lưu trữ chưa khởi tạo thành số 0. Theo dõi khởi tạo chưa hoàn tất. Lỗi builder tách biệt với trap khi chạy.
+IR không hợp lệ là lỗi kiểm tra. Trình kiểm tra từ chối legacy `undef`; hãy tạo lại từ AST. Khai báo chưa khởi tạo dùng format 4 `uninit` và kiểm tra lần đọc thực tế, không thay bằng không hoặc giá trị tùy ý. Vi phạm điều kiện thực thi tạo trap xác định có vị trí IR.
 
 `InterpreterTrap` báo lý do, số bước đã chạy và `ExecutionSite`: ID hàm, ID khối, chỉ số lệnh từ 0 và ID giá trị kết quả tùy chọn. Chỉ số terminator nằm sau các lệnh. CLI cũng nêu tệp đầu vào. Typed IR chưa có span nguồn nên đây là vị trí IR, không phải số dòng nguồn. Trap trả lỗi và dừng chạy tiếp; thư viện không kết thúc tiến trình chủ.
 
@@ -210,17 +210,17 @@ AST và typed IR sử dụng format version tương ứng và semantics version 
 
 Các số nguyên được truyền dưới dạng độ rộng bit·signedness·số chuỗi. Các hằng số dấu phẩy động được truyền dưới dạng chuỗi bit có chiều rộng và chính xác. Văn bản round-trip trong IR phải giữ nguyên tên·ID·loại·hằng·chuỗi·thuộc tính·siêu dữ liệu. Không gian và vị trí bình luận không được bảo tồn.
 
-Có thể dùng hợp đồng AST JSON bên dưới cùng việc đọc, kiểm tra và in khứ hồi typed IR format 3.
+Có thể dùng hợp đồng AST JSON bên dưới cùng việc đọc, kiểm tra và in khứ hồi typed IR format 4.
 
 ### Định danh được in và tên trong dấu ngoặc kép
 
-Typed IR format 3 in hàm dưới dạng `@fN`, giá trị toàn cục là `@gN`, giá trị là `%vN`, khối là `%bN`. ID hàm và toàn cục thuộc mô-đun; ID giá trị và khối thuộc hàm chứa chúng. Các ID được cung cấp được giữ nguyên, kể cả khoảng trống trong số thứ tự. Tên trong ngoặc kép chỉ là chú thích, không dùng để phân giải tham chiếu. Hàm ghi rõ `entry %bN`, độc lập với thứ tự lưu các khối.
+Typed IR format 4 in hàm dưới dạng `@fN`, giá trị toàn cục là `@gN`, giá trị là `%vN`, khối là `%bN`. ID hàm và toàn cục thuộc mô-đun; ID giá trị và khối thuộc hàm chứa chúng. Các ID được cung cấp được giữ nguyên, kể cả khoảng trống trong số thứ tự. Tên trong ngoặc kép chỉ là chú thích, không dùng để phân giải tham chiếu. Hàm ghi rõ `entry %bN`, độc lập với thứ tự lưu các khối.
 
 Mô-đun hoàn chỉnh sau đã được kiểm tra và in qua API IR Rust. Cả hai khối nhánh đều có tên `"branch"`; ID phân biệt định nghĩa và đầu vào phi.
 
 ```text
 module {
-  format_version 3
+  format_version 4
   semantics_version 1
   target "x86_64-whale-linux"
   datalayout { ptr=64, endian=little }
@@ -252,7 +252,7 @@ Mọi trường tên và chuỗi đều dùng dấu ngoặc kép: đích, tên h
 "line\ncolumn\tquote\"slash\\한글"
 ```
 
-Đầu ra format 2 phải chuyển thủ công sang ID tường minh, ID tham số, tên trong ngoặc kép và tham chiếu khối vào. Bộ đọc chỉ nhận format 3 với semantics version 1 và không tự chuyển format 2. AST JSON format 2 có hợp đồng riêng.
+Bộ đọc nhận typed IR formats 3 và 4 với semantics version 1 và luôn in format 4. `uninit` yêu cầu format 4. Lệnh format 3 hợp lệ vẫn đọc được, nhưng legacy `undef` là lỗi kiểm tra trong cả hai định dạng và phải tạo lại từ AST. Văn bản format 2 cần chuyển thủ công sang ID tường minh, tên trong ngoặc kép và tham chiếu khối vào. AST JSON có format 2 độc lập.
 
 ### Đọc và kiểm tra IR văn bản
 
@@ -284,13 +284,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let canonical = print_module(&module);
     let reread = parse_module_with_limits(&canonical, limits)?;
     assert_eq!(print_module(&reread), canonical);
-    let invalid = source.replacen("format_version 3", "format_version 99", 1);
+    let invalid = source.replacen("format_version 4", "format_version 99", 1);
     assert!(parse_module_with_limits(&invalid, limits).is_err());
     Ok(())
 }
 ```
 
-Có thể truyền giới hạn vào `verify_module_with_limits`, `ConstExpr::evaluate_with_limits`, `validate_signature_with_limits` và `ModuleBuilder::declare_function_with_limits`. Duyệt kiểu lặp diễn ra trước clone, so sánh và chẩn đoán đệ quy; hằng được tính bằng ngăn xếp công việc. Cây Rust mượn và Drop vẫn thuộc bên gọi. Cây tùy ý chưa kiểm tra vẫn có clone/Drop đệ quy; chữ ký sở hữu bị API khai báo checked từ chối được giải phóng lặp. Bộ đọc giữ legacy `undef` để tương thích lowering hiện có. Theo dõi khởi tạo, kiểm tra truy cập bộ nhớ, metadata con trỏ và thực thi native vẫn là các tính năng riêng chưa hoàn thành.
+Có thể truyền giới hạn vào `verify_module_with_limits`, `ConstExpr::evaluate_with_limits`, `validate_signature_with_limits` và `ModuleBuilder::declare_function_with_limits`. Duyệt kiểu lặp diễn ra trước clone, so sánh và chẩn đoán đệ quy; hằng được tính bằng ngăn xếp công việc. Cây Rust mượn và Drop vẫn thuộc bên gọi. Cây tùy ý chưa kiểm tra vẫn có clone/Drop đệ quy; chữ ký sở hữu bị API khai báo checked từ chối được giải phóng lặp. IR không hợp lệ là lỗi kiểm tra. Trình kiểm tra từ chối legacy `undef`; hãy tạo lại từ AST. Khai báo chưa khởi tạo dùng format 4 `uninit` và kiểm tra lần đọc thực tế, không thay bằng không hoặc giá trị tùy ý. Vi phạm điều kiện thực thi tạo trap xác định có vị trí IR.
 
 ### Phiên bản được chỉ định AST JSON
 
@@ -342,7 +342,7 @@ cargo run --locked --features socket-cli -- ir lower program.json
 
 ```text
 module {
-  format_version 3
+  format_version 4
   semantics_version 1
   target "x86_64-whale-linux"
   datalayout { ptr=64, endian=little }
@@ -364,7 +364,7 @@ Số nguyên `value` là một chuỗi thập phân. Signed Một số được 
 
 [Lược đồ JSON hoàn chỉnh](https://github.com/wavefnd/Whale/blob/master/ir/schema/ast-v2.schema.json) chỉ định hình dạng, trường bắt buộc và biến thể. Việc kiểm tra phạm vi/loại và phát hiện khóa trùng lặp cũng được áp dụng. Tập hợp con hạ thấp vô hướng bao gồm hằng số, biến/hằng, cộng/phụ/mul, so sánh, gán, if/while, trả về và ngắt/tiếp tục. Hỗ trợ tham chiếu chức năng, gọi trực tiếp và gọi gián tiếp; biểu thức tổng hợp không được hỗ trợ. `Opaque` có ​​thể biểu thị trong lược đồ nhưng không được hỗ trợ bằng cách hạ thấp.
 
-Di chuyển yêu cầu bọc Program cũ chưa có envelope và thay số JSON bằng chuỗi số nguyên thập phân hoặc chuỗi bit số thực. Đầu vào không có phiên bản bị từ chối. Format 1 phải chuyển sang format 2, thêm `program.declarations` (mảng rỗng nếu không dùng) và `convention`/`linkage` rõ ràng trong định nghĩa. Các phiên bản độc lập: AST format 2, typed IR format 3 và semantics version 1.
+Di chuyển yêu cầu bọc Program cũ chưa có envelope và thay số JSON bằng chuỗi số nguyên thập phân hoặc chuỗi bit số thực. Đầu vào không có phiên bản bị từ chối. Format 1 phải chuyển sang format 2, thêm `program.declarations` (mảng rỗng nếu không dùng) và `convention`/`linkage` rõ ràng trong định nghĩa. Các phiên bản độc lập: AST format 2, typed IR format 4 và semantics version 1.
 
 ### Đầu vào bị từ chối và khôi phục CLI
 
@@ -396,7 +396,7 @@ Lệnh thoát với trạng thái khác 0 và không tạo đầu ra mới hoặ
 
 ## Trình thông dịch số nguyên vô hướng
 
-Bản dựng mặc định chạy hàm đã xác minh theo quy ước Whale, với tham số số nguyên/Bool và kết quả số nguyên/Bool hoặc void. Hỗ trợ hằng và khai báo hằng, mov, số học và so sánh số nguyên, cast số nguyên, cặp checked và extract, select, phi, nhánh, switch, return, trap_if và trap. Chưa chạy bộ nhớ, float, lời gọi, địa chỉ, aggregate tổng quát và legacy `undef`. Toàn bộ mô-đun được xác minh trước; mọi khối của hàm đã chọn, kể cả khối không thể tới, phải thuộc tập con này. Hàm khác chỉ cần qua xác minh. Chưa chạy được ví dụ lowering Wave dùng bộ nhớ.
+Bộ thông dịch mặc định thực thi số nguyên/Bool, luồng điều khiển, cấp phát ngăn xếp, lưu và đọc con trỏ dữ liệu, typed GEP, memcpy và memset. Đọc cặp checked bỏ qua padding. Địa chỉ là giá trị tổng hợp 64 bit, không giải tham chiếu bộ nhớ máy chủ. Đối số và kết quả vẫn giới hạn ở số nguyên/Bool hoặc void; float, lời gọi, con trỏ hàm, giá trị aggregate tổng quát, địa chỉ global và thực thi native chưa hỗ trợ. Cấp phát ngăn xếp tồn tại đến khi hàm trả về. Kết thúc vòng đời theo phạm vi, truyền con trỏ qua lời gọi/kết quả, bộ chuyển đổi bộ nhớ ngoài và native shadow metadata cần triển khai tiếp.
 
 `InterpreterOptions::max_steps` mặc định là 1,000,000. Mỗi lệnh được chạy, gồm phi, và mỗi terminator tiêu thụ một bước. Giới hạn 0 dừng trước thao tác đầu tiên; vòng lặp vô hạn trả về `InterpreterError::StepLimit`. `ir_limits` giới hạn xác minh riêng. Phép toán không có nơi dùng vẫn chạy và có thể trap. Overflow checked là kết quả Bool; chỉ trap_if tường minh mới biến nó thành trap.
 
@@ -404,7 +404,7 @@ Lưu mô-đun hoàn chỉnh này thành `swap-loop.wir`. Khối vào được ch
 
 ```text
 module {
-  format_version 3
+  format_version 4
   semantics_version 1
   target "x86_64-whale-linux"
   datalayout { ptr=64, endian=little }

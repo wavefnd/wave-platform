@@ -33,7 +33,7 @@ native 地址保持 64 位。单独的shadowmetadata与指针一起通过复制/
 
 ```text
 module {
-  format_version 3
+  format_version 4
   semantics_version 1
   target "x86_64-whale-linux"
   datalayout { ptr=64, endian=little }
@@ -52,7 +52,7 @@ module {
 }
 ```
 
-`alloca` 创建 i32 存储，`store` 写入 42，`load` 定义要返回的值。这是从键入的 IR 打印机输出的，而不是本机执行跟踪。比对为 3 是验证错误。在此内存模型下，删除存储将需要未初始化的读取陷阱，但初始化跟踪和相应的运行时陷阱检查尚未实现。仅通过当前验证程序并不能确定此读取是安全的。
+将这个完整模块保存为 `initialized.wir`，执行输出为 `i32 42`。删除store后，load因未初始化而trap。对齐3是验证错误。alloca的物理零字节不代表初始化。
 
 ## 与指针运算的比较
 
@@ -127,3 +127,79 @@ standalone array placement alignment: 16
 因此，由`A`、NUL和`B`组成的字节字符串的长度为3。不能用于显式C字符串转换，这会拒绝内部NUL。前端不应该默默地将其截断为`A`。
 
 外部C·原始地址·内联汇编是一个单独的合约边界。跟踪内存的运行时检查不能保证检测到外部代码中的所有不正确行为。
+
+## 跟踪栈内存执行
+
+默认解释器执行整数、Bool、控制流、栈分配、数据指针存取、typed GEP、memcpy和memset。checked二元组读取不检查填充字节。地址是合成的64位值，不会解引用主机内存。参数和返回仍限于整数、Bool或void；float、调用、函数指针、通用聚合值、全局地址及native执行不受支持。栈分配保持有效直到函数返回。词法生命周期结束、调用和返回中的指针传递、外部内存适配器及native shadow metadata仍需实现。
+
+`--max-memory`设置逻辑分配字节预算，默认64 MiB。`InterpreterOptions::memory_limits`还限制分配数为16384、指针字节元数据为262144片段、字节和元数据工作量为256 Mi单位。超限返回带IR位置的`MemoryLimit`错误，与程序trap区分。验证器也在执行前拒绝输出目标已知存储大小的overflow。
+
+```shell
+whale ir run initialized.wir --function @f0
+```
+
+```text
+i32 42
+```
+
+## 字节复制与初始化重置
+
+将以下完整模块保存为 `tracked-memory.wir`。@f0复制指针字节和独立元数据，然后读取42。@f1的uninit将类型存储范围标为未初始化并清除指针元数据，但不修改原有字节。memcpy可以复制未初始化字节；之后读取目标值时检查状态。分段复制只有集齐一致的8字节元数据才保留访问权限。用整数或memset写入相同位模式不会恢复权限。
+
+零长度memcpy和memset不进行访问或对齐检查就成功，包括null和one-past指针。非空重叠memcpy会trap。memset初始化写入的字节并清除其指针元数据。Bool存储必须为0或1；读取其他表示会trap。
+
+```text
+module {
+  format_version 4
+  semantics_version 1
+  target "x86_64-whale-linux"
+  datalayout { ptr=64, endian=little }
+
+  declare @f0 "copied_pointer": whale () -> u32, linkage internal
+  declare @f1 "uninitialized": whale () -> u32, linkage internal
+
+  fn @f0 "copied_pointer"() -> u32, entry %b0 {
+  %b0 "entry":
+    %v0: ptr<u32> = alloca u32, align 4
+    %v1: u32 = const u32 42
+    store u32 %v1, ptr<u32> %v0, align 4
+    %v2: ptr<ptr<u32>> = alloca ptr<u32>, align 8
+    %v3: ptr<ptr<u32>> = alloca ptr<u32>, align 8
+    store ptr<u32> %v0, ptr<ptr<u32>> %v2, align 8
+    %v4: ptr<u8> = bitcast ptr<ptr<u32>> %v2 to ptr<u8>
+    %v5: ptr<u8> = bitcast ptr<ptr<u32>> %v3 to ptr<u8>
+    %v6: u64 = const u64 8
+    memcpy ptr<u8> %v5, ptr<u8> %v4, u64 %v6, align 8
+    %v7: ptr<u32> = load ptr<u32>, ptr<ptr<u32>> %v3, align 8
+    %v8: u32 = load u32, ptr<u32> %v7, align 4
+    ret u32 %v8
+  }
+
+  fn @f1 "uninitialized"() -> u32, entry %b0 {
+  %b0 "entry":
+    %v0: ptr<u32> = alloca u32, align 4
+    uninit u32, ptr<u32> %v0, align 4
+    %v1: u32 = load u32, ptr<u32> %v0, align 4
+    ret u32 %v1
+  }
+
+}
+```
+
+```shell
+whale ir run tracked-memory.wir --function @f0
+whale ir run tracked-memory.wir --function @f1
+```
+
+```text
+u32 42
+Error: tracked-memory.wir: trap at @f1 %b0 instruction 2 (%v1): uninitialized byte at allocation offset 0 (after 3 steps)
+```
+
+## 验证、lowering与执行职责
+
+| 阶段 | 职责 |
+| --- | --- |
+| Verifier | 检查操作数与指针类型、对齐形式和输出目标存储大小；拒绝undef。 |
+| O0 lowering | 在实际执行的声明位置保留uninit，用store写入初始值，并保留读取。 |
+| Runtime | 检查分配标识、代际与生命周期、范围、权限、对齐、地址overflow和初始化；传递复制状态。 |

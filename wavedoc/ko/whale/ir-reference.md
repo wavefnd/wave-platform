@@ -43,7 +43,7 @@ fn main() {
 
 ```text
 module {
-  format_version 3
+  format_version 4
   semantics_version 1
   target "x86_64-whale-linux"
   datalayout { ptr=64, endian=little }
@@ -126,7 +126,7 @@ fn main() {
 
 ```text
 module {
-  format_version 3
+  format_version 4
   semantics_version 1
   target "x86_64-whale-linux"
   datalayout { ptr=64, endian=little }
@@ -198,7 +198,7 @@ Select는 이미 계산된 값 중 하나를 선택합니다. 어느 쪽 입력�
 
 ## 검증과 trap
 
-잘못된 IR은 검증 단계에서 거부합니다. 지원하는 인터프리터 부분집합의 실행 조건 위반은 정의된 trap으로 처리합니다. 파서·검증기는 기존 lowering과의 호환성을 위해 legacy `undef`를 보존하지만 인터프리터는 이를 명시적으로 거부합니다. 미초기화 저장소를 0으로 바꾸지 않으며 초기화 추적은 미완료입니다. builder 오류와 실행 trap은 별개입니다.
+잘못된 IR은 검증 오류입니다. legacy `undef`는 검증기에서 거부하며 기존 AST를 다시 lowering해야 합니다. 초기화 없는 선언은 format 4의 `uninit`과 검사된 실제 읽기로 표현합니다. 자동 0 초기화나 임의 값으로 대체하지 않습니다. 실행 조건 위반은 IR 위치를 포함한 정의된 trap입니다.
 
 현재 `InterpreterTrap`은 이유·실행 단계 수·`ExecutionSite`를 제공합니다. 위치는 함수 ID, 블록 ID, 0부터 시작하는 명령 인덱스, 선택적인 결과 값 ID입니다. terminator 인덱스는 마지막 명령 다음입니다. CLI 진단에는 입력 파일도 표시합니다. typed IR에는 아직 소스 span이 없으므로 이 위치는 소스 줄 번호가 아닌 IR 위치입니다. trap은 오류를 반환하고 이후 실행을 중단하며 라이브러리는 호스트 프로세스를 종료하지 않습니다.
 
@@ -210,17 +210,17 @@ AST와 typed IR은 각각의 format version과 공통 semantics version을 사�
 
 정수는 비트 폭·signedness·문자열 숫자로 전달합니다. 부동소수점 상수는 폭과 정확한 비트열로 전달합니다. 텍스트 IR의 round-trip은 이름·ID·타입·상수·순서·속성·메타데이터를 보존해야 합니다. 공백과 주석 배치는 보존 대상이 아닙니다.
 
-아래 AST JSON 계약과 typed IR 형식 3의 읽기·검증·왕복 출력을 사용할 수 있습니다.
+아래 AST JSON 계약과 typed IR 형식 4의 읽기·검증·왕복 출력을 사용할 수 있습니다.
 
 ### 출력 식별자와 인용된 이름
 
-typed IR format 3은 함수 식별자를 `@fN`, 전역을 `@gN`, 값을 `%vN`, 블록을 `%bN`으로 출력합니다. 함수·전역 ID는 모듈에, 값·블록 ID는 해당 함수에 속합니다. 번호에 빈 구간이 있어도 입력 ID를 보존합니다. 인용된 이름은 설명용 표기이며 참조 해석에 사용하지 않습니다. 함수는 블록 저장 순서와 독립적으로 `entry %bN`을 명시합니다.
+typed IR format 4은 함수 식별자를 `@fN`, 전역을 `@gN`, 값을 `%vN`, 블록을 `%bN`으로 출력합니다. 함수·전역 ID는 모듈에, 값·블록 ID는 해당 함수에 속합니다. 번호에 빈 구간이 있어도 입력 ID를 보존합니다. 인용된 이름은 설명용 표기이며 참조 해석에 사용하지 않습니다. 함수는 블록 저장 순서와 독립적으로 `entry %bN`을 명시합니다.
 
 다음 전체 모듈은 Rust IR API에서 검증하고 출력했습니다. 두 분기 블록의 이름이 모두 `"branch"`이지만, ID가 정의와 phi 입력을 구분합니다.
 
 ```text
 module {
-  format_version 3
+  format_version 4
   semantics_version 1
   target "x86_64-whale-linux"
   datalayout { ptr=64, endian=little }
@@ -252,7 +252,7 @@ module {
 "line\ncolumn\tquote\"slash\\한글"
 ```
 
-형식 2의 출력은 명시적 ID, 매개변수 ID, 인용된 이름, 진입 블록 참조로 직접 마이그레이션해야 합니다. 파서는 형식 3과 semantics version 1만 받으며 형식 2를 자동 변환하지 않습니다. AST JSON 형식 2는 별도 계약입니다.
+파서는 typed IR format 3과 4, semantics version 1을 읽고 항상 format 4를 출력합니다. `uninit`은 format 4에서만 사용할 수 있습니다. format 3의 유효한 기존 명령은 유지되지만 legacy `undef`는 어느 형식에서도 검증 오류이며 AST에서 재생성해야 합니다. format 2 텍스트는 명시적 ID·인용 이름·진입 참조로 직접 이관해야 합니다. AST JSON은 별도 format 2입니다.
 
 ### 텍스트 IR 읽기와 검증
 
@@ -284,13 +284,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let canonical = print_module(&module);
     let reread = parse_module_with_limits(&canonical, limits)?;
     assert_eq!(print_module(&reread), canonical);
-    let invalid = source.replacen("format_version 3", "format_version 99", 1);
+    let invalid = source.replacen("format_version 4", "format_version 99", 1);
     assert!(parse_module_with_limits(&invalid, limits).is_err());
     Ok(())
 }
 ```
 
-`verify_module_with_limits`, `ConstExpr::evaluate_with_limits`, `validate_signature_with_limits`, `ModuleBuilder::declare_function_with_limits`에도 한도를 전달할 수 있습니다. 타입은 재귀 clone·비교·진단 전에 반복 순회로 검사하며 상수식은 작업 스택으로 평가합니다. 차용한 Rust 트리의 소유권과 Drop은 호출자에게 있습니다. 임의로 구성한 미검증 트리의 clone/Drop까지 보호하지 않으며, checked 선언 API가 소유한 거부된 서명은 반복적으로 해제합니다. 파서는 기존 lowering과 호환되도록 legacy `undef`를 보존합니다. 초기화 추적·메모리 접근 검사·포인터 메타데이터·native 실행은 별도 미완료 기능입니다.
+`verify_module_with_limits`, `ConstExpr::evaluate_with_limits`, `validate_signature_with_limits`, `ModuleBuilder::declare_function_with_limits`에도 한도를 전달할 수 있습니다. 타입은 재귀 clone·비교·진단 전에 반복 순회로 검사하며 상수식은 작업 스택으로 평가합니다. 차용한 Rust 트리의 소유권과 Drop은 호출자에게 있습니다. 임의로 구성한 미검증 트리의 clone/Drop까지 보호하지 않으며, checked 선언 API가 소유한 거부된 서명은 반복적으로 해제합니다. 잘못된 IR은 검증 오류입니다. legacy `undef`는 검증기에서 거부하며 기존 AST를 다시 lowering해야 합니다. 초기화 없는 선언은 format 4의 `uninit`과 검사된 실제 읽기로 표현합니다. 자동 0 초기화나 임의 값으로 대체하지 않습니다. 실행 조건 위반은 IR 위치를 포함한 정의된 trap입니다.
 
 ### 버전이 명시된 AST JSON
 
@@ -342,7 +342,7 @@ cargo run --locked --features socket-cli -- ir lower program.json
 
 ```text
 module {
-  format_version 3
+  format_version 4
   semantics_version 1
   target "x86_64-whale-linux"
   datalayout { ptr=64, endian=little }
@@ -396,7 +396,7 @@ Failed to parse socket JSON: unsupported AST format_version 99; expected 2
 
 ## 스칼라 정수 인터프리터
 
-기본 빌드는 정수·Bool 매개변수와 정수·Bool 또는 void 반환을 가진 검증된 Whale 호출 규약 함수를 실행합니다. 상수·상수 선언, mov, 정수 연산·비교·cast, checked 쌍과 extract, select, phi, 분기, switch, return, trap_if, trap을 지원합니다. 메모리·float·호출·주소·일반 aggregate·legacy `undef`의 실행은 미지원입니다. 먼저 모듈 전체를 검증하며, 선택한 함수는 도달 불가능한 블록까지 모두 이 부분집합에 속해야 합니다. 다른 함수는 검증만 통과하면 됩니다. 메모리를 사용하는 Wave lowering 예제의 실행은 아직 지원하지 않습니다.
+기본 인터프리터는 정수·Bool, 제어 흐름, 스택 할당, 데이터 포인터 저장·읽기, typed GEP, memcpy·memset을 실행합니다. checked 쌍의 값 읽기는 패딩을 제외합니다. 주소는 호스트 메모리를 가리키지 않는 합성 64비트 주소입니다. 함수 인자·반환은 정수·Bool 또는 void로 제한되며 float, 호출, 함수 포인터, 일반 aggregate 값, 전역 주소, native 실행은 미지원입니다. 스택 할당은 함수 반환까지 살아 있습니다. 블록별 수명 종료, 호출·반환의 포인터 전달, 외부 메모리 어댑터와 native shadow metadata는 후속 구현이 필요합니다.
 
 `InterpreterOptions::max_steps` 기본값은 1,000,000입니다. phi를 포함한 실행 명령 하나와 terminator 하나가 각각 한 단계를 소비합니다. 한도가 0이면 첫 연산 전에 중단하며 무한 분기 루프는 `InterpreterError::StepLimit`을 반환합니다. `ir_limits`는 검증량을 별도로 제한합니다. 미사용 정수 연산도 실행하고 trap할 수 있습니다. checked overflow는 Bool 결과이며, 명시적인 trap_if가 있어야 trap으로 처리합니다.
 
@@ -404,7 +404,7 @@ Failed to parse socket JSON: unsupported AST format_version 99; expected 2
 
 ```text
 module {
-  format_version 3
+  format_version 4
   semantics_version 1
   target "x86_64-whale-linux"
   datalayout { ptr=64, endian=little }

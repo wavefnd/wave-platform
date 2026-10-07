@@ -43,7 +43,7 @@ The printer produces:
 
 ```text
 module {
-  format_version 3
+  format_version 4
   semantics_version 1
   target "x86_64-whale-linux"
   datalayout { ptr=64, endian=little }
@@ -126,7 +126,7 @@ fn main() {
 
 ```text
 module {
-  format_version 3
+  format_version 4
   semantics_version 1
   target "x86_64-whale-linux"
   datalayout { ptr=64, endian=little }
@@ -198,7 +198,7 @@ Select chooses between values that have already been computed. It does not suppr
 
 ## Validation and traps
 
-Malformed IR is rejected by verification. Runtime conditions in the supported interpreter subset produce defined traps. The parser/verifier still retain legacy `undef` for existing lowering compatibility, but the interpreter rejects it explicitly; it does not turn uninitialized storage into zero. Initialization tracking remains unfinished. Builder errors remain separate from execution traps.
+Malformed IR is a verification error. The verifier rejects legacy `undef`; regenerate existing AST lowering. An uninitialized declaration uses format 4 `uninit` and checked actual reads, without zero initialization or arbitrary values. Runtime condition violations produce defined traps with IR locations.
 
 The current `InterpreterTrap` reports a reason, executed step count and `ExecutionSite`: function ID, block ID, zero-based instruction index and optional result value ID. The terminator index follows the instructions. CLI diagnostics also name the input file. Typed IR does not yet carry source spans, so these are IR locations, not source line numbers. A trap returns an error and stops subsequent execution; the library does not abort the host process.
 
@@ -210,17 +210,17 @@ AST and typed IR use separate format versions and a common semantics version. Re
 
 Integers carry a bit width, signedness, and a textual numeric value. Floating-point constants carry a width and an exact bit pattern. A text IR round trip must preserve names, IDs, types, constants, ordering, attributes, and metadata. Whitespace and comment placement need not survive the round trip.
 
-The AST JSON contract below and typed IR format 3 reading, verification and round-trip printing are available.
+The AST JSON contract below and typed IR format 4 reading, verification and round-trip printing are available.
 
 ### Printed identities and quoted names
 
-Typed IR format 3 prints function identities as `@fN`, globals as `@gN`, values as `%vN`, and blocks as `%bN`. Function and global IDs belong to the module; value and block IDs belong to the containing function. Preserve the supplied IDs, including gaps. Quoted names are descriptive annotations and are not used to resolve references. A function explicitly records `entry %bN`, independent of the order of its stored blocks.
+Typed IR format 4 prints function identities as `@fN`, globals as `@gN`, values as `%vN`, and blocks as `%bN`. Function and global IDs belong to the module; value and block IDs belong to the containing function. Preserve the supplied IDs, including gaps. Quoted names are descriptive annotations and are not used to resolve references. A function explicitly records `entry %bN`, independent of the order of its stored blocks.
 
 This complete module was verified and printed through the Rust IR API. Both branch blocks are named `"branch"`; the IDs distinguish their definitions and the phi inputs:
 
 ```text
 module {
-  format_version 3
+  format_version 4
   semantics_version 1
   target "x86_64-whale-linux"
   datalayout { ptr=64, endian=little }
@@ -252,7 +252,7 @@ All name and string fields use double quotes: target, function/global/parameter/
 "line\ncolumn\tquote\"slash\\한글"
 ```
 
-Format 2 output must be migrated manually to explicit IDs, parameter IDs, quoted names and an entry reference. The reader accepts only format 3 with semantics version 1 and does not convert format 2 automatically. AST JSON format 2 is a separate contract.
+The reader accepts typed IR formats 3 and 4 with semantics version 1 and always prints format 4. `uninit` requires format 4. Valid existing format 3 instructions remain readable, but legacy `undef` is a verification error in either format and must be regenerated from AST. Format 2 text requires manual migration to explicit IDs, quoted names and entry references. AST JSON has its separate format 2.
 
 ### Reading and verifying text IR
 
@@ -284,13 +284,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let canonical = print_module(&module);
     let reread = parse_module_with_limits(&canonical, limits)?;
     assert_eq!(print_module(&reread), canonical);
-    let invalid = source.replacen("format_version 3", "format_version 99", 1);
+    let invalid = source.replacen("format_version 4", "format_version 99", 1);
     assert!(parse_module_with_limits(&invalid, limits).is_err());
     Ok(())
 }
 ```
 
-Pass limits to `verify_module_with_limits`, `ConstExpr::evaluate_with_limits`, `validate_signature_with_limits` and `ModuleBuilder::declare_function_with_limits` as well. Iterative type traversal precedes recursive clone, equality and diagnostics; constant evaluation uses a work stack. Borrowed Rust trees remain caller-owned, including Drop. Arbitrary unverified trees still have recursive clone/Drop; a rejected owned signature in the checked declaration API is disposed of iteratively. The reader retains legacy `undef` for existing lowering compatibility. Initialization tracking, memory-access checks, pointer metadata and native execution remain separate unfinished features.
+Pass limits to `verify_module_with_limits`, `ConstExpr::evaluate_with_limits`, `validate_signature_with_limits` and `ModuleBuilder::declare_function_with_limits` as well. Iterative type traversal precedes recursive clone, equality and diagnostics; constant evaluation uses a work stack. Borrowed Rust trees remain caller-owned, including Drop. Arbitrary unverified trees still have recursive clone/Drop; a rejected owned signature in the checked declaration API is disposed of iteratively. Malformed IR is a verification error. The verifier rejects legacy `undef`; regenerate existing AST lowering. An uninitialized declaration uses format 4 `uninit` and checked actual reads, without zero initialization or arbitrary values. Runtime condition violations produce defined traps with IR locations.
 
 ### Versioned AST JSON
 
@@ -342,7 +342,7 @@ cargo run --locked --features socket-cli -- ir lower program.json
 
 ```text
 module {
-  format_version 3
+  format_version 4
   semantics_version 1
   target "x86_64-whale-linux"
   datalayout { ptr=64, endian=little }
@@ -364,7 +364,7 @@ Integer `value` is a decimal string: optional minus for signed integers, followe
 
 [The complete JSON Schema](https://github.com/wavefnd/Whale/blob/master/ir/schema/ast-v2.schema.json) specifies shapes, required fields and variants. Range/type checks and duplicate-key detection additionally apply. The scalar lowering subset includes literals, variables/constants, add/sub/mul, comparisons, assignment, if/while, return and break/continue. Function references, direct calls and indirect calls are supported; aggregate expressions are unsupported. `Opaque` is representable in the schema but unsupported by lowering.
 
-Migration requires wrapping old bare Program payloads and replacing numeric JSON literals with decimal integer strings or float bit strings. Old unversioned payloads are rejected. Format 1 payloads must be migrated to format 2: add `program.declarations` (an empty array when unused) and explicit `convention`/`linkage` on definitions. AST and typed IR version numbers are independent: AST format 2, typed IR format 3, and semantics version 1.
+Migration requires wrapping old bare Program payloads and replacing numeric JSON literals with decimal integer strings or float bit strings. Old unversioned payloads are rejected. Format 1 payloads must be migrated to format 2: add `program.declarations` (an empty array when unused) and explicit `convention`/`linkage` on definitions. AST and typed IR version numbers are independent: AST format 2, typed IR format 4, and semantics version 1.
 
 ### Rejected input and CLI recovery
 
@@ -396,7 +396,7 @@ The command exits nonzero without creating an output or replacing an existing fi
 
 ## Scalar integer interpreter
 
-The default build executes a verified Whale-convention function with integer/Bool parameters and an integer/Bool or void return. It supports constants and constant declarations, mov, integer arithmetic and comparisons, integer casts, checked pairs and extracts, select, phi, branches, switch, return, trap_if and trap. Memory, float, calls, addresses, general aggregates and legacy `undef` are unsupported execution operations. The whole module is verified first; every block of the selected function must belong to this subset, including unreachable blocks. Other functions need only pass verification. This does not execute the memory-based Wave lowering examples yet.
+The default interpreter executes integer/Bool values, control flow, stack allocations, data-pointer storage and loads, typed GEP, memcpy and memset. Checked-pair reads exclude padding. Addresses are synthetic 64-bit values, never host-memory dereferences. Function arguments and returns remain integer/Bool or void; float, calls, function pointers, general aggregate values, global addresses and native execution are unsupported. Stack allocations live until function return. Lexical lifetime-end operations, pointer transfer through calls/returns, foreign-memory adapters and native shadow metadata require further implementation.
 
 `InterpreterOptions::max_steps` defaults to 1,000,000. Each executed instruction, including a phi, and each terminator consumes one step. A zero limit prevents the first operation; an infinite branch loop returns `InterpreterError::StepLimit`. `ir_limits` independently bounds verification. Unused arithmetic still executes and can trap. Overflow from checked arithmetic is a Bool result; only an explicit trap_if makes it a trap.
 
@@ -404,7 +404,7 @@ Save this complete module as `swap-loop.wir`. The entry block is explicit althou
 
 ```text
 module {
-  format_version 3
+  format_version 4
   semantics_version 1
   target "x86_64-whale-linux"
   datalayout { ptr=64, endian=little }

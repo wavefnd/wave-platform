@@ -33,7 +33,7 @@ Das folgende Modul wurde als builder konfiguriert und hat den Prüfer bestanden.
 
 ```text
 module {
-  format_version 3
+  format_version 4
   semantics_version 1
   target "x86_64-whale-linux"
   datalayout { ptr=64, endian=little }
@@ -52,7 +52,7 @@ module {
 }
 ```
 
-`alloca` erstellt i32-Speicher, `store` schreibt 42 und `load` definiert den zurückzugebenden Wert. Dies wird vom typisierten IR-Drucker ausgegeben, nicht von einer nativen Ausführungsverfolgung. Eine Ausrichtung von 3 ist ein Validierungsfehler. Das Entfernen des Speichers würde bei diesem Speichermodell einen nicht initialisierten Lese-Trap erfordern, aber die Initialisierungsverfolgung und die entsprechenden Laufzeit-Trap-Prüfungen sind noch nicht implementiert. Das Bestehen des aktuellen Verifizierers allein stellt nicht sicher, dass dieser Lesevorgang sicher ist.
+Speichern Sie dieses vollständige Modul als `initialized.wir`; es gibt `i32 42` aus. Ohne store löst load einen Trap wegen nicht initialisierten Speichers aus. Ausrichtung 3 ist ein Prüfungsfehler. Physische Nullbytes von alloca bedeuten keine Initialisierung.
 
 ## Vergleich mit Zeigerarithmetik
 
@@ -127,3 +127,79 @@ Eine Zeichenfolge ist eine unveränderliche Folge von Bytes mit einer bestimmten
 Daher beträgt die Länge der Bytefolge bestehend aus `A`, NUL und `B` 3. Kann nicht für explizite C-Stringkonvertierungen verwendet werden, die das interne NUL ablehnen. Das Frontend sollte dies nicht stillschweigend auf `A` kürzen.
 
 Externe C·Rohadresse·Inline Assembly ist eine separate Vertragsgrenze. Bei der Laufzeitüberprüfung des Trace-Speichers kann nicht garantiert werden, dass alle fehlerhaften Verhaltensweisen im externen Code erkannt werden.
+
+## Ausführung mit verfolgtem Stapelspeicher
+
+Der Standardinterpreter führt Ganzzahlen/Bool, Kontrollfluss, Stapelzuweisungen, Datenzeigerspeicherung und -lesen, typed GEP, memcpy und memset aus. Beim Lesen von checked-Paaren wird Padding ausgeschlossen. Adressen sind synthetische 64-Bit-Werte ohne Zugriff auf Hostspeicher. Argumente und Rückgaben bleiben Ganzzahlen/Bool oder void; float, Aufrufe, Funktionszeiger, allgemeine Aggregatwerte, globale Adressen und native Ausführung fehlen. Stapelzuweisungen leben bis zur Rückgabe. Lexikalisches Lebensdauerende, Zeigerübergabe bei Aufrufen/Rückgaben, Fremdspeicheradapter und native shadow metadata müssen noch implementiert werden.
+
+`--max-memory` begrenzt logische Zuweisungsbytes, standardmäßig 64 MiB. `InterpreterOptions::memory_limits` begrenzt außerdem Zuweisungen auf 16384, Zeigerbyte-Metadaten auf 262144 Fragmente und Byte-/Metadatenarbeit auf 256 Mi Einheiten. Überschreitungen liefern `MemoryLimit` mit IR-Position, getrennt von Programm-Traps. Die Prüfung lehnt auch bekannten Speichergrößen-overflow des Ausgabeziels vor Ausführung ab.
+
+```shell
+whale ir run initialized.wir --function @f0
+```
+
+```text
+i32 42
+```
+
+## Bytekopien und Zurücksetzen der Initialisierung
+
+Speichern Sie das vollständige folgende Modul als `tracked-memory.wir`. @f0 kopiert Zeigerbytes und getrennte Metadaten und liest 42. Bei @f1 markiert uninit den Speicherbereich des Typs als nicht initialisiert und löscht Zeigermetadaten, ohne bestehende Bytes zu ändern. memcpy darf nicht initialisierte Bytes kopieren; spätere Wertzugriffe prüfen den Zielzustand. Teilkopien erhalten Rechte erst, wenn alle acht konsistenten Metadatenfragmente vorliegen. Gleiche Bits durch Ganzzahlen oder memset stellen keine Rechte wieder her.
+
+memcpy/memset mit Länge null gelingen ohne Zugriffs- oder Ausrichtungsprüfung, auch für null und one-past. Überlappende nichtleere memcpy löst einen Trap aus. memset initialisiert geschriebene Bytes und löscht ihre Zeigermetadaten. Bool muss als 0 oder 1 gespeichert sein; andere Darstellungen lösen beim Lesen einen Trap aus.
+
+```text
+module {
+  format_version 4
+  semantics_version 1
+  target "x86_64-whale-linux"
+  datalayout { ptr=64, endian=little }
+
+  declare @f0 "copied_pointer": whale () -> u32, linkage internal
+  declare @f1 "uninitialized": whale () -> u32, linkage internal
+
+  fn @f0 "copied_pointer"() -> u32, entry %b0 {
+  %b0 "entry":
+    %v0: ptr<u32> = alloca u32, align 4
+    %v1: u32 = const u32 42
+    store u32 %v1, ptr<u32> %v0, align 4
+    %v2: ptr<ptr<u32>> = alloca ptr<u32>, align 8
+    %v3: ptr<ptr<u32>> = alloca ptr<u32>, align 8
+    store ptr<u32> %v0, ptr<ptr<u32>> %v2, align 8
+    %v4: ptr<u8> = bitcast ptr<ptr<u32>> %v2 to ptr<u8>
+    %v5: ptr<u8> = bitcast ptr<ptr<u32>> %v3 to ptr<u8>
+    %v6: u64 = const u64 8
+    memcpy ptr<u8> %v5, ptr<u8> %v4, u64 %v6, align 8
+    %v7: ptr<u32> = load ptr<u32>, ptr<ptr<u32>> %v3, align 8
+    %v8: u32 = load u32, ptr<u32> %v7, align 4
+    ret u32 %v8
+  }
+
+  fn @f1 "uninitialized"() -> u32, entry %b0 {
+  %b0 "entry":
+    %v0: ptr<u32> = alloca u32, align 4
+    uninit u32, ptr<u32> %v0, align 4
+    %v1: u32 = load u32, ptr<u32> %v0, align 4
+    ret u32 %v1
+  }
+
+}
+```
+
+```shell
+whale ir run tracked-memory.wir --function @f0
+whale ir run tracked-memory.wir --function @f1
+```
+
+```text
+u32 42
+Error: tracked-memory.wir: trap at @f1 %b0 instruction 2 (%v1): uninitialized byte at allocation offset 0 (after 3 steps)
+```
+
+## Pflichten von Prüfung, lowering und Ausführung
+
+| Stufe | Pflicht |
+| --- | --- |
+| Verifier | Operanden/Zeigertypen, Ausrichtungsform und Speichergrößen des Ausgabeziels prüfen; undef ablehnen. |
+| O0 lowering | uninit an der ausgeführten Deklaration belassen, Anfangswerte speichern und Lesezugriffe erhalten. |
+| Runtime | Zuweisungsidentität, Generation/Lebensdauer, Bereich, Rechte, Ausrichtung, Adress-overflow und Initialisierung prüfen; Kopierzustand übertragen. |

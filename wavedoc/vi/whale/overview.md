@@ -43,9 +43,9 @@ Tài liệu tham khảo xác định các quy tắc ngữ nghĩa cho Whale. Các
 | --- | --- | --- |
 |người lắp ráp|Tạo đối tượng có thể định vị lại ELF64 từ tập hợp AMD64|Phạm vi bao phủ không đầy đủ của các lệnh và chỉ thị|
 |thư viện đối tượng|Thành phần đối tượng, payload không có BSS, xác thực mục tiêu, AMD64 ELF64 tuần tự hóa và triển khai bản ghi Wave có thể chọn để kiểm tra kích thước.|Các đối tượng có thể định vị lại không thể thực thi được|
-| IR | Xây dựng, in ấn, các cuộc gọi trực tiếp/gián tiếp được kiểm tra chữ ký, hạ thấp phiên bản AST, xác thực mục tiêu và bố cục loại đã kiểm tra | Có AST format 2 / typed IR format 3, hằng bit chính xác, đọc, kiểm tra và in khứ hồi văn bản; chưa có phát sinh lời gọi máy |
+| IR | Xây dựng, in ấn, các cuộc gọi trực tiếp/gián tiếp được kiểm tra chữ ký, hạ thấp phiên bản AST, xác thực mục tiêu và bố cục loại đã kiểm tra | Có AST format 2 / typed IR format 4, hằng bit chính xác, đọc, kiểm tra và in khứ hồi văn bản; chưa có phát sinh lời gọi máy |
 |người liên kết|Giải thích biểu tượng, xác minh mục tiêu đầu vào, kiểm tra vị trí phần tệp/bộ nhớ|Việc áp dụng chuyển vị trí đầy đủ và xuất ra các tập tin thực thi không được hỗ trợ.|
-|Chạy và gỡ lỗi| Chạy số nguyên/Bool vô hướng và vòng lặp có giới hạn | Chưa hỗ trợ bộ nhớ, float, lời gọi, mã native và DWARF |
+| Thực thi và gỡ lỗi | Số nguyên/Bool, luồng điều khiển, ngăn xếp theo dõi và kiểm tra khởi tạo | Float, lời gọi, địa chỉ global, sinh mã native và DWARF chưa hỗ trợ |
 
 Các quy tắc cấm hành vi không xác định áp dụng cho IR đã được xác minh và theo dõi ký ức. Việc triển khai thử nghiệm chưa triển khai tất cả các kiểm tra thời gian chạy trong tài liệu tham khảo bộ nhớ/thực thi.
 

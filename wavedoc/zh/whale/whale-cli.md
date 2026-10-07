@@ -52,7 +52,7 @@ whale object input.bin -o output.o
 
 ## 文本 IR 验证与打印
 
-默认构建可以读取并验证 format 3 typed IR。将 [IR 参考](ir-reference)中的完整示例保存为 `answer.wir`。`print` 验证后输出规范文本，失败时保留已有文件。它不执行 IR 或生成 native 代码。
+默认构建可以读取并验证 format 4 typed IR。将 [IR 参考](ir-reference)中的完整示例保存为 `answer.wir`。`print` 验证后输出规范文本，失败时保留已有文件。它不执行 IR 或生成 native 代码。
 
 ```shell
 whale ir verify answer.wir
@@ -83,4 +83,22 @@ whale ir run swap-loop.wir --function @f7 --arg 3 --max-steps 100
 
 ```text
 i32 22
+```
+
+## 跟踪栈内存执行
+
+默认解释器执行整数、Bool、控制流、栈分配、数据指针存取、typed GEP、memcpy和memset。checked二元组读取不检查填充字节。地址是合成的64位值，不会解引用主机内存。参数和返回仍限于整数、Bool或void；float、调用、函数指针、通用聚合值、全局地址及native执行不受支持。栈分配保持有效直到函数返回。词法生命周期结束、调用和返回中的指针传递、外部内存适配器及native shadow metadata仍需实现。
+
+`--max-memory`设置逻辑分配字节预算，默认64 MiB。`InterpreterOptions::memory_limits`还限制分配数为16384、指针字节元数据为262144片段、字节和元数据工作量为256 Mi单位。超限返回带IR位置的`MemoryLimit`错误，与程序trap区分。验证器也在执行前拒绝输出目标已知存储大小的overflow。
+
+[内存模型](memory-model): `tracked-memory.wir`.
+
+```shell
+whale ir run tracked-memory.wir --function @f0 --max-memory 20
+whale ir run tracked-memory.wir --function @f0 --max-memory 3
+```
+
+```text
+u32 42
+Error: tracked-memory.wir: interpreter memory Bytes limit 3 reached at @f0 %b0 instruction 0 (%v0)
 ```
