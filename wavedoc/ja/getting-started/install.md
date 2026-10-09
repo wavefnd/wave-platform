@@ -61,6 +61,8 @@ powershell -ExecutionPolicy Bypass -File .\install.ps1
 wavec --version
 ```
 
+任意のディレクトリにプレーンテキストファイル `main.wave` を作成し、以下のプログラム全体を保存してください。ファイル名が `main.wave.txt` になっていないことを確認してください。
+
 <!-- wave-example: install-stdlib -->
 ```wave
 import("std::string::len")::{
@@ -72,9 +74,13 @@ fun main() {
 }
 ```
 
+`main.wave` のあるディレクトリで端末を開くか、`cd` で移動してから実行してください:
+
 ```shell
 wavec run main.wave
 ```
+
+期待される出力:
 
 ```text
 Wave: 4 bytes

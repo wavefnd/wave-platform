@@ -61,6 +61,8 @@ Installer mengompilasi dan menjalankan program kecil dengan std bawaan. Tidak pe
 wavec --version
 ```
 
+Buat berkas teks biasa bernama `main.wave` di direktori pilihan Anda dan simpan seluruh program di bawah ini. Pastikan namanya bukan `main.wave.txt`.
+
 <!-- wave-example: install-stdlib -->
 ```wave
 import("std::string::len")::{
@@ -72,9 +74,13 @@ fun main() {
 }
 ```
 
+Buka terminal di direktori yang berisi `main.wave`, atau pindah ke direktori tersebut dengan `cd`, lalu jalankan:
+
 ```shell
 wavec run main.wave
 ```
+
+Keluaran yang diharapkan:
 
 ```text
 Wave: 4 bytes

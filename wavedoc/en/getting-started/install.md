@@ -61,6 +61,8 @@ The installer compiles and runs a small program using the bundled std. There is 
 wavec --version
 ```
 
+Create a plain-text file named `main.wave` in a directory of your choice and save the complete program below. Make sure the filename is not `main.wave.txt`.
+
 <!-- wave-example: install-stdlib -->
 ```wave
 import("std::string::len")::{
@@ -72,9 +74,13 @@ fun main() {
 }
 ```
 
+Open a terminal in the directory containing `main.wave` (or use `cd` to navigate there), then run:
+
 ```shell
 wavec run main.wave
 ```
+
+Expected output:
 
 ```text
 Wave: 4 bytes

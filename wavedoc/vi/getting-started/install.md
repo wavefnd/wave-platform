@@ -61,6 +61,8 @@ Trình cài đặt biên dịch và chạy một chương trình nhỏ dùng std
 wavec --version
 ```
 
+Tạo tệp văn bản thuần có tên `main.wave` trong thư mục tùy chọn và lưu toàn bộ chương trình bên dưới. Kiểm tra để bảo đảm tên tệp không phải là `main.wave.txt`.
+
 <!-- wave-example: install-stdlib -->
 ```wave
 import("std::string::len")::{
@@ -72,9 +74,13 @@ fun main() {
 }
 ```
 
+Mở terminal trong thư mục chứa `main.wave` hoặc dùng `cd` để chuyển đến thư mục đó, rồi chạy:
+
 ```shell
 wavec run main.wave
 ```
+
+Kết quả mong đợi:
 
 ```text
 Wave: 4 bytes

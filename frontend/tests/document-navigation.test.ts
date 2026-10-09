@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { readFileSync } from 'node:fs'
+import { homeDocumentationLinks, firstWaveProgram } from '../src/services/homeOnboarding.ts'
 import { documentLocales, isDocumentLocale, initialDocumentLocale } from '../src/services/documentLocale.ts'
 import { canonicalDocumentPath, documentationCatalog, documentationPath, documentationProject, projectDocuments } from '../src/services/documentNavigation.ts'
 
@@ -91,4 +93,28 @@ test('new documentation locales accept language codes and normalize browser regi
   }
   Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: { getItem: () => 'pt' } })
   assert.equal(initialDocumentLocale(), 'pt')
+})
+
+
+test('home onboarding links select installation, the first lesson, and the course index', () => {
+  assert.deepEqual(homeDocumentationLinks.map(({ label, path }) => [label, path]), [
+    ['docs.installation', 'getting-started/install'],
+    ['docs.firstProgram', 'language/program-structure'],
+    ['docs.language', 'getting-started/overview'],
+  ])
+  for (const locale of ['en', 'ko', 'ja', 'zh']) {
+    for (const { path } of homeDocumentationLinks) {
+      assert.equal(canonicalDocumentPath(path), path)
+      const document = readFileSync(new URL(`../../wavedoc/${locale}/${path}.md`, import.meta.url), 'utf8')
+      assert.ok(document.includes(`path: ${path}\n`), `${locale}/${path} must be a published document`)
+    }
+  }
+})
+
+test('home example stays aligned with the complete first-lesson program', () => {
+  for (const locale of ['en', 'ko']) {
+    const lesson = readFileSync(new URL(`../../wavedoc/${locale}/language/program-structure.md`, import.meta.url), 'utf8')
+    const example = lesson.match(/<!-- wave-example: book-hello -->\s*```wave\n([\s\S]*?)\n```/)
+    assert.equal(example?.[1], firstWaveProgram)
+  }
 })

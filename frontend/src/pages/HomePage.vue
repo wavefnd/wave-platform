@@ -4,6 +4,7 @@ import { computed, onMounted, ref } from 'vue'
 
 import GitHubMark from '../components/icons/GitHubMark.vue'
 import { useI18n } from '../i18n'
+import { homeDocumentationLinks, firstWaveProgram } from '../services/homeOnboarding'
 import {
   getCommunityThreads,
   getCommunitySpaces,
@@ -31,11 +32,9 @@ const installCommand = computed(() => installPlatform.value === 'windows'
   ? 'irm https://wave-lang.dev/install.ps1 -OutFile install.ps1; powershell -ExecutionPolicy Bypass -File .\\install.ps1'
   : 'curl -fsSL https://wave-lang.dev/install.sh | bash')
 
-const docs = computed(() => [
-  { path: 'getting-started/install', label: t('docs.installation'), detail: t('docs.installation.detail') },
-  { path: 'getting-started/overview', label: t('docs.firstProgram'), detail: t('docs.firstProgram.detail') },
-  { path: 'reference/syntax-quick-reference', label: t('docs.language'), detail: t('docs.language.detail') },
-])
+const docs = computed(() => homeDocumentationLinks.map((item) => ({
+  ...item, label: t(item.label), detail: t(item.detail),
+})))
 
 function authorName(author: string) {
   const label = author.replace(/\s*<[^>]+>\s*$/, '').trim()
@@ -98,10 +97,29 @@ onMounted(async () => {
 
 <template>
   <main class="portal-home portal-width">
+    <section class="portal-intro" aria-labelledby="wave-intro-title">
+      <div class="portal-intro-copy">
+        <h1 id="wave-intro-title">{{ t('home.languageTitle') }}</h1>
+        <p>{{ t('home.languageIntro') }}</p>
+        <p class="portal-development-note">{{ t('home.developmentStatus') }}</p>
+        <nav class="portal-start-links" :aria-label="t('home.start.title')">
+          <RouterLink v-for="item in docs" :key="item.path" :to="`/docs/${item.path}`">{{ item.label }}</RouterLink>
+        </nav>
+      </div>
+      <div class="portal-first-program">
+        <h2>{{ t('home.exampleTitle') }}</h2>
+        <p>{{ t('home.exampleSave') }}</p>
+        <pre><code>{{ firstWaveProgram }}</code></pre>
+        <p>{{ t('home.exampleRun') }}</p>
+        <pre><code>wavec run main.wave</code></pre>
+        <p class="portal-example-output">{{ t('home.exampleOutput') }} <samp>Hello, Wave!</samp></p>
+      </div>
+    </section>
+
     <div class="portal-modules">
       <section v-if="releases.length" id="releases" class="portal-module">
         <header>
-          <h1>{{ t('home.latestReleases') }}</h1>
+          <h2>{{ t('home.latestReleases') }}</h2>
 		  <RouterLink to="/releases">{{ t('common.more') }}</RouterLink>
         </header>
         <ul class="portal-data-list">

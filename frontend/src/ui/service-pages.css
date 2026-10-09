@@ -4,6 +4,33 @@
   padding: 34px 0 52px;
 }
 
+.portal-intro {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+  gap: 34px 48px;
+  margin-bottom: 38px;
+  padding-bottom: 34px;
+  border-bottom: 1px solid var(--wave-border);
+}
+.portal-intro-copy, .portal-first-program { min-width: 0; }
+.portal-intro h1 { margin: 0 0 16px; color: var(--wave-text); font-size: clamp(28px, 4vw, 40px); line-height: 1.15; letter-spacing: -0.035em; }
+.portal-intro p { margin: 0 0 16px; color: var(--wave-text-secondary); line-height: 1.65; }
+.portal-intro .portal-development-note { color: var(--wave-text-muted); font-size: 13px; }
+.portal-start-links, .community-welcome nav { display: flex; flex-wrap: wrap; gap: 12px 20px; }
+.portal-start-links a, .community-welcome nav a { color: var(--wave-accent); font-weight: 650; text-underline-offset: 3px; }
+.portal-first-program { padding: 20px; border: 1px solid var(--wave-border); border-radius: var(--wave-radius-sm); background: var(--wave-surface); }
+.portal-first-program h2 { margin: 0 0 12px; font-size: 16px; }
+.portal-first-program p { font-size: 13px; }
+.portal-first-program pre { overflow-x: auto; margin: 0 0 14px; padding: 14px; border-radius: var(--wave-radius-sm); background: #1e1e1e; color: #e8e8e8; font: 13px/1.6 var(--wave-font-code); }
+.portal-first-program .portal-example-output { margin-bottom: 0; }
+.portal-example-output samp { font-family: var(--wave-font-code); }
+.community-welcome { padding: 24px 20px; border-bottom: 1px solid var(--wave-border); }
+.community-welcome h2 { margin: 0 0 10px; font-size: 20px; }
+.community-welcome p { margin: 0 0 14px; color: var(--wave-text-secondary); line-height: 1.6; }
+.community-welcome nav { font-size: 13px; }
+.community-welcome .community-language-policy { margin: 16px 0 0; }
+
 .portal-modules {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -919,6 +946,7 @@
 	.user-activity-row { grid-template-columns: 90px minmax(0, 1fr); }
 	.user-activity-row time { grid-column: 2; }
 	.user-activity-row p { grid-column: 1 / -1; }
+  .portal-intro { grid-template-columns: 1fr; gap: 24px; }
   .portal-modules { grid-template-columns: 1fr; gap: 30px; }
   .portal-module-pair { grid-template-columns: 1fr; gap: 30px; }
   .docs-catalog { grid-template-columns: 1fr; }
