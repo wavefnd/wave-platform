@@ -169,8 +169,8 @@ fun main() {
 
 The fence works without metadata, but official documentation must keep its
 adjacent `wave-example` marker and set `"playground": true` on the matching entry
-in `wavedoc/examples.json`. The existing `stdin`, `stdout`, and `exit` fields
-supply initial input and the collapsible expected output. Reset restores the
+in `wavedoc/examples.json`. The `stdin` field supplies initial input; `stdout` and `exit` remain
+verification data for automated tests. Reset restores the
 original source and input and clears the previous execution result. The same ID
 in translations reuses this metadata; keep the fence modifier in translations.
 

@@ -19,8 +19,6 @@ test('only an explicit playground fence becomes an embedded editor', () => {
 test('metadata is supplied by the adjacent registered example only', () => {
   const result = renderDocumentMarkdown('<!-- wave-example: input-calculator -->\n' + fence, options)
   assert.equal(result.slots[0].stdin, '3 1200\n')
-  assert.equal(result.slots[0].expectedOutput, 'total=3600\n')
-  assert.equal(result.slots[0].expectedExit, 0)
   for (const prefix of ['<!-- wave-example: unknown -->\n', '<!-- wave-example: input-calculator -->\n\nA paragraph.\n\n']) {
     assert.equal(renderDocumentMarkdown(prefix + fence, options).slots[0].stdin, undefined)
   }
@@ -37,11 +35,11 @@ test('a single parse preserves headings, references and surrounding lists', () =
 })
 
 test('nested examples retain container markup and metadata', () => {
-  const nested = ('<!-- wave-example: book-hello -->\n' + fence).split('\n').map(line => '> ' + line).join('\n')
+  const nested = ('<!-- wave-example: input-calculator -->\n' + fence).split('\n').map(line => '> ' + line).join('\n')
   const result = renderDocumentMarkdown(nested, options)
   assert.match(result.html, /^<blockquote>/)
   assert.match(result.html, /<\/blockquote>/)
-  assert.equal(result.slots[0].expectedOutput, 'Hello, Wave!\n')
+  assert.equal(result.slots[0].stdin, '3 1200\n')
 })
 
 test('example text stays data, including HTML and closing-tag strings', () => {

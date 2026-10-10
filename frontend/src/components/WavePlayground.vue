@@ -4,7 +4,7 @@ import { tokenizeWave } from '../services/waveSyntax'
 import { useI18n } from '../i18n'
 import { compileWave, WAVE_VERSION } from '../services/playground/client'
 
-const props = defineProps<{ source: string; compact?: boolean; embedded?: boolean; stdin?: string; expectedOutput?: string; expectedExit?: number }>()
+const props = defineProps<{ source: string; compact?: boolean; embedded?: boolean; stdin?: string }>()
 const { t } = useI18n()
 const id = useId()
 const code = ref(props.source)
@@ -110,11 +110,6 @@ onBeforeUnmount(() => { resizeObserver?.disconnect(); generation++; release() })
       <pre v-if="failure" class="playground-error" role="alert">{{ failure }}</pre>
       <p v-if="!output && !failure">{{ t('playground.noOutput') }}</p>
     </div>
-    <details v-if="expectedOutput !== undefined" class="playground-expected">
-      <summary>{{ t('playground.expectedOutput') }}</summary>
-      <pre>{{ expectedOutput }}</pre>
-      <p>{{ t('playground.exit') }} {{ expectedExit ?? 0 }}</p>
-    </details>
     <p class="playground-limit">{{ t('playground.limits') }}</p>
   </section>
 </template>
@@ -141,8 +136,8 @@ onBeforeUnmount(() => { resizeObserver?.disconnect(); generation++; release() })
   .playground-highlight { visibility: hidden; }
 }
 .wave-playground textarea:focus-visible, .wave-playground button:focus-visible { outline: 2px solid var(--wave-accent); outline-offset: 2px; }
-.playground-input, .playground-expected { margin: 10px 0; font-size: 12px; }
-.playground-input summary, .playground-expected summary { cursor: pointer; }
+.playground-input { margin: 10px 0; font-size: 12px; }
+.playground-input summary { cursor: pointer; }
 .playground-input label { display: block; margin: 8px 0; color: var(--wave-text-secondary); }
 .playground-input textarea { background: var(--wave-surface); color: var(--wave-text); }
 .playground-actions { margin: 12px 0; }
@@ -150,7 +145,7 @@ onBeforeUnmount(() => { resizeObserver?.disconnect(); generation++; release() })
 .playground-actions .playground-run { color: var(--wave-accent); }
 .playground-actions a { margin-left: auto; font-size: 12px; color: var(--wave-accent); }
 .playground-result { max-height: 280px; overflow: auto; border-top: 1px solid var(--wave-border); padding-top: 10px; }
-.wave-playground .playground-result pre, .wave-playground .playground-expected pre { margin: 0; padding: 8px 0; border: 0; border-radius: 0; background: transparent; color: var(--wave-text); white-space: pre-wrap; overflow-wrap: anywhere; font: 13px/1.6 var(--wave-font-code); }
+.wave-playground .playground-result pre { margin: 0; padding: 8px 0; border: 0; border-radius: 0; background: transparent; color: var(--wave-text); white-space: pre-wrap; overflow-wrap: anywhere; font: 13px/1.6 var(--wave-font-code); }
 .wave-playground .playground-result .playground-error { color: var(--wave-danger, #c93838); }
 .wave-playground .playground-limit { margin: 8px 0 0; color: var(--wave-text-muted); font-size: 11px; line-height: 1.5; }
 </style>

@@ -2,8 +2,8 @@ import { Marked, Renderer, type Token, type Tokens } from 'marked'
 import { gfmHeadingId } from 'marked-gfm-heading-id'
 import manifest from '../../../wavedoc/examples.json' with { type: 'json' }
 
-export type DocumentExample = { source: string; stdin?: string; expectedOutput?: string; expectedExit?: number }
-type ExampleMetadata = { id: string; stdin?: string; stdout?: string | null; exit?: number }
+export type DocumentExample = { source: string; stdin?: string }
+type ExampleMetadata = { id: string; stdin?: string }
 const examples = new Map<string, ExampleMetadata>(manifest.map(item => [item.id, item]))
 const marker = /^<!--\s*wave-example: ([a-z0-9-]+)\s*-->\s*$/
 
@@ -37,8 +37,6 @@ export function renderDocumentMarkdown(source: string, options: {
       const index = slots.push({
         source: token.text,
         stdin: example?.stdin,
-        expectedOutput: typeof example?.stdout === 'string' ? example.stdout : undefined,
-        expectedExit: example ? example.exit ?? 0 : undefined,
       }) - 1
       return `<div class="document-playground" data-wave-playground="${options.slotPrefix}-${index}"></div>`
     }
