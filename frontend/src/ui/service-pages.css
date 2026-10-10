@@ -682,9 +682,9 @@
 .document-content li { margin: 5px 0; }
 .document-content blockquote { margin: 18px 0; padding: 11px 14px; border-left: 3px solid var(--service-accent); background: var(--wave-accent-soft); color: var(--wave-text-secondary); }
 .document-content blockquote p { margin: 3px 0; }
-.document-content pre { overflow-x: auto; margin: 17px 0 22px; padding: 18px 20px; border: 1px solid var(--wave-code-border); border-radius: 5px; background: var(--wave-code-bg); color: var(--wave-code-text); }
+.document-content pre { overflow-x: auto; margin: 17px 0 22px; padding: 18px 20px; border: 1px solid var(--wave-border); border-radius: 5px; background: var(--wave-bg-subtle); color: var(--wave-text); }
 .document-content pre code { color: inherit; font: 13px/1.65 var(--wave-font-code); font-variant-ligatures: none; white-space: pre; }
-.document-content pre .token.comment { color: var(--wave-code-comment); }.document-content pre .token.keyword { color: var(--wave-code-keyword); }.document-content pre .token.builtin { color: var(--wave-code-type); }.document-content pre .token.string { color: var(--wave-code-string); }.document-content pre .token.number { color: var(--wave-code-type); }.document-content pre .token.operator { color: var(--wave-code-operator); }
+.document-content pre .token.comment { color: var(--wave-syntax-comment); }.document-content pre .token.keyword { color: var(--wave-syntax-keyword); }.document-content pre .token.builtin { color: var(--wave-syntax-type); }.document-content pre .token.string { color: var(--wave-syntax-string); }.document-content pre .token.number { color: var(--wave-syntax-number); }.document-content pre .token.operator { color: var(--wave-syntax-keyword); }
 .document-content table { display: block; max-width: 100%; overflow-x: auto; margin: 18px 0 24px; border-collapse: collapse; font-size: 14px; }
 .document-content table th, .document-content table td { padding: 8px 10px; border: 1px solid var(--wave-border); text-align: left; vertical-align: top; }
 .document-content table th { background: var(--wave-bg-subtle); font-weight: 680; }

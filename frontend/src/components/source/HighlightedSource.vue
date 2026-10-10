@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import type { Token as PrismToken, TokenStream } from 'prismjs'
 
+import { tokenizeWave } from '../../services/waveSyntax'
 import type { SourceBlob } from './types'
 import { grammarForLanguage, languageForPath, Prism } from './syntax'
 
@@ -49,7 +50,9 @@ const lines = computed<Segment[][]>(() => {
   } else {
     const language = languageForPath(props.path)
     const grammar = grammarForLanguage(language)
-    segments = grammar ? flattenPrism(Prism.tokenize(props.content, grammar)) : [{ classes: [], text: props.content }]
+    segments = language === 'wave'
+      ? tokenizeWave(props.content).map(({ kind, text }) => ({ classes: kind ? ['token', kind] : [], text }))
+      : grammar ? flattenPrism(Prism.tokenize(props.content, grammar)) : [{ classes: [], text: props.content }]
   }
   if (!segments.length) segments = [{ classes: [], text: props.content }]
 

@@ -5,6 +5,7 @@ import { gfmHeadingId } from 'marked-gfm-heading-id'
 import { computed } from 'vue'
 
 import { grammarForLanguage, normalizeFenceLanguage, Prism } from './source/syntax'
+import { highlightWave } from '../services/waveSyntax'
 import { useI18n } from '../i18n'
 
 const props = defineProps<{ source: string; repository?: string; path?: string; reference?: string; runnable?: boolean }>()
@@ -59,7 +60,7 @@ const rendered = computed(() => {
   renderer.code = ({ text, lang }) => {
     const language = normalizeFenceLanguage(lang)
     const grammar = grammarForLanguage(language)
-    const content = grammar ? Prism.highlight(text, grammar, language) : String(Prism.util.encode(text))
+    const content = language === 'wave' ? highlightWave(text) : grammar ? Prism.highlight(text, grammar, language) : String(Prism.util.encode(text))
     const languageClass = language ? ` class="language-${language}"` : ''
     const code = `<pre><code${languageClass}>${content}\n</code></pre>`
     return props.runnable && language === 'wave'

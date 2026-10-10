@@ -109,6 +109,10 @@ jobs:
         working-directory: frontend
         run: npm run test:playground
 
+      - name: Test Wave syntax highlighting
+        working-directory: frontend
+        run: npm run test:syntax
+
       - name: Build frontend
         working-directory: frontend
         run: npm run build
