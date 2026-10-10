@@ -1,5 +1,5 @@
 import("std::env::environ")::{EnvResult, env_exists, env_get_i32};
-import("./http/server")::{serve};
+import("./server")::{serve};
 import("./translation/backend")::{backend_status};
 
 fun main() -> i32 {

@@ -3,7 +3,9 @@
 The homepage, `/playground`, and documentation Wave fences share one editor and
 runner. The HTTP/compiler service in `src/` is Wave. The Vue component and the
 small JavaScript Wasm/WASI host connect it to the browser; no Go or Python service
-compiles or runs playground programs.
+compiles or runs playground programs. HTTP framing and connection handling come
+from the shared [Wave HTTP library](../http/README.md); routes and compilation
+policy remain in this service.
 
 All Wave builds use the root `wave-version` pin and the compiler's bundled std.
 The same pin applies to platform native modules, WaveEditor, public installers,

@@ -14,8 +14,8 @@ integration are not implemented yet. `/readyz` deliberately returns `503` with
 | Path | Responsibility |
 | --- | --- |
 | `src/main.wave` | Configuration and service entry point |
-| `src/http/request.wave` | Bounded HTTP request parsing |
-| `src/http/server.wave` | TCP acceptance, deadlines, and HTTP responses |
+| `../http/src/` | Shared Wave HTTP framing, I/O deadlines, and responses |
+| `src/server.wave` | Translation listener, health routes, and response bodies |
 | `src/translation/backend.wave` | Current model readiness status |
 | `tools/toolchain.py` | Pinned release verification, retention, and installation |
 | `tools/build.py` | Build with the locked compiler and its matching standard library |
@@ -43,7 +43,9 @@ WAVE_TRANSLATE_PORT=8091 /tmp/wave-translation
 
 The install destination must be new. Installation checks the archive
 size and SHA-256, safely extracts them, and records the lock used. The build tool
-requires that receipt to match the selected lock and explicitly sets `--std-root`.
+requires that receipt to match the selected lock and explicitly sets `--std-root`
+and `--dep wave_http=<repository>/http`. See [Wave HTTP](../http/README.md) for
+the reusable library shared with Playground.
 Do not mix the pinned compiler with a previously installed standard library.
 
 ```sh

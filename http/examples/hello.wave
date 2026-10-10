@@ -1,0 +1,40 @@
+import("std::net::tcp")::{TcpStream, TcpListener, tcp_bind_loopback, tcp_accept, tcp_close_listener};
+import("std::net::error")::{NetResult};
+import("std::env::environ")::{EnvResult, env_exists, env_get_i32};
+import("wave_http::request")::{Request, method_is, target_is};
+import("wave_http::connection")::{read_request, write_response, close_connection};
+
+fun handle(stream: TcpStream) {
+    var data: array<u8, 12288>;
+    var request: Request = read_request(stream, &data[0], 12288, 4096, 2000);
+    if (request.status == 0) { return; }
+    if (request.status != 200) {
+        write_response(stream, request.status, "text/plain", "", "Rejected\n" as ptr<u8>, 9, request.head_only);
+    } else if (target_is(&data[0], request, "/echo") && method_is(&data[0], request, "POST")) {
+        write_response(stream, 201, "application/octet-stream", "", &data[request.body_start], request.length, false);
+    } else if (target_is(&data[0], request, "/empty")) {
+        write_response(stream, 204, "text/plain", "", null, 0, request.head_only);
+    } else if (target_is(&data[0], request, "/") && (request.head_only || method_is(&data[0], request, "GET"))) {
+        write_response(stream, 200, "text/plain", "", "Hello, HTTP!\n" as ptr<u8>, 13, request.head_only);
+    } else {
+        write_response(stream, 404, "text/plain", "", "Not found\n" as ptr<u8>, 10, request.head_only);
+    }
+}
+
+fun main() -> i32 {
+    var port: i32 = 8093;
+    if (env_exists("WAVE_HTTP_PORT")) {
+        var configured: EnvResult<i32> = env_get_i32("WAVE_HTTP_PORT");
+        if (!configured.ok || configured.value < 1 || configured.value > 65535) { return 2; }
+        port = configured.value;
+    }
+    var listener: NetResult<TcpListener> = tcp_bind_loopback(port as u16);
+    if (!listener.ok) { return 1; }
+    while (true) {
+        var client: NetResult<TcpStream> = tcp_accept(listener.value);
+        if (!client.ok) { tcp_close_listener(listener.value); return 2; }
+        handle(client.value);
+        close_connection(client.value);
+    }
+    return 0;
+}

@@ -1,0 +1,32 @@
+import("std::string::len")::{len};
+import("wave_http::request")::{Request, parse_request, method_is, target_is, content_type_is};
+
+fun status(source: str, max_body: i64) -> i32 {
+    return parse_request(source as ptr<u8>, len(source) as i64, max_body).status;
+}
+
+fun main() -> i32 {
+    // The library must accept routes, methods, and media types it knows nothing about.
+    var source: str = "PATCH /custom?mode=one HTTP/1.1\r\nHost: local\r\nContent-Type: application/json\r\nContent-Length: 17\r\n\r\n";
+    var request: Request = parse_request(source as ptr<u8>, len(source) as i64, 17);
+    if (request.status != 200 || request.length != 17 || !request.has_length) { return 1; }
+    if (!method_is(source as ptr<u8>, request, "PATCH")) { return 2; }
+    if (!target_is(source as ptr<u8>, request, "/custom?mode=one")) { return 3; }
+    if (!content_type_is(source as ptr<u8>, request, "application/json")) { return 4; }
+    if (request.body_start != len(source) as i64 || request.head_only) { return 5; }
+    if (status(source, 16) != 413 || status(source, 0) != 413) { return 6; }
+    // Check bounds before multiplying a Content-Length digit into an i64.
+    if (status("POST / HTTP/1.1\r\nHost: a\r\nContent-Length: 9223372036854775807\r\n\r\n", 9223372036854775807) != 200) { return 7; }
+    if (status("POST / HTTP/1.1\r\nHost: a\r\nContent-Length: 9223372036854775808\r\n\r\n", 9223372036854775807) != 413) { return 8; }
+    if (status("GET / HTTP/1.1\r\nHost: a\r\nContent-Length: 0000\r\n\r\n", 0) != 200) { return 9; }
+    if (status("GET / HTTP/1.1\r\nHost: a\r\nHost: b\r\n\r\n", 0) != 400) { return 10; }
+    if (status("POST / HTTP/1.1\r\nHost: a\r\nContent-Length: 0\r\nTransfer-Encoding: chunked\r\n\r\n", 0) != 400) { return 11; }
+    if (status("POST / HTTP/1.1\r\nHost: a\r\nTransfer-Encoding: chunked\r\n\r\n", 0) != 501) { return 12; }
+    if (status("GET / HTTP/1.1\r\nHost: a\r\nContent-Type: text/plain\r\nContent-Type: application/json\r\n\r\n", 0) != 400) { return 13; }
+    if (status("GET / HTTP/1.1\r\nHost: a\r\nExpect: 100-continue\r\n\r\n", 0) != 400) { return 14; }
+    source = "HEAD / HTTP/1.1\r\n\r\n";
+    request = parse_request(source as ptr<u8>, len(source) as i64, 0);
+    if (request.status != 400 || !request.head_only) { return 15; }
+    println("Wave HTTP parser tests passed");
+    return 0;
+}

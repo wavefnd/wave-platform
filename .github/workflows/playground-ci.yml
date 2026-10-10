@@ -4,6 +4,9 @@ on:
   pull_request:
     paths:
       - 'playground/**'
+      - 'http/**'
+      - 'translate/src/**'
+      - 'translate/tests/test_http.py'
       - 'frontend/src/services/playground/**'
       - 'frontend/tests/playground*'
       - 'wave-version'
@@ -14,6 +17,9 @@ on:
     branches: [master]
     paths:
       - 'playground/**'
+      - 'http/**'
+      - 'translate/src/**'
+      - 'translate/tests/test_http.py'
       - 'frontend/src/services/playground/**'
       - 'frontend/tests/playground*'
       - 'wave-version'
@@ -40,6 +46,18 @@ jobs:
           address=$(docker inspect --format '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' "$container")
           echo "PLAYGROUND_URL=http://$address:8092" >> "$GITHUB_ENV"
           curl --retry 15 --retry-delay 1 --retry-connrefused --fail "http://$address:8092/healthz"
+      - name: Test the shared HTTP library and Translation consumer
+        run: |
+          container=$(docker compose ps -q playground)
+          sdk="$RUNNER_TEMP/wave-http-sdk"
+          docker cp "$container:/opt/wave" "$sdk"
+          python3 tools/check-wave-version.py "$sdk/wavec"
+          "$sdk/wavec" --std-root "$sdk/std" --dep "wave_http=$PWD/http" build http/tests/request.wave --target-dir /tmp/http-tests-build -o /tmp/http-tests
+          /tmp/http-tests
+          "$sdk/wavec" --std-root "$sdk/std" --dep "wave_http=$PWD/http" build http/examples/hello.wave --target-dir /tmp/http-example-build -o /tmp/wave-http-example
+          python3 http/tests/test_server.py
+          "$sdk/wavec" --std-root "$sdk/std" --dep "wave_http=$PWD/http" build translate/src/main.wave --target-dir /tmp/translate-build -o /tmp/wave-translation-server
+          python3 translate/tests/test_http.py
       - name: Test real compilation and browser host execution
         run: |
           python3 playground/tests/test_server.py

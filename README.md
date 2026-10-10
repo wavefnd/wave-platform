@@ -58,6 +58,10 @@ The homepage, documentation examples, and `/playground` use the Wave compiler
 service included in Docker Compose. See [Playground](playground/README.md) for
 its execution limits and integration checks.
 
+Wave services share the small [HTTP library](http/README.md). Playground and
+Translation remain independent processes with their own routes and lifecycle;
+the Go platform remains a single host application.
+
 ### LLVM toolchain downloads
 
 The `/toolchains` page reads `/downloads/toolchains/index.json`. In development,

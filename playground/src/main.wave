@@ -1,63 +1,14 @@
-import("std::net::tcp")::{TcpStream, TcpListener, tcp_bind, tcp_accept, tcp_close, tcp_shutdown_write, tcp_read_timeout, tcp_write_timeout};
-import("std::net::error")::{NetResult, NetIoResult, NET_ERROR_NONE, NET_ERROR_TIMED_OUT};
-import("std::time::clock")::{time_now_monotonic_ns};
+import("std::net::tcp")::{TcpStream, TcpListener, tcp_bind, tcp_accept, tcp_close_listener};
+import("std::net::error")::{NetResult};
 import("std::string::len")::{len};
 import("std::fs::file")::{fs_read_all};
 import("std::mem::alloc")::{mem_alloc, mem_free};
-import("./request")::{Request, header_end, parse_request};
+import("wave_http::request")::{Request, method_is, target_is, content_type_is};
+import("wave_http::connection")::{read_request, write_response, close_connection};
 import("./compiler")::{compile, cleanup};
 
-fun remaining(deadline: i64) -> i32 {
-    var now: i64 = time_now_monotonic_ns();
-    if (now < 0 || now >= deadline) { return 0; }
-    return ((deadline - now) / 1000000 + 1) as i32;
-}
-
-fun send(stream: TcpStream, bytes: ptr<u8>, size: i64, deadline: i64) -> bool {
-    var sent: i64 = 0;
-    while (sent < size) {
-        var wait: i32 = remaining(deadline);
-        if (wait == 0) { return false; }
-        var result: NetIoResult = tcp_write_timeout(stream, &bytes[sent], size - sent, wait);
-        if (result.error.kind != NET_ERROR_NONE || result.count <= 0) { return false; }
-        sent += result.count;
-    }
-    return true;
-}
-
-fun text(stream: TcpStream, value: str, deadline: i64) -> bool {
-    return send(stream, value as ptr<u8>, len(value) as i64, deadline);
-}
-
 fun respond(stream: TcpStream, status: i32, content_type: str, data: ptr<u8>, size: i64, head: bool) {
-    var deadline: i64 = time_now_monotonic_ns() + 2000000000;
-    var line: str = "HTTP/1.1 400 Bad Request\r\n";
-    if (status == 200) { line = "HTTP/1.1 200 OK\r\n"; }
-    if (status == 404) { line = "HTTP/1.1 404 Not Found\r\n"; }
-    if (status == 405) { line = "HTTP/1.1 405 Method Not Allowed\r\n"; }
-    if (status == 408) { line = "HTTP/1.1 408 Request Timeout\r\n"; }
-    if (status == 413) { line = "HTTP/1.1 413 Content Too Large\r\n"; }
-    if (status == 422) { line = "HTTP/1.1 422 Unprocessable Content\r\n"; }
-    if (status == 431) { line = "HTTP/1.1 431 Request Header Fields Too Large\r\n"; }
-    if (status == 503) { line = "HTTP/1.1 503 Service Unavailable\r\n"; }
-    if (status == 501) { line = "HTTP/1.1 501 Not Implemented\r\n"; }
-    if (status == 505) { line = "HTTP/1.1 505 HTTP Version Not Supported\r\n"; }
-    if (!text(stream, line, deadline)) { return; }
-    if (!text(stream, "Connection: close\r\nCache-Control: no-store\r\nX-Content-Type-Options: nosniff\r\nX-Wave-Version: 0.2.1-pre-beta\r\nContent-Type: ", deadline)) { return; }
-    if (!text(stream, content_type, deadline)) { return; }
-    if (!text(stream, "\r\nContent-Length: ", deadline)) { return; }
-    var digits: array<u8, 20>;
-    var cursor: i64 = 20;
-    var number: i64 = size;
-    while (true) {
-        cursor -= 1;
-        digits[cursor] = (48 + number % 10) as u8;
-        number /= 10;
-        if (number == 0) { break; }
-    }
-    if (!send(stream, &digits[cursor], 20 - cursor, deadline)) { return; }
-    if (!text(stream, "\r\n\r\n", deadline)) { return; }
-    if (!head) { send(stream, data, size, deadline); }
+    write_response(stream, status, content_type, "X-Wave-Version: 0.2.1-pre-beta\r\n", data, size, head);
 }
 
 fun error(stream: TcpStream, status: i32, message: str, head: bool) {
@@ -66,34 +17,34 @@ fun error(stream: TcpStream, status: i32, message: str, head: bool) {
 
 fun handle(stream: TcpStream) {
     var request_bytes: array<u8, 40960>;
-    var used: i64 = 0;
-    var end: i64 = 0;
-    var deadline: i64 = time_now_monotonic_ns() + 3000000000;
-    var request: Request = Request { status: 400, route: 0, head_only: false, length: 0 };
-    while (true) {
-        var wait: i32 = remaining(deadline);
-        if (wait == 0) { error(stream, 408, "Request timed out.", false); return; }
-        var limit: i64 = 8192 - used;
-        if (end > 0) { limit = end + request.length - used; }
-        if (limit <= 0) { error(stream, 431, "Request headers are too large.", false); return; }
-        var received: NetIoResult = tcp_read_timeout(stream, &request_bytes[used], limit, wait);
-        if (received.error.kind == NET_ERROR_TIMED_OUT) { error(stream, 408, "Request timed out.", false); return; }
-        if (received.error.kind != NET_ERROR_NONE || received.count <= 0) { return; }
-        used += received.count;
-        if (end == 0) {
-            end = header_end(&request_bytes[0], used);
-            if (end > 0) {
-                request = parse_request(&request_bytes[0], end);
-                if (request.status != 200) { error(stream, request.status, "Invalid playground request.", request.head_only); return; }
-                if (request.route == 2) {
-                    error(stream, 200, "Wave Playground 0.2.1-pre-beta", request.head_only);
-                    return;
-                }
-            }
-        }
-        if (end > 0 && used >= end + request.length) { break; }
+    var request: Request = read_request(stream, &request_bytes[0], 40960, 32768, 3000);
+    if (request.status == 0) { return; }
+    if (request.status != 200) {
+        error(stream, request.status, "Invalid playground request.", request.head_only);
+        return;
     }
-    var status: i32 = compile(&request_bytes[end], request.length);
+    if (method_is(&request_bytes[0], request, "POST")) {
+        if (!request.has_length || request.length == 0 || !content_type_is(&request_bytes[0], request, "text/plain")) {
+            error(stream, 400, "Expected a nonempty text/plain body.", false);
+            return;
+        }
+        if (!target_is(&request_bytes[0], request, "/api/playground/compile")) {
+            error(stream, 404, "Not found.", false);
+            return;
+        }
+    } else {
+        if (!request.head_only && !method_is(&request_bytes[0], request, "GET")) {
+            error(stream, 405, "Method not allowed.", false);
+        } else if (request.length != 0) {
+            error(stream, 400, "Unexpected request body.", request.head_only);
+        } else if (target_is(&request_bytes[0], request, "/healthz")) {
+            error(stream, 200, "Wave Playground 0.2.1-pre-beta", request.head_only);
+        } else {
+            error(stream, 404, "Not found.", request.head_only);
+        }
+        return;
+    }
+    var status: i32 = compile(&request_bytes[request.body_start], request.length);
     var output: ptr<u8> = mem_alloc(4194304);
     if (output == null) { cleanup(); error(stream, 503, "Compiler capacity exceeded.", false); return; }
     if (status == 0) {
@@ -118,21 +69,9 @@ fun main() -> i32 {
     println("Wave Playground 0.2.1-pre-beta listening on :8092");
     while (true) {
         var client: NetResult<TcpStream> = tcp_accept(listener.value);
-        if (!client.ok) { return 2; }
+        if (!client.ok) { tcp_close_listener(listener.value); return 2; }
         handle(client.value);
-        // Deliver the response and FIN before discarding any rejected body.
-        // Closing a socket with unread bytes immediately can turn a valid 4xx
-        // response into ECONNRESET/502 at the reverse proxy.
-        tcp_shutdown_write(client.value);
-        var discarded: array<u8, 4096>;
-        var drain_deadline: i64 = time_now_monotonic_ns() + 100000000;
-        var drained: i64 = 0;
-        while (drained < 40960 && remaining(drain_deadline) > 0) {
-            var part: NetIoResult = tcp_read_timeout(client.value, &discarded[0], 4096, remaining(drain_deadline));
-            if (part.error.kind != NET_ERROR_NONE || part.count <= 0) { break; }
-            drained += part.count;
-        }
-        tcp_close(client.value);
+        close_connection(client.value);
     }
     return 0;
 }

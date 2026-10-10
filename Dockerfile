@@ -86,7 +86,8 @@ RUN vex --version
 FROM wave-toolchain AS playground-builder
 WORKDIR /src
 COPY playground/src ./playground/src
-RUN wavec --std-root /root/.wave/bin/std build playground/src/main.wave \
+COPY http/ ./http/
+RUN wavec --std-root /root/.wave/bin/std --dep wave_http=/src/http build playground/src/main.wave \
     --target-dir /tmp/playground-build -o /tmp/wave-playground
 
 FROM debian:trixie-slim AS playground

@@ -119,6 +119,7 @@ class ToolingTests(unittest.TestCase):
             build.build(sdk, self.lock_path, self.root / 'server', self.root / 'build')
             command = run.call_args.args[0]
             self.assertEqual(command[:3], [str(sdk / 'wavec'), '--std-root', str(sdk / 'std')])
+            self.assertEqual(command[3:5], ['--dep', 'wave_http=' + str(build.ROOT.parent / 'http')])
             receipt = sdk / 'wave-translation-install.json'
             receipt.write_text('{}')
             with self.assertRaisesRegex(ValueError, 'differs'):
