@@ -66,6 +66,11 @@ services:
     depends_on:
       wave-platform:
         condition: service_healthy
+      playground:
+        condition: service_started
+    networks:
+      - default
+      - playground
     environment:
       WAVE_SITE_ADDRESS: "${WAVE_SITE_ADDRESS:-http://localhost}"
     ports:
@@ -88,6 +93,31 @@ services:
       interval: 10s
       timeout: 3s
       retries: 5
+      start_period: 5s
+
+  playground:
+    build:
+      context: .
+      target: playground
+    image: wave-playground:development
+    restart: unless-stopped
+    init: true
+    read_only: true
+    user: "10002:10002"
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    pids_limit: 64
+    mem_limit: 1g
+    cpus: 1.0
+    tmpfs:
+      - /work:rw,noexec,nosuid,nodev,size=64m,uid=10002,gid=10002,mode=0700
+    networks: [playground]
+    expose: ["8092"]
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8092/healthz"]
+      interval: 30s
+      timeout: 15s
+      retries: 3
       start_period: 5s
 
   wave-platform-data-init:
@@ -117,3 +147,7 @@ services:
 volumes:
   caddy-data:
   caddy-config:
+
+networks:
+  playground:
+    internal: true

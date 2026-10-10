@@ -8,12 +8,12 @@
     [switch]$Help,
     [Parameter(ValueFromRemainingArguments = $true)][string[]]$Remaining
 )
-# Wave installer channel policy: latest-only-v1
+# Wave installer channel policy: pinned-0.2.1-v1
 $ErrorActionPreference = 'Stop'
 
 function Write-Info($Message) { Write-Host "[info] $Message" }
 function Manual-Only {
-    throw 'This installer only installs the latest public release. Install older versions or Nightly manually: https://github.com/wavefnd/Wave/releases'
+    throw 'This installer installs Wave v0.2.1-pre-beta. Install older versions or Nightly manually: https://github.com/wavefnd/Wave/releases'
 }
 function Get-LatestRelease($Repository) {
     $best = $null
@@ -33,6 +33,11 @@ function Get-LatestRelease($Repository) {
     }
     if ($null -eq $best) { throw "No public versioned release is available for $Repository." }
     return $best
+}
+function Get-PinnedWaveRelease {
+    $release = Invoke-RestMethod -Headers @{Accept='application/vnd.github+json'} -TimeoutSec 60 -Uri 'https://api.github.com/repos/wavefnd/Wave/releases/tags/v0.2.1-pre-beta'
+    if ($release.tag_name -ne 'v0.2.1-pre-beta' -or $release.draft -ne $false) { throw 'Pinned Wave release metadata does not match.' }
+    return $release
 }
 function Get-ReleaseAsset($Release, $Name, [bool]$Optional = $false) {
     $assets = @($Release.assets | Where-Object { $_.name -ceq $Name })
@@ -87,7 +92,8 @@ function Test-Installation($Directory, $Target, [bool]$InstallVex, $Work) {
     $wavec = Join-Path $Directory 'wavec.exe'
     & $wavec --version
     if ($LASTEXITCODE -ne 0) { throw 'wavec --version failed. Check the Visual C++ runtime.' }
-    $actual = & $wavec print host-target
+    $spec = & $wavec print target-spec --format=json
+    $actual = ($spec | ConvertFrom-Json).triple
     if ($LASTEXITCODE -ne 0 -or "$actual".Trim() -ne $Target) { throw "Compiler host target differs from $Target." }
     $source = Join-Path $Work 'install-smoke.wave'
     [IO.File]::WriteAllText($source, @'
@@ -112,7 +118,7 @@ fun main() -> i32 {
 function Install-Wave {
     if ($Help) {
         Write-Host @'
-Wave Toolchain Installer — latest public release only
+Wave Toolchain Installer — Wave v0.2.1-pre-beta
 Usage: .\install.ps1 [-Latest] [-WithVex | -WithoutVex] [-NoModifyPath]
 Default: install Wave and install Vex when its latest release supports this platform.
 -WithVex requires Vex; -WithoutVex installs Wave only.
@@ -138,7 +144,7 @@ Older versions and Nightly: download manually from https://github.com/wavefnd/Wa
             throw "Refusing to replace a directory not managed by Wave: $installDir"
         }
     }
-    $wave = Get-LatestRelease 'wavefnd/Wave'
+    $wave = Get-PinnedWaveRelease
     $waveName = "wave-$($wave.tag_name)-$target.zip"
     $waveAsset = Get-ReleaseAsset $wave $waveName
     $vex = $null; $vexAsset = $null; $vexName = ''

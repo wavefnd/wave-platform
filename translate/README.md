@@ -2,7 +2,7 @@
 
 An internal translation service implemented in Wave. The foundation contains a
 Wave TCP server, a bounded HTTP/1.1 parser, health endpoints, and tooling for
-installing and testing an exact Wave nightly snapshot. There is no Go code or Go
+installing and testing a repository-pinned Wave release. There is no Go code or Go
 service in this directory. Python is used only for bootstrap, builds, and tests.
 
 Translation, model inference, document chunking, persistent jobs, and platform
@@ -17,9 +17,9 @@ integration are not implemented yet. `/readyz` deliberately returns `503` with
 | `src/http/request.wave` | Bounded HTTP request parsing |
 | `src/http/server.wave` | TCP acceptance, deadlines, and HTTP responses |
 | `src/translation/backend.wave` | Current model readiness status |
-| `tools/nightly.py` | Snapshot resolution, verification, retention, and installation |
+| `tools/toolchain.py` | Pinned release verification, retention, and installation |
 | `tools/build.py` | Build with the locked compiler and its matching standard library |
-| `wave-toolchain.lock.json` | Validated nightly generation and artifact digests |
+| `wave-toolchain.lock.json` | Pinned release and archive digest |
 | `tests/` | Offline tooling tests and real TCP integration tests |
 
 ## Build and run
@@ -33,7 +33,7 @@ modified or used. From the repository root:
 TRANSLATE_STORE="$HOME/.local/share/wave-translation/snapshots"
 TRANSLATE_SDK="$HOME/.local/share/wave-translation/sdk-initial"
 
-python3 translate/tools/nightly.py install \
+python3 translate/tools/toolchain.py \
   --store "$TRANSLATE_STORE" --destination "$TRANSLATE_SDK"
 PYTHONDONTWRITEBYTECODE=1 python3 translate/tools/build.py \
   --toolchain "$TRANSLATE_SDK" \
@@ -41,10 +41,10 @@ PYTHONDONTWRITEBYTECODE=1 python3 translate/tools/build.py \
 WAVE_TRANSLATE_PORT=8091 /tmp/wave-translation
 ```
 
-The install destination must be new. Installation checks the manifest and archive
+The install destination must be new. Installation checks the archive
 size and SHA-256, safely extracts them, and records the lock used. The build tool
 requires that receipt to match the selected lock and explicitly sets `--std-root`.
-Do not mix the nightly compiler with a previously installed standard library.
+Do not mix the pinned compiler with a previously installed standard library.
 
 ```sh
 curl -i http://127.0.0.1:8091/healthz
@@ -80,45 +80,16 @@ server handles connections sequentially. There is no request-body handling,
 keep-alive, TLS, concurrency, or public API yet. The parser is an intentionally
 limited health-service implementation, not a general-purpose HTTP server.
 
-## Nightly replacement and retention
+## Pinned release
 
-The upstream `nightly` tag and its release assets are replaceable. The tag alone
-is not a reproducible dependency. Resolution records the published source SHA,
-generation, compiler version, target, manifest, and archive digests. It checks the
-release before and after reading the manifest and rejects publication races.
-Downloaded bytes must also match the lock before they enter the store.
+All Wave components now use the version in the root `wave-version` file.
+The translation lock pins the release archive's size and SHA-256. Installation
+rejects a lock for any other version and never resolves a rolling release.
+The service must use the compiler's bundled standard library.
 
-`resolve` retains both artifacts **before** publishing a candidate lock:
-
-```sh
-python3 translate/tools/nightly.py resolve \
-  --store "$TRANSLATE_STORE" --lock /tmp/wave-translation-candidate.json
-python3 translate/tools/nightly.py install \
-  --lock /tmp/wave-translation-candidate.json \
-  --store "$TRANSLATE_STORE" --destination /tmp/wave-translation-candidate-sdk --offline
-PYTHONDONTWRITEBYTECODE=1 python3 translate/tools/build.py \
-  --lock /tmp/wave-translation-candidate.json \
-  --toolchain /tmp/wave-translation-candidate-sdk \
-  --build-dir /tmp/wave-translation-candidate-build --output /tmp/wave-translation-candidate
-WAVE_TRANSLATE_BINARY=/tmp/wave-translation-candidate \
-  python3 translate/tests/test_http.py
-```
-
-After tests pass, review the candidate and replace `wave-toolchain.lock.json` in a
-normal commit. Resolution never overwrites an existing lock; installation never
-silently substitutes a newer nightly. Linux ARM64 can be selected with
-`resolve --target aarch64-linux-gnu`, but this foundation was tested on x86-64.
-
-**A lock file does not preserve a deleted upstream archive.** Keep the content-
-addressed store on durable storage and copy both the lock and store to another
-host for `install --offline`. If an archive has disappeared and no retained copy
-exists, installation fails; a new snapshot requires explicit resolution and
-validation. `/tmp` is suitable for disposable tests, not snapshot retention.
-
-This foundation does not yet provide a shared artifact mirror or production
-deployment package. A Git checkout contains source and the lock, not the compiler
-archive. Shared snapshot distribution must be supplied before depending on this
-lock for unattended builds or server deployment after upstream replacement.
+Retain the archive in the selected store to reinstall with `--offline`. The
+compiler archive is not committed to Git; normal installation downloads the
+exact versioned release. Production deployment remains a separate step.
 
 ## Tests
 
@@ -127,8 +98,8 @@ PYTHONDONTWRITEBYTECODE=1 python3 translate/tests/test_tooling.py
 WAVE_TRANSLATE_BINARY=/tmp/wave-translation python3 translate/tests/test_http.py
 ```
 
-Tooling tests run offline and cover publication races, missing/corrupted
-snapshots, manifest binding, unsafe extraction, and compiler/standard-library
+Tooling tests run offline and cover version pinning, missing/corrupted
+archives, unsafe extraction, and compiler/standard-library
 selection. HTTP tests build no mock server: they launch the Wave binary on a
 temporary loopback port and exercise split requests, malformed framing, size
 limits, HEAD semantics, deadlines, and connection closure. Local socket access

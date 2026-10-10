@@ -26,6 +26,12 @@ $script:Responses = @(
 Assert ((Get-LatestRelease 'wavefnd/Wave').tag_name -eq 'v1.1.0-alpha') 'latest public version'
 $script:Responses = @()
 Must-Fail { Get-LatestRelease 'wavefnd/Wave' }
+$script:Responses = @{tag_name='v0.2.1-pre-beta';draft=$false}
+Assert ((Get-PinnedWaveRelease).tag_name -eq 'v0.2.1-pre-beta') 'pinned Wave release'
+foreach ($wrong in @(@{tag_name='nightly';draft=$false}, @{tag_name='v0.2.1-pre-beta';draft=$true})) {
+    $script:Responses = $wrong
+    Must-Fail { Get-PinnedWaveRelease } '*does not match*'
+}
 $temp = Join-Path ([IO.Path]::GetTempPath()) ('wave installer tests ' + [Guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $temp | Out-Null
 $previousDir = $env:WAVE_INSTALL_DIR
@@ -58,11 +64,13 @@ try {
     }
     function Add-UserPath($Directory) { throw 'fixture PATH failure' }
     function Get-LatestRelease($Repository) { return $script:Releases[$Repository] }
+    function Get-PinnedWaveRelease { return $script:Releases['wavefnd/Wave'] }
     $script:Archives=@{}; $script:Releases=@{}
     foreach ($target in @('x86_64-pc-windows-msvc','aarch64-pc-windows-msvc')) {
         $script:Target=$target
         foreach ($repo in @('Wave','Vex')) {
-            $name="$($repo.ToLower())-v1.0.0-$target"
+            $tag = if ($repo -eq 'Wave') { 'v0.2.1-pre-beta' } else { 'v1.0.0' }
+            $name="$($repo.ToLower())-$tag-$target"
             $folder=Join-Path $temp $name
             New-Item -ItemType Directory -Force -Path (Join-Path $folder 'llvm/bin'),(Join-Path $folder 'std') | Out-Null
             [IO.File]::WriteAllText((Join-Path $folder 'std/manifest.json'),'{}')
@@ -71,7 +79,7 @@ try {
             $zip=Join-Path $temp "$name.zip"
             Compress-Archive -LiteralPath $folder -DestinationPath $zip
             $script:Archives["$name.zip"]=$zip
-            $script:Releases["wavefnd/$repo"]=@{tag_name='v1.0.0';assets=@(@{name="$name.zip";state='uploaded';digest=('sha256:'+(Get-FileHash -LiteralPath $zip -Algorithm SHA256).Hash)})}
+            $script:Releases["wavefnd/$repo"]=@{tag_name=$tag;assets=@(@{name="$name.zip";state='uploaded';digest=('sha256:'+(Get-FileHash -LiteralPath $zip -Algorithm SHA256).Hash)})}
         }
         $env:WAVE_INSTALL_DIR=Join-Path $temp "install $target/bin"
         foreach ($failure in @('download','digest','smoke','none')) {
@@ -102,4 +110,4 @@ try {
     $env:WAVE_INSTALL_DIR=$previousDir
     Remove-Item -LiteralPath $temp -Recurse -Force
 }
-Write-Host 'Latest-only PowerShell tests passed'
+Write-Host 'Pinned Wave and latest Vex PowerShell tests passed'

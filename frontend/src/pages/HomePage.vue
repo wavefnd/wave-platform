@@ -3,6 +3,7 @@ import { Check, Copy } from '@lucide/vue'
 import { computed, onMounted, ref } from 'vue'
 
 import GitHubMark from '../components/icons/GitHubMark.vue'
+import WavePlayground from '../components/WavePlayground.vue'
 import { useI18n } from '../i18n'
 import { homeDocumentationLinks, firstWaveProgram } from '../services/homeOnboarding'
 import {
@@ -108,11 +109,7 @@ onMounted(async () => {
       </div>
       <div class="portal-first-program">
         <h2>{{ t('home.exampleTitle') }}</h2>
-        <p>{{ t('home.exampleSave') }}</p>
-        <pre><code>{{ firstWaveProgram }}</code></pre>
-        <p>{{ t('home.exampleRun') }}</p>
-        <pre><code>wavec run main.wave</code></pre>
-        <p class="portal-example-output">{{ t('home.exampleOutput') }} <samp>Hello, Wave!</samp></p>
+        <WavePlayground :source="firstWaveProgram" compact />
       </div>
     </section>
 

@@ -11,7 +11,7 @@ summary: Install Wave on Linux, macOS, or Windows and run your first program.
 
 ## Installation policy
 
-The installers install only the latest public versioned release, including versioned prereleases. Drafts and Nightly are excluded. Use manual installation below for older versions and Nightly. If the latest release has no package for your platform, installation stops without selecting an older version.
+The installers use the Wave release pinned by this platform. Drafts and Nightly are excluded. Use manual installation below for other releases. If the pinned release has no package for your platform, installation stops without selecting another version.
 
 | Operating system | Architectures |
 | --- | --- |

@@ -5,8 +5,17 @@ import { gfmHeadingId } from 'marked-gfm-heading-id'
 import { computed } from 'vue'
 
 import { grammarForLanguage, normalizeFenceLanguage, Prism } from './source/syntax'
+import { useI18n } from '../i18n'
 
-const props = defineProps<{ source: string; repository?: string; path?: string; reference?: string }>()
+const props = defineProps<{ source: string; repository?: string; path?: string; reference?: string; runnable?: boolean }>()
+const emit = defineEmits<{ runWave: [source: string] }>()
+const { t } = useI18n()
+function runExample(event: MouseEvent) {
+  if (!props.runnable || !(event.target instanceof Element)) return
+  const button = event.target.closest('button[data-wave-run]')
+  const code = button?.parentElement?.querySelector('pre > code')
+  if (code) emit('runWave', code.textContent ?? '')
+}
 
 function rewriteRelativeLinks(html: string) {
   if (!props.repository || typeof document === 'undefined') return html
@@ -52,7 +61,10 @@ const rendered = computed(() => {
     const grammar = grammarForLanguage(language)
     const content = grammar ? Prism.highlight(text, grammar, language) : String(Prism.util.encode(text))
     const languageClass = language ? ` class="language-${language}"` : ''
-    return `<pre><code${languageClass}>${content}\n</code></pre>`
+    const code = `<pre><code${languageClass}>${content}\n</code></pre>`
+    return props.runnable && language === 'wave'
+      ? `<div class="document-wave-example">${code}<button type="button" data-wave-run>${Prism.util.encode(t('playground.runExample'))}</button></div>`
+      : code
   }
   const parser = new Marked(gfmHeadingId(), { async: false, gfm: true, breaks: false, renderer })
   const html = parser.parse(props.source) as string
@@ -62,5 +74,5 @@ const rendered = computed(() => {
 </script>
 
 <template>
-  <article class="markdown-content markdown-body" v-html="rendered" />
+  <article class="markdown-content markdown-body" @click="runExample" v-html="rendered" />
 </template>

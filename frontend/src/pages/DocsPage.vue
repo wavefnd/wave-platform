@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { Search } from '@lucide/vue'
-import { computed, ref, watch, watchEffect } from 'vue'
+import { computed, nextTick, ref, watch, watchEffect } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import MarkdownContent from '../components/MarkdownContent.vue'
+import WavePlayground from '../components/WavePlayground.vue'
 import { useI18n } from '../i18n'
 import { documentLocales, isDocumentLocale, saveDocumentLocale } from '../services/documentLocale'
 import { documentationCatalog, documentationPath, documentationProject, projectDocuments } from '../services/documentNavigation'
@@ -15,6 +16,14 @@ import UiSkeletonRows from '../ui/UiSkeletonRows.vue'
 const route = useRoute()
 const router = useRouter()
 const { locale, t } = useI18n()
+const example = ref<string | null>(null)
+const exampleDialog = ref<HTMLDialogElement | null>(null)
+async function runExample(source: string) {
+  example.value = source
+  await nextTick()
+  exampleDialog.value?.showModal()
+}
+watch(() => route.fullPath, () => { exampleDialog.value?.close(); example.value = null })
 const documents = ref<DocumentSummary[]>([])
 const document = ref<DocumentView | null>(null)
 const query = ref('')
@@ -192,7 +201,7 @@ watchEffect(() => {
         <nav class="document-breadcrumb"><RouterLink :to="catalogBase">{{ projectName }} {{ t('docs.title') }}</RouterLink><span>/</span><span>{{ groupName(document.group) }}</span></nav>
         <p v-if="showingEnglishFallback" class="docs-translation-notice" role="status">{{ t('docs.englishFallback') }}</p>
         <header><h1>{{ document.title }}</h1><p>{{ document.summary }}</p></header>
-        <div class="document-content"><MarkdownContent :source="document.markdown" /></div>
+        <div class="document-content"><MarkdownContent :source="document.markdown" runnable @run-wave="runExample" /></div>
         <nav class="document-pagination">
           <RouterLink v-if="previous" :to="`${docBase}/${previous.path}`"><small>{{ t('docs.previous') }}</small><span>← {{ previous.title }}</span></RouterLink><span v-else />
           <RouterLink v-if="next" :to="`${docBase}/${next.path}`"><small>{{ t('docs.next') }}</small><span>{{ next.title }} →</span></RouterLink>
@@ -213,5 +222,10 @@ watchEffect(() => {
       </div>
       <p v-if="groups.length === 0" class="docs-empty" role="status">{{ t(documents.length === 0 ? 'docs.emptyProject' : 'docs.noResults') }}</p>
     </div>
+    <dialog ref="exampleDialog" class="document-playground-dialog" :aria-label="t('playground.title')" @close="example = null">
+      <header><h2>{{ t('playground.title') }}</h2><button type="button" @click="exampleDialog?.close()">{{ t('playground.close') }}</button></header>
+      <p>{{ t('playground.exampleHelp') }}</p>
+      <WavePlayground v-if="example !== null" :source="example" autorun />
+    </dialog>
   </main>
 </template>

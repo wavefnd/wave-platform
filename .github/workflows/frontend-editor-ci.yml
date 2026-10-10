@@ -44,7 +44,7 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
-      - name: Test latest-only installer and recovery
+      - name: Test pinned Wave and latest Vex installer and recovery
         shell: powershell
         run: ./frontend/tests/install_latest_test.ps1
 
@@ -65,13 +65,13 @@ jobs:
             editor/package-lock.json
             frontend/package-lock.json
 
-      - name: Check latest-only shell installer
+      - name: Check pinned Wave and latest Vex shell installer
         run: |
           bash frontend/tests/install_checksum_test.sh
           bash frontend/tests/install_latest_test.sh
           python3 frontend/tests/install_latest_test.py
 
-      - name: Check latest-only PowerShell installer
+      - name: Check pinned Wave and latest Vex PowerShell installer
         shell: pwsh
         run: ./frontend/tests/install_latest_test.ps1
 
@@ -104,6 +104,10 @@ jobs:
       - name: Run frontend toolchain tests
         working-directory: frontend
         run: npm run test:toolchains
+
+      - name: Run browser playground host tests
+        working-directory: frontend
+        run: npm run test:playground
 
       - name: Build frontend
         working-directory: frontend

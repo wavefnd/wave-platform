@@ -1,0 +1,55 @@
+name: Wave Playground
+
+on:
+  pull_request:
+    paths:
+      - 'playground/**'
+      - 'frontend/src/services/playground/**'
+      - 'frontend/tests/playground*'
+      - 'wave-version'
+      - 'Dockerfile'
+      - 'compose.yml'
+      - '.github/workflows/playground-ci.yml'
+  push:
+    branches: [master]
+    paths:
+      - 'playground/**'
+      - 'frontend/src/services/playground/**'
+      - 'frontend/tests/playground*'
+      - 'wave-version'
+      - 'Dockerfile'
+      - 'compose.yml'
+      - '.github/workflows/playground-ci.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  compile-and-run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Build and start the isolated Wave service
+        run: |
+          docker compose up --build -d playground
+          container=$(docker compose ps -q playground)
+          address=$(docker inspect --format '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' "$container")
+          echo "PLAYGROUND_URL=http://$address:8092" >> "$GITHUB_ENV"
+          curl --retry 15 --retry-delay 1 --retry-connrefused --fail "http://$address:8092/healthz"
+      - name: Test real compilation and browser host execution
+        run: |
+          python3 playground/tests/test_server.py
+          python3 playground/tests/test_http.py
+          node --experimental-strip-types --test frontend/tests/playground-live.test.ts
+          docker compose exec -T playground test ! -e /work/injected
+          docker compose exec -T playground test ! -e /work/job
+      - name: Service logs
+        if: failure()
+        run: docker compose logs playground
+      - name: Stop CI service
+        if: always()
+        run: docker compose down

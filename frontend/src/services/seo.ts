@@ -207,7 +207,7 @@ export function updateSEO(route: RouteLocationNormalizedLoaded, locale: Locale, 
   const localDescriptions = descriptions[locale]
   const description = localDescriptions[service === 'personal' ? 'community' : service] ?? localDescriptions.portal
   const suffix = labels[service]
-  const title = service === 'portal' && route.name === 'home' ? 'Wave Programming Language' : `${suffix} · Wave`
+  const title = route.name === 'playground' ? `${locale === 'ko' ? '플레이그라운드' : 'Playground'} · Wave` : service === 'portal' && route.name === 'home' ? 'Wave Programming Language' : `${suffix} · Wave`
   const privateService = ['mail', 'account', 'admin'].includes(service)
   const noIndex = privateService || nonIndexableRoutes.has(String(route.name ?? ''))
   const detail = Boolean(route.params.pathMatch || route.params.thread || route.params.question || route.params.number || route.params.repository || route.params.slug)

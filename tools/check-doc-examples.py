@@ -59,6 +59,7 @@ def main():
         parser.error(f'unknown examples: {sorted(unknown)}')
     failures = []
     compiler, std = str(args.compiler.resolve()), str(args.std_root.resolve())
+    subprocess.run(['python3', str(ROOT / 'tools/check-wave-version.py'), compiler], check=True)
     for case in cases:
         name = case['id']
         if args.case and name not in args.case:

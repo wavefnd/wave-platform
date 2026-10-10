@@ -6,7 +6,7 @@ from pathlib import Path
 import platform
 import subprocess
 
-from nightly import DEFAULT_LOCK, read_lock
+from toolchain import DEFAULT_LOCK, read_lock
 
 ROOT = Path(__file__).resolve().parents[1]
 

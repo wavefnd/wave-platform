@@ -36,13 +36,13 @@ RUN apt-get update \
         pkg-config \
     && rm -rf /var/lib/apt/lists/*
 
-ARG WAVE_VERSION=0.2.0-pre-beta
+COPY wave-version /opt/wave-version
 ARG VEX_VERSION=0.0.1
 
-# The server keeps a pinned toolchain. Public installers only install latest,
-# so provision these explicit historical versions from release archives directly.
+# All platform Wave components use wave-version and the bundled standard library.
 RUN <<'INSTALL'
 set -eu
+WAVE_VERSION="$(cat /opt/wave-version)"
 case "$(uname -m)" in
     x86_64) arch=x86_64 ;;
     aarch64) arch=aarch64 ;;
@@ -82,6 +82,26 @@ ENV PATH="/root/.wave/bin:${PATH}"
 
 RUN wavec --version
 RUN vex --version
+
+FROM wave-toolchain AS playground-builder
+WORKDIR /src
+COPY playground/src ./playground/src
+RUN wavec --std-root /root/.wave/bin/std build playground/src/main.wave \
+    --target-dir /tmp/playground-build -o /tmp/wave-playground
+
+FROM debian:trixie-slim AS playground
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates curl util-linux \
+    && rm -rf /var/lib/apt/lists/* \
+    && groupadd --gid 10002 playground \
+    && useradd --uid 10002 --gid playground --no-create-home playground
+COPY --from=playground-builder /root/.wave/bin /opt/wave
+RUN ln -s ld.lld /opt/wave/llvm/bin/wasm-ld
+COPY --from=playground-builder /tmp/wave-playground /usr/local/bin/wave-playground
+WORKDIR /work
+USER 10002:10002
+EXPOSE 8092
+CMD ["/usr/local/bin/wave-playground"]
 
 FROM wave-toolchain AS application-builder
 

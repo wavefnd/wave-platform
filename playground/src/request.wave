@@ -1,0 +1,191 @@
+// A bounded HTTP/1.1 request-head parser. It never treats input as a C string.
+pub struct Request {
+    status: i32;
+    route: i32;
+    head_only: bool;
+    length: i64;
+}
+
+pub fun matches(data: ptr<u8>, start: i64, size: i64, text: str, folded: bool) -> bool {
+    var index: i64 = 0;
+    while (index < size) {
+        if (text[index] == 0) {
+            return false;
+        }
+        var value: u8 = data[start + index];
+        if (folded && value >= 65 && value <= 90) {
+            value += 32;
+        }
+        if (value != text[index]) {
+            return false;
+        }
+        index += 1;
+    }
+    return text[index] == 0;
+}
+
+fun token(value: u8) -> bool {
+    return (value >= 65 && value <= 90) || (value >= 97 && value <= 122)
+        || (value >= 48 && value <= 57) || value == 33 || value == 35
+        || value == 36 || value == 37 || value == 38 || value == 39
+        || value == 42 || value == 43 || value == 45 || value == 46
+        || value == 94 || value == 95 || value == 96 || value == 124 || value == 126;
+}
+
+pub fun header_end(data: ptr<u8>, size: i64) -> i64 {
+    var index: i64 = 0;
+    while (index + 3 < size) {
+        if (data[index] == 13 && data[index + 1] == 10
+            && data[index + 2] == 13 && data[index + 3] == 10) {
+            return index + 4;
+        }
+        index += 1;
+    }
+    return 0;
+}
+
+fun line_end(data: ptr<u8>, start: i64, size: i64) -> i64 {
+    var index: i64 = start;
+    while (index + 1 < size) {
+        if (data[index] == 13 && data[index + 1] == 10) {
+            return index;
+        }
+        index += 1;
+    }
+    return -1;
+}
+
+pub fun parse_request(data: ptr<u8>, size: i64) -> Request {
+    var result: Request = Request { status: 400, route: 0, head_only: false, length: 0 };
+    if (size < 4 || size > 8192 || header_end(data, size) != size) {
+        return result;
+    }
+    var end: i64 = line_end(data, 0, size);
+    var method_end: i64 = 0;
+    while (method_end < end && token(data[method_end])) {
+        method_end += 1;
+    }
+    if (method_end == 0 || method_end >= end || data[method_end] != 32) {
+        return result;
+    }
+    result.head_only = matches(data, 0, method_end, "HEAD", false);
+    var target_start: i64 = method_end + 1;
+    var target_end: i64 = target_start;
+    while (target_end < end && data[target_end] != 32) {
+        var value: u8 = data[target_end];
+        if (value < 33 || value > 126 || value == 35) {
+            return result;
+        }
+        target_end += 1;
+    }
+    if (target_end == target_start || target_end >= end || data[target_start] != 47) {
+        return result;
+    }
+    if (!matches(data, target_end + 1, end - target_end - 1, "HTTP/1.1", false)) {
+        result.status = 505;
+        return result;
+    }
+    var have_host: bool = false;
+    var have_length: bool = false;
+    var have_transfer: bool = false;
+    var have_type: bool = false;
+    var count: i32 = 0;
+    var cursor: i64 = end + 2;
+    while (cursor < size - 2) {
+        count += 1;
+        if (count > 100) {
+            result.status = 431;
+            return result;
+        }
+        end = line_end(data, cursor, size);
+        if (end <= cursor) {
+            return result;
+        }
+        var colon: i64 = cursor;
+        while (colon < end && token(data[colon])) {
+            colon += 1;
+        }
+        if (colon == cursor || colon >= end || data[colon] != 58) {
+            return result;
+        }
+        var first: i64 = colon + 1;
+        var last: i64 = end;
+        var scan: i64 = first;
+        while (scan < last) {
+            if ((data[scan] < 32 && data[scan] != 9) || data[scan] == 127) {
+                return result;
+            }
+            scan += 1;
+        }
+        while (first < last && (data[first] == 32 || data[first] == 9)) {
+            first += 1;
+        }
+        while (last > first && (data[last - 1] == 32 || data[last - 1] == 9)) {
+            last -= 1;
+        }
+        if (matches(data, cursor, colon - cursor, "host", true)) {
+            if (have_host || first == last) {
+                return result;
+            }
+            scan = first;
+            while (scan < last) {
+                if (data[scan] <= 32 || data[scan] == 44 || data[scan] >= 127) {
+                    return result;
+                }
+                scan += 1;
+            }
+            have_host = true;
+        }
+        if (matches(data, cursor, colon - cursor, "content-type", true)) {
+            if (have_type || !matches(data, first, last - first, "text/plain", true)) { return result; }
+            have_type = true;
+        }
+        if (matches(data, cursor, colon - cursor, "expect", true)) { return result; }
+        if (matches(data, cursor, colon - cursor, "content-length", true)) {
+            if (have_length || first == last) {
+                return result;
+            }
+            have_length = true;
+            scan = first;
+            while (scan < last) {
+                if (data[scan] < 48 || data[scan] > 57) {
+                    return result;
+                }
+                result.length = result.length * 10 + (data[scan] - 48) as i64;
+                if (result.length > 32768) { result.status = 413; return result; }
+                scan += 1;
+            }
+        }
+        if (matches(data, cursor, colon - cursor, "transfer-encoding", true)) {
+            have_transfer = true;
+        }
+        cursor = end + 2;
+    }
+    if (!have_host || (have_transfer && have_length)) {
+        return result;
+    }
+    if (have_transfer) {
+        result.status = 501;
+        return result;
+    }
+    if (matches(data, 0, method_end, "POST", false)) {
+        if (!have_length || !have_type || result.length == 0) { return result; }
+        result.status = 404;
+        if (matches(data, target_start, target_end - target_start, "/api/playground/compile", false)) {
+            result.status = 200;
+            result.route = 1;
+        }
+        return result;
+    }
+    if (!result.head_only && !matches(data, 0, method_end, "GET", false)) {
+        result.status = 405;
+        return result;
+    }
+    if (result.length != 0) { return result; }
+    result.status = 404;
+    if (matches(data, target_start, target_end - target_start, "/healthz", false)) {
+        result.status = 200;
+        result.route = 2;
+    }
+    return result;
+}
