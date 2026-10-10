@@ -6,7 +6,7 @@ from pathlib import Path
 import platform
 import subprocess
 
-from nightly import DEFAULT_LOCK, read_lock
+from toolchain import DEFAULT_LOCK, read_lock
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -29,6 +29,7 @@ def build(toolchain, lock_path, output, build_dir):
     # An explicit std root avoids silently using an older ~/.wave installation.
     subprocess.run([
         str(toolchain / 'wavec'), '--std-root', str(toolchain / 'std'),
+        '--dep', 'wave_http=' + str(ROOT.parent / 'http'),
         'build', str(ROOT / 'src/main.wave'), '--target-dir', str(build_dir),
         '-o', str(output),
     ], check=True, cwd=ROOT)

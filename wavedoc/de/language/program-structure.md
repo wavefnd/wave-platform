@@ -27,7 +27,7 @@ cd wave-study
 Erstellen Sie in diesem Verzeichnis mit Ihrem Editor `main.wave`. Überprüfen Sie die Erweiterung, um sicherzustellen, dass der Dateiname nicht `main.wave.txt` lautet. Unten finden Sie die gesamte Datei, nicht nur ein Fragment innerhalb der Funktion.
 
 <!-- wave-example: book-hello -->
-```wave
+```wave playground
 fun main() {
     println("Hello, Wave!");
 }
@@ -60,7 +60,7 @@ In `()` nach `main` schreiben Sie die Parameter. main in diesem Programm benöti
 Versuchen Sie, es dreimal so zu ändern, dass es gedruckt wird. Nicht mit dem vorherigen Programm kombinieren, sondern den Inhalt von main.wave durch das gesamte Programm unten ersetzen.
 
 <!-- wave-example: book-sequence -->
-```wave
+```wave playground
 fun main() {
     println("start");
     println("working");
@@ -83,7 +83,7 @@ Nachdem Sie den ersten Satz beendet haben, fahren Sie mit dem nächsten Satz for
 `println` fügt am Ende einen Zeilenumbruch hinzu. `print` ändert die Zeilen nicht automatisch. Der Unterschied wird deutlich, wenn kleine Teile zu einer einzigen Linie verbunden werden.
 
 <!-- wave-example: book-print-lines -->
-```wave
+```wave playground
 fun main() {
     print("Wave");
     print(" ");
@@ -106,7 +106,7 @@ Dreimaliges Drucken führt nicht immer zu drei Zeilen. Unterscheiden Sie zwische
 Um das Berechnungsergebnis in eine Zeichenfolge einzufügen, übergeben Sie den Wert, der `{}` entspricht.
 
 <!-- wave-example: book-format-first -->
-```wave
+```wave playground
 fun main() {
     println("{} + {} = {}", 2, 3, 2 + 3);
 }
@@ -142,7 +142,7 @@ Benennen Sie in Windows die Ausgabedatei `hello.exe` und führen Sie sie in Powe
 Menschen lesen die Ausgabeanweisung, aber eine Shell oder ein anderes Programm kann den Erfolg anhand des Exit-Codes bestimmen. Im Folgenden wird angegeben, dass main i32 zurückgibt.
 
 <!-- wave-example: book-exit-success -->
-```wave
+```wave playground
 fun main() -> i32 {
     println("completed");
     return 0;
@@ -183,7 +183,7 @@ Beheben Sie zunächst den ersten Fehler und überprüfen Sie ihn dann erneut. We
 ### Lösung: Ausgabe des Berechnungsprozesses
 
 <!-- wave-example: book-first-solution -->
-```wave
+```wave playground
 fun main() -> i32 {
     println("Learning Wave");
     println("My first program");

@@ -148,13 +148,12 @@ transform functions:
 import("wave_editor")::{editor_abi_version, analyze_document, transform_document};
 ```
 
-The current tagged `wavec 0.2.0-pre-beta` binary predates public module
-visibility even though the latest Wave source and Vex contract support `pub`.
-Validate the Vex library with a compiler build that includes the public module
-contract:
+Use the compiler version pinned in the repository's `wave-version` file and its
+bundled standard library. The same version builds the platform's native modules,
+the playground, and the translation service.
 
 ```sh
-VEX_WAVEC=/path/to/current/wavec vex check
+VEX_WAVEC=/path/to/pinned/wavec vex check
 ```
 
 Wave Platform keeps `wave/main.wave` as an ABI-compatible production adapter so

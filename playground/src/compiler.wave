@@ -1,0 +1,43 @@
+import("std::fs::file")::{fs_mkdir, fs_open_write, fs_close, fs_write_all, fs_read_all};
+import("std::process::spawn")::{proc_spawn_exec_raw};
+import("std::process::wait")::{proc_wait, proc_status_exited, proc_status_exit_code};
+
+// Fixed paths/arguments only. Source bytes are never interpolated into a shell.
+fun execute(path: str, args: ptr<ptr<i8>>, output: i64) -> i32 {
+    var environment: array<ptr<i8>, 4> = [
+        "PATH=/opt/wave/llvm/bin:/usr/bin:/bin" as ptr<i8>, "HOME=/work" as ptr<i8>,
+        "TMPDIR=/work/job" as ptr<i8>, null
+    ];
+    var pid: i64 = proc_spawn_exec_raw(path, args, &environment[0], -1, output, output);
+    if (pid < 0) { return 125; }
+    var status: i32 = 0;
+    if (proc_wait(pid, &status) < 0 || !proc_status_exited(status)) { return 125; }
+    return proc_status_exit_code(status);
+}
+
+pub fun cleanup() {
+    var args: array<ptr<i8>, 5> = ["rm" as ptr<i8>, "-rf" as ptr<i8>, "--" as ptr<i8>, "/work/job" as ptr<i8>, null];
+    execute("/usr/bin/rm", &args[0], -1);
+}
+
+pub fun compile(source: ptr<u8>, size: i64) -> i32 {
+    cleanup();
+    if (fs_mkdir("/work/job", 448) < 0) { return 125; }
+    if (fs_write_all("/work/job/main.wave", source, size, 384) != size) { return 125; }
+    var output: i64 = fs_open_write("/work/job/diagnostics", 384);
+    if (output < 0) { return 125; }
+    var args: array<ptr<i8>, 24> = [
+        "prlimit" as ptr<i8>, "--as=805306368" as ptr<i8>, "--cpu=8" as ptr<i8>,
+        "--fsize=4194304" as ptr<i8>, "--nofile=64" as ptr<i8>, "--" as ptr<i8>,
+        "/usr/bin/timeout" as ptr<i8>, "-k" as ptr<i8>, "1" as ptr<i8>, "10" as ptr<i8>,
+        "/opt/wave/wavec" as ptr<i8>, "--std-root" as ptr<i8>, "/opt/wave/std" as ptr<i8>,
+        "--target=wasm32-wasip1" as ptr<i8>, "--error-format=json" as ptr<i8>,
+        "-C" as ptr<i8>, "link-arg=--max-memory=67108864" as ptr<i8>,
+        "build" as ptr<i8>, "/work/job/main.wave" as ptr<i8>,
+        "--target-dir" as ptr<i8>, "/work/job/build" as ptr<i8>,
+        "-o" as ptr<i8>, "/work/job/program.wasm" as ptr<i8>, null
+    ];
+    var status: i32 = execute("/usr/bin/prlimit", &args[0], output);
+    fs_close(output);
+    return status;
+}

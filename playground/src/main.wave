@@ -1,0 +1,77 @@
+import("std::net::tcp")::{TcpStream, TcpListener, tcp_bind, tcp_accept, tcp_close_listener};
+import("std::net::error")::{NetResult};
+import("std::string::len")::{len};
+import("std::fs::file")::{fs_read_all};
+import("std::mem::alloc")::{mem_alloc, mem_free};
+import("wave_http::request")::{Request, method_is, target_is, content_type_is};
+import("wave_http::connection")::{read_request, write_response, close_connection};
+import("./compiler")::{compile, cleanup};
+
+fun respond(stream: TcpStream, status: i32, content_type: str, data: ptr<u8>, size: i64, head: bool) {
+    write_response(stream, status, content_type, "X-Wave-Version: 0.2.1-pre-beta\r\n", data, size, head);
+}
+
+fun error(stream: TcpStream, status: i32, message: str, head: bool) {
+    respond(stream, status, "text/plain; charset=utf-8", message as ptr<u8>, len(message) as i64, head);
+}
+
+fun handle(stream: TcpStream) {
+    var request_bytes: array<u8, 40960>;
+    var request: Request = read_request(stream, &request_bytes[0], 40960, 32768, 3000);
+    if (request.status == 0) { return; }
+    if (request.status != 200) {
+        error(stream, request.status, "Invalid playground request.", request.head_only);
+        return;
+    }
+    if (method_is(&request_bytes[0], request, "POST")) {
+        if (!request.has_length || request.length == 0 || !content_type_is(&request_bytes[0], request, "text/plain")) {
+            error(stream, 400, "Expected a nonempty text/plain body.", false);
+            return;
+        }
+        if (!target_is(&request_bytes[0], request, "/api/playground/compile")) {
+            error(stream, 404, "Not found.", false);
+            return;
+        }
+    } else {
+        if (!request.head_only && !method_is(&request_bytes[0], request, "GET")) {
+            error(stream, 405, "Method not allowed.", false);
+        } else if (request.length != 0) {
+            error(stream, 400, "Unexpected request body.", request.head_only);
+        } else if (target_is(&request_bytes[0], request, "/healthz")) {
+            error(stream, 200, "Wave Playground 0.2.1-pre-beta", request.head_only);
+        } else {
+            error(stream, 404, "Not found.", request.head_only);
+        }
+        return;
+    }
+    var status: i32 = compile(&request_bytes[request.body_start], request.length);
+    var output: ptr<u8> = mem_alloc(4194304);
+    if (output == null) { cleanup(); error(stream, 503, "Compiler capacity exceeded.", false); return; }
+    if (status == 0) {
+        var size: i64 = fs_read_all("/work/job/program.wasm", output, 4194304);
+        if (size > 8) { respond(stream, 200, "application/wasm", output, size, false); }
+        else { error(stream, 503, "Compiler did not produce WebAssembly.", false); }
+    } else {
+        var size: i64 = fs_read_all("/work/job/diagnostics", output, 65536);
+        if (size > 0 && status != 124 && status != 125 && status != 137) {
+            respond(stream, 422, "text/plain; charset=utf-8", output, size, false);
+        } else {
+            error(stream, 503, "Compilation exceeded its resource limit. Try a smaller program.", false);
+        }
+    }
+    mem_free(output, 4194304);
+    cleanup();
+}
+
+fun main() -> i32 {
+    var listener: NetResult<TcpListener> = tcp_bind(8092);
+    if (!listener.ok) { return 1; }
+    println("Wave Playground 0.2.1-pre-beta listening on :8092");
+    while (true) {
+        var client: NetResult<TcpStream> = tcp_accept(listener.value);
+        if (!client.ok) { tcp_close_listener(listener.value); return 2; }
+        handle(client.value);
+        close_connection(client.value);
+    }
+    return 0;
+}

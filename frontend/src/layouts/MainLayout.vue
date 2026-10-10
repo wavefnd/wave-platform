@@ -83,6 +83,7 @@ watchEffect(() => updateSEO(route, locale.value, service.value as Parameters<typ
     <footer v-if="showFooter && !isAdmin" class="site-footer">
       <div class="portal-width footer-row">
         <span>Wave Platform</span>
+        <RouterLink to="/playground">{{ t('playground.title') }}</RouterLink>
         <RouterLink to="/toolchains">{{ t('nav.toolchains') }}</RouterLink>
       </div>
     </footer>

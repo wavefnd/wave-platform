@@ -27,7 +27,7 @@ cd wave-study
 Cree `main.wave` en este directorio con su editor. Verifique la extensión para asegurarse de que el nombre del archivo no sea `main.wave.txt`. A continuación se muestra el archivo completo, no solo un fragmento dentro de la función.
 
 <!-- wave-example: book-hello -->
-```wave
+```wave playground
 fun main() {
     println("Hello, Wave!");
 }
@@ -60,7 +60,7 @@ No mezcle comandos de terminal con el código Wave. Ingrese `wavec run` en la te
 Intente cambiarlo para imprimir tres veces. No lo combine con el programa anterior, sino reemplace el contenido de main.wave con el programa completo a continuación.
 
 <!-- wave-example: book-sequence -->
-```wave
+```wave playground
 fun main() {
     println("start");
     println("working");
@@ -83,7 +83,7 @@ Después de terminar la primera oración, pase a la siguiente. Aquí no hay tare
 `println` agrega un salto de línea al final. `print` no cambia las líneas automáticamente. La diferencia es evidente al conectar piezas pequeñas para crear una sola línea.
 
 <!-- wave-example: book-print-lines -->
-```wave
+```wave playground
 fun main() {
     print("Wave");
     print(" ");
@@ -106,7 +106,7 @@ Imprimir tres veces no siempre da como resultado tres líneas. Distinga entre n�
 Para poner el resultado del cálculo en una cadena, pase el valor correspondiente a `{}`.
 
 <!-- wave-example: book-format-first -->
-```wave
+```wave playground
 fun main() {
     println("{} + {} = {}", 2, 3, 2 + 3);
 }
@@ -142,7 +142,7 @@ En Windows, nombre el archivo de salida `hello.exe` y ejecútelo en PowerShell c
 Los humanos leen la declaración de salida, pero un shell u otro programa puede determinar el éxito mediante el código de salida. Lo siguiente especifica que main devuelve i32.
 
 <!-- wave-example: book-exit-success -->
-```wave
+```wave playground
 fun main() -> i32 {
     println("completed");
     return 0;
@@ -183,7 +183,7 @@ Primero, corrija el primer error y luego vuelva a verificar. Si los paréntesis 
 ### Solución: salida del proceso de cálculo
 
 <!-- wave-example: book-first-solution -->
-```wave
+```wave playground
 fun main() -> i32 {
     println("Learning Wave");
     println("My first program");

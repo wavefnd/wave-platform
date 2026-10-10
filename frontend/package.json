@@ -8,9 +8,11 @@
     "build": "vue-tsc --noEmit && vite build",
     "preview": "vite preview",
     "typecheck": "vue-tsc --noEmit",
-    "test:docs": "node --experimental-strip-types --test tests/document-navigation.test.ts",
+    "test:docs": "node --experimental-strip-types --test tests/document-navigation.test.ts tests/document-markdown.test.ts",
     "test:seo": "node --experimental-strip-types --test tests/seo-image.test.ts",
-    "test:toolchains": "node --experimental-strip-types --test tests/toolchains.test.ts"
+    "test:toolchains": "node --experimental-strip-types --test tests/toolchains.test.ts",
+    "test:syntax": "node --experimental-strip-types --test tests/wave-syntax.test.ts",
+    "test:playground": "node --experimental-strip-types --test tests/playground.test.ts"
   },
   "dependencies": {
 	"@wavefnd/editor": "file:../editor",

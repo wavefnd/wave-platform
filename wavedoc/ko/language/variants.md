@@ -18,7 +18,7 @@ enum은 이름 붙은 정수 값을 나타내고, variant는 경우마다 다른
 `main.wave`에 저장해 실행합니다.
 
 <!-- wave-example: variant-api -->
-```wave
+```wave playground
 variant Result {
     Value(i32), Error(i32)
 }

@@ -27,7 +27,7 @@ cd wave-study
 Create `main.wave` in this directory with your editor. Check the extension to make sure the file name is not `main.wave.txt`. Below is the entire file, not just a fragment inside the function.
 
 <!-- wave-example: book-hello -->
-```wave
+```wave playground
 fun main() {
     println("Hello, Wave!");
 }
@@ -60,7 +60,7 @@ Do not mix terminal commands with the code Wave. Enter `wavec run` into the term
 Try changing it to print three times. Do not combine with the previous program, but replace the contents of main.wave with the entire program below.
 
 <!-- wave-example: book-sequence -->
-```wave
+```wave playground
 fun main() {
     println("start");
     println("working");
@@ -83,7 +83,7 @@ After finishing the first sentence, move on to the next sentence. There are no t
 `println` adds a line break at the end. `print` does not automatically change lines. The difference is evident in connecting small pieces to create a single line.
 
 <!-- wave-example: book-print-lines -->
-```wave
+```wave playground
 fun main() {
     print("Wave");
     print(" ");
@@ -106,7 +106,7 @@ Printing three times does not always result in three lines. Distinguish between 
 To put the calculation result into a string, pass the value corresponding to `{}`.
 
 <!-- wave-example: book-format-first -->
-```wave
+```wave playground
 fun main() {
     println("{} + {} = {}", 2, 3, 2 + 3);
 }
@@ -142,7 +142,7 @@ In Windows, name the output file `hello.exe` and run in PowerShell as `.\hello.e
 Humans read the output statement, but a shell or other program can determine success by the exit code. The following specifies that main returns i32.
 
 <!-- wave-example: book-exit-success -->
-```wave
+```wave playground
 fun main() -> i32 {
     println("completed");
     return 0;
@@ -183,7 +183,7 @@ First, fix the first error and then recheck. If the preceding parentheses or quo
 ### Solution: Calculation process output
 
 <!-- wave-example: book-first-solution -->
-```wave
+```wave playground
 fun main() -> i32 {
     println("Learning Wave");
     println("My first program");

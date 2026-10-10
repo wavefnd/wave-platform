@@ -12,7 +12,22 @@ import subprocess
 import tempfile
 
 ROOT = Path(__file__).resolve().parents[1]
-MARKER = re.compile(r'<!-- wave-example: ([a-z0-9-]+) -->\s*```wave\n(.*?)\n```', re.S)
+MARKER = re.compile(r'<!-- wave-example: ([a-z0-9-]+) -->\s*```wave(?:[ \t]+playground)?[ \t]*\n(.*?)\n```', re.S | re.I)
+
+PLAYGROUND = re.compile(r'^```wave[ \t]+playground[ \t]*$', re.M | re.I)
+PLAYGROUND_MARKER = re.compile(r'<!-- wave-example: ([a-z0-9-]+) -->\s*```wave[ \t]+playground[ \t]*\n(.*?)\n```', re.S | re.I)
+
+def validate_playgrounds(source, cases, filename):
+    marked = PLAYGROUND_MARKER.findall(source)
+    if len(marked) != len(PLAYGROUND.findall(source)):
+        raise ValueError(f'{filename}: every playground needs an adjacent wave-example marker')
+    for name, _ in marked:
+        case = cases.get(name)
+        if not case or case.get('playground') is not True:
+            raise ValueError(f'{filename}: {name} is not registered for playground validation')
+        if case.get('mode', 'run') != 'run' or case.get('files'):
+            raise ValueError(f'{filename}: {name} requires native-only facilities or is not runnable')
+    return {name for name, _ in marked}
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
@@ -21,6 +36,9 @@ def main():
     parser.add_argument('--links-only', action='store_true')
     parser.add_argument('--case', action='append', default=[])
     args = parser.parse_args()
+    cases = json.loads((ROOT / 'wavedoc/examples.json').read_text())
+    case_map = {case['id']: case for case in cases}
+    inline_ids = set()
     examples = {}
     paths = set()
     locales = {item['id'] for item in json.loads((ROOT / 'wavedoc/locales.json').read_text())}
@@ -31,6 +49,9 @@ def main():
         path = re.search(r'^path: (.+)$', source, re.M).group(1)
         paths.add((file.relative_to(ROOT / 'wavedoc').parts[0], path))
         locale = file.relative_to(ROOT / 'wavedoc').parts[0]
+        inline = validate_playgrounds(source, case_map, file)
+        if locale == 'ko':
+            inline_ids.update(inline)
         for name, code in MARKER.findall(source):
             if locale != 'ko':
                 translations.append((file, name, code))
@@ -47,7 +68,8 @@ def main():
             if locale not in locales or (path not in ('', 'stdlib', 'whale') and (locale, path) not in paths and ('en', path) not in paths):
                 raise ValueError(f'{file}: broken link /docs/{locale}/{path}')
     print('Documentation links and translated examples: PASS', flush=True)
-    cases = json.loads((ROOT / 'wavedoc/examples.json').read_text())
+    if inline_ids != {case['id'] for case in cases if case.get('playground') is True}:
+        raise ValueError('playground fences and manifest flags must correspond exactly')
     if len({c['id'] for c in cases}) != len(cases) or set(examples) != {c['id'] for c in cases}:
         raise ValueError('example markers and manifest must correspond exactly')
     if args.links_only:
@@ -59,6 +81,7 @@ def main():
         parser.error(f'unknown examples: {sorted(unknown)}')
     failures = []
     compiler, std = str(args.compiler.resolve()), str(args.std_root.resolve())
+    subprocess.run(['python3', str(ROOT / 'tools/check-wave-version.py'), compiler], check=True)
     for case in cases:
         name = case['id']
         if args.case and name not in args.case:

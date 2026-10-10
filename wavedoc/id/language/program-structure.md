@@ -27,7 +27,7 @@ cd wave-study
 Buat `main.wave` di direktori ini dengan editor Anda. Periksa ekstensi untuk memastikan nama file bukan `main.wave.txt`. Di bawah ini adalah keseluruhan file, bukan hanya sebagian di dalam fungsinya.
 
 <!-- wave-example: book-hello -->
-```wave
+```wave playground
 fun main() {
     println("Hello, Wave!");
 }
@@ -60,7 +60,7 @@ Jangan mencampur perintah terminal dengan kode Wave. Masukkan `wavec run` ke ter
 Coba ubah untuk mencetak tiga kali. Jangan gabungkan dengan program sebelumnya, tapi ganti isi main.wave dengan keseluruhan program di bawah ini.
 
 <!-- wave-example: book-sequence -->
-```wave
+```wave playground
 fun main() {
     println("start");
     println("working");
@@ -83,7 +83,7 @@ Setelah menyelesaikan kalimat pertama, lanjutkan ke kalimat berikutnya. Tidak ad
 `println` menambahkan jeda baris di akhir. `print` tidak otomatis mengubah garis. Perbedaannya terlihat jelas dalam menghubungkan potongan-potongan kecil menjadi satu garis.
 
 <!-- wave-example: book-print-lines -->
-```wave
+```wave playground
 fun main() {
     print("Wave");
     print(" ");
@@ -106,7 +106,7 @@ Mencetak tiga kali tidak selalu menghasilkan tiga baris. Bedakan antara jumlah p
 Untuk memasukkan hasil perhitungan ke dalam string, berikan nilai yang sesuai dengan `{}`.
 
 <!-- wave-example: book-format-first -->
-```wave
+```wave playground
 fun main() {
     println("{} + {} = {}", 2, 3, 2 + 3);
 }
@@ -142,7 +142,7 @@ Di Windows, beri nama file output `hello.exe` dan jalankan di PowerShell sebagai
 Manusia membaca pernyataan keluaran, tetapi shell atau program lain dapat menentukan keberhasilan melalui kode keluar. Berikut ini menetapkan bahwa main mengembalikan i32.
 
 <!-- wave-example: book-exit-success -->
-```wave
+```wave playground
 fun main() -> i32 {
     println("completed");
     return 0;
@@ -183,7 +183,7 @@ Pertama, perbaiki kesalahan pertama lalu periksa kembali. Jika tanda kurung atau
 ### Solusi : Perhitungan keluaran proses
 
 <!-- wave-example: book-first-solution -->
-```wave
+```wave playground
 fun main() -> i32 {
     println("Learning Wave");
     println("My first program");

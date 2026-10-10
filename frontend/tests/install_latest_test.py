@@ -52,7 +52,7 @@ else: print(json.dumps(entry['json']))
         if is_wave:
             script += f'''case "$*" in
 --version) echo 'Wave 1.0.0';;
-'print host-target') echo '{target}';;
+'print target-spec --format=json') echo '{{"triple":"{target}"}}';;
 run*) {'exit 7' if bad else '[ "$3" = --std-root ] && [ -f "$4/manifest.json" ]'};;
 *) exit 2;;
 esac
@@ -66,7 +66,8 @@ esac
                 entry.size=len(data); entry.mode=0o755 if file==exe else 0o644
                 archive.addfile(entry,io.BytesIO(data))
         digest=hashlib.sha256(path.read_bytes()).hexdigest()
-        self.urls[f'https://github.com/wavefnd/{repo}/releases/download/v1.0.0/{name}']={'file':str(path)}
+        version = 'v0.2.1-pre-beta' if is_wave else 'v1.0.0'
+        self.urls[f'https://github.com/wavefnd/{repo}/releases/download/{version}/{name}']={'file':str(path)}
         return {'name':name,'state':'uploaded','digest':'sha256:'+digest}
 
     def releases(self, os_name='Linux', arch='x86_64', bad=False, vex=True):
@@ -79,8 +80,9 @@ esac
                ('FreeBSD','amd64'):('x86_64-unknown-freebsd',)*3}
         target,wave_suffix,vex_suffix=table[os_name,arch]
         self.env.update(FIXTURE_OS=os_name,FIXTURE_ARCH=arch)
-        assets={'Wave':[self.archive('Wave',f'wave-v1.0.0-{wave_suffix}.tar.gz',target,bad)],
+        assets={'Wave':[self.archive('Wave',f'wave-v0.2.1-pre-beta-{wave_suffix}.tar.gz',target,bad)],
                 'Vex':[self.archive('Vex',f'vex-v1.0.0-{vex_suffix}.tar.gz',target)] if vex else []}
+        self.urls['https://api.github.com/repos/wavefnd/Wave/releases/tags/v0.2.1-pre-beta'] = {'json': {'tag_name': 'v0.2.1-pre-beta', 'draft': False, 'assets': assets['Wave']}}
         for repo in assets:
             self.urls[f'https://api.github.com/repos/wavefnd/{repo}/releases?per_page=100&page=1']={'json':[
                 {'id':2,'tag_name':'nightly','draft':False,'published_at':'2026-10-05T00:00:00Z','assets':[]},
@@ -136,17 +138,18 @@ esac
         for failure in ['digest','download','smoke','activate','vex-required']:
             with self.subTest(failure=failure):
                 self.releases(bad=failure=='smoke',vex=failure!='vex-required')
-                wave=self.urls['https://api.github.com/repos/wavefnd/Wave/releases?per_page=100&page=1']['json'][1]['assets'][0]
+                wave=self.urls['https://api.github.com/repos/wavefnd/Wave/releases/tags/v0.2.1-pre-beta']['json']['assets'][0]
                 if failure=='digest': wave['digest']='sha256:'+'0'*64
-                if failure=='download': del self.urls['https://github.com/wavefnd/Wave/releases/download/v1.0.0/'+wave['name']]
+                if failure=='download': del self.urls['https://github.com/wavefnd/Wave/releases/download/v0.2.1-pre-beta/'+wave['name']]
                 self.env['FAIL_ACTIVATE']='1' if failure=='activate' else '0'
                 self.run_install('--with-vex','--no-modify-path',success=False)
                 self.assertEqual((self.install/'wavec').read_text(),'previous compiler')
                 self.assertEqual((self.install/'keep.txt').read_text(),'previous data')
                 self.assertFalse(Path(str(self.install)+'.install-lock').exists())
 
-    def test_no_fallback_when_latest_lacks_target(self):
+    def test_no_fallback_when_pinned_release_lacks_target(self):
         self.releases()
+        self.urls['https://api.github.com/repos/wavefnd/Wave/releases/tags/v0.2.1-pre-beta']['json']['assets'] = []
         releases=self.urls['https://api.github.com/repos/wavefnd/Wave/releases?per_page=100&page=1']['json']
         releases.insert(0,{'id':4,'tag_name':'v2.0.0','draft':False,'published_at':'2026-10-04T00:00:00Z','assets':[]})
         result=self.run_install(success=False)

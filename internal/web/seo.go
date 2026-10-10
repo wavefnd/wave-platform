@@ -126,6 +126,7 @@ func (handler SEOHandler) Sitemap(writer http.ResponseWriter, request *http.Requ
 		{Location: base + "/blog"},
 		{Location: base + "/releases"},
 		{Location: base + "/toolchains"},
+		{Location: base + "/playground"},
 		{Location: base + "/community"},
 		{Location: base + "/community/showcase"},
 		{Location: base + "/lunastev"},
@@ -454,8 +455,8 @@ func (handler SEOHandler) StatusCode(request *http.Request) int {
 		if post.Category != "release" {
 			return http.StatusNotFound
 		}
-	case "toolchains":
-		if request.URL.Path != "/toolchains" {
+	case "toolchains", "playground":
+		if request.URL.Path != "/"+segments[0] {
 			return http.StatusNotFound
 		}
 		return http.StatusOK
@@ -480,6 +481,10 @@ func (handler SEOHandler) metadata(requestPath, base string) pageMetadata {
 		first = segments[0]
 	}
 	switch first {
+	case "playground":
+		metadata.Title = "Playground · Wave"
+		metadata.Description = "Write and run Wave programs in your browser."
+		metadata.Breadcrumbs = []seoBreadcrumb{home, {Name: "Playground", URL: handler.location(base, "playground")}}
 	case "toolchains":
 		metadata.Title = "LLVM Toolchains · Wave"
 		metadata.Description = "Verified LLVM SDK downloads for building Wave, with fixed versions and SHA-256 checksums."

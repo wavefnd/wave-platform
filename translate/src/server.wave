@@ -1,0 +1,48 @@
+import("std::net::tcp")::{TcpStream, TcpListener, tcp_bind_loopback, tcp_accept, tcp_close_listener};
+import("std::net::error")::{NetResult};
+import("std::string::len")::{len};
+import("wave_http::request")::{Request, method_is, target_is};
+import("wave_http::connection")::{read_request, write_response, close_connection};
+
+fun handle(stream: TcpStream, ready_body: str) {
+    var data: array<u8, 8192>;
+    var request: Request = read_request(stream, &data[0], 8192, 0, 2000);
+    if (request.status == 0) { return; }
+    var status: i32 = request.status;
+    var body: str = "{\"error\":\"request_rejected\"}\n";
+    var headers: str = "";
+    if (status == 200) {
+        if (!request.head_only && !method_is(&data[0], request, "GET")) {
+            status = 405;
+            headers = "Allow: GET, HEAD\r\n";
+        } else if (target_is(&data[0], request, "/healthz")) {
+            body = "{\"service\":\"wave-translation\",\"status\":\"ok\"}\n";
+        } else if (target_is(&data[0], request, "/readyz")) {
+            status = 503;
+            body = ready_body;
+        } else {
+            status = 404;
+        }
+    }
+    write_response(stream, status, "application/json; charset=utf-8", headers,
+        body as ptr<u8>, len(body) as i64, request.head_only);
+}
+
+pub fun serve(port: u16, ready_body: str) -> i32 {
+    var bound: NetResult<TcpListener> = tcp_bind_loopback(port);
+    if (!bound.ok) {
+        println("Cannot bind Wave Translation: error={}", bound.error.native_code);
+        return 1;
+    }
+    println("Wave Translation listening on 127.0.0.1:{}", port);
+    while (true) {
+        var accepted: NetResult<TcpStream> = tcp_accept(bound.value);
+        if (!accepted.ok) {
+            tcp_close_listener(bound.value);
+            return 2;
+        }
+        handle(accepted.value, ready_body);
+        close_connection(accepted.value);
+    }
+    return 0;
+}

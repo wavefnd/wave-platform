@@ -61,6 +61,8 @@ Der Installer kompiliert und startet ein kleines Programm mit der enthaltenen st
 wavec --version
 ```
 
+Erstellen Sie in einem Verzeichnis Ihrer Wahl eine reine Textdatei namens `main.wave` und speichern Sie darin das vollständige Programm unten. Achten Sie darauf, dass die Datei nicht `main.wave.txt` heißt.
+
 <!-- wave-example: install-stdlib -->
 ```wave
 import("std::string::len")::{
@@ -72,9 +74,13 @@ fun main() {
 }
 ```
 
+Öffnen Sie ein Terminal im Verzeichnis mit `main.wave` oder wechseln Sie mit `cd` dorthin. Führen Sie dann Folgendes aus:
+
 ```shell
 wavec run main.wave
 ```
+
+Erwartete Ausgabe:
 
 ```text
 Wave: 4 bytes

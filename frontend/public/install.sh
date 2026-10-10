@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
 set -euo pipefail
-# Wave installer channel policy: latest-only-v1
+# Wave installer channel policy: pinned-0.2.1-v1
 
 info() { printf '[info] %s\n' "$*"; }
 fail() { printf '[error] %s\n' "$*" >&2; exit 1; }
 manual_only() {
-    fail 'This installer only installs the latest public release. Install older versions or Nightly manually: https://github.com/wavefnd/Wave/releases'
+    fail 'This installer installs Wave v0.2.1-pre-beta. Install older versions or Nightly manually: https://github.com/wavefnd/Wave/releases'
 }
 usage() {
     cat <<'HELP'
-Wave Toolchain Installer — latest public release only
+Wave Toolchain Installer — Wave v0.2.1-pre-beta
 Usage: bash install.sh [latest] [--with-vex | --without-vex] [--no-modify-path]
   Default: install Wave and install Vex when its latest release supports this platform.
   --with-vex       Require Vex; fail before installation if its package is absent.
@@ -41,6 +41,12 @@ latest_release() {
     done
     [[ "$best" != null ]] || fail "No public versioned release is available for $repository."
     printf '%s\n' "$best"
+}
+pinned_wave_release() {
+    local release
+    release="$(fetch -H 'Accept: application/vnd.github+json' 'https://api.github.com/repos/wavefnd/Wave/releases/tags/v0.2.1-pre-beta')" || fail 'Cannot fetch pinned Wave release.'
+    jq -e '.tag_name == "v0.2.1-pre-beta" and .draft == false' >/dev/null <<< "$release" || fail 'Pinned Wave release metadata does not match.'
+    printf '%s\n' "$release"
 }
 asset() {
     # An absent optional Vex asset is distinct from an invalid published asset.
@@ -101,7 +107,7 @@ configure_path() {
 verify_installation() {
     local directory="$1" target="$2" with_vex="$3" work="$4" actual
     "$directory/wavec" --version || return 1
-    actual="$("$directory/wavec" print host-target)" || return 1
+    actual="$("$directory/wavec" print target-spec --format=json | jq -er .triple)" || return 1
     [[ "$actual" == "$target" ]] || { printf 'Expected %s; compiler reports %s\n' "$target" "$actual" >&2; return 1; }
     cat > "$work/install-smoke.wave" <<'WAVE'
 import("std::mem::layout")::{size_of};
@@ -141,7 +147,7 @@ main() {
     [[ ! -L "$INSTALL_DIR" ]] || fail 'The installation directory must not be a symbolic link.'
     if [[ -e "$INSTALL_DIR" && ! -f "$INSTALL_DIR/wavec" ]]; then fail "Refusing to replace a directory not managed by Wave: $INSTALL_DIR"; fi
     local wave_release wave_version wave_name wave_asset vex_release vex_version='' vex_name='' vex_asset='null' install_vex=false
-    wave_release="$(latest_release wavefnd/Wave)"; wave_version="$(jq -r '.tag_name' <<< "$wave_release")"
+    wave_release="$(pinned_wave_release)"; wave_version="$(jq -r '.tag_name' <<< "$wave_release")"
     wave_name="wave-$wave_version-$WAVE_SUFFIX.tar.gz"; wave_asset="$(asset "$wave_release" "$wave_name")"
     if [[ "$vex_mode" != off ]]; then
         vex_release="$(latest_release wavefnd/Vex)"; vex_version="$(jq -r '.tag_name' <<< "$vex_release")"

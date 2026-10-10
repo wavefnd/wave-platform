@@ -412,6 +412,17 @@ watchEffect(() => {
       </aside>
 
       <section class="community-feed" aria-live="polite">
+        <section v-if="!personalMode && !showcaseMode && !threadID && !isComposer" class="community-welcome" aria-labelledby="community-welcome-title">
+          <h2 id="community-welcome-title">{{ t('community.welcomeTitle') }}</h2>
+          <p>{{ t('community.welcomeBody') }}</p>
+          <nav :aria-label="t('community.welcomeTitle')">
+            <RouterLink to="/questions/new">{{ t('community.askQuestion') }}</RouterLink>
+            <RouterLink to="/docs/language/program-structure">{{ t('docs.firstProgram') }}</RouterLink>
+            <a href="https://github.com/wavefnd/Wave/blob/master/CONTRIBUTING.md" target="_blank" rel="noopener noreferrer">{{ t('community.contribute') }}</a>
+            <a href="https://discord.gg/3nev5nHqq9" target="_blank" rel="noopener noreferrer">{{ t('nav.discord') }}</a>
+          </nav>
+          <p class="community-language-policy">{{ t('community.englishOnly') }}</p>
+        </section>
 		<header v-if="showcaseMode && !threadID && !isComposer" class="showcase-intro">
 		  <span>{{ t('community.showcaseEyebrow') }}</span>
 		  <h2>{{ t('community.showcaseHeading') }}</h2>

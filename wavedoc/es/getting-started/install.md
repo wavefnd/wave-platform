@@ -61,6 +61,8 @@ El instalador compila y ejecuta un programa pequeño con la std incluida. No nec
 wavec --version
 ```
 
+Cree un archivo de texto sin formato llamado `main.wave` en el directorio que prefiera y guarde el programa completo que aparece a continuación. Compruebe que el nombre no sea `main.wave.txt`.
+
 <!-- wave-example: install-stdlib -->
 ```wave
 import("std::string::len")::{
@@ -72,9 +74,13 @@ fun main() {
 }
 ```
 
+Abra una terminal en el directorio que contiene `main.wave` o acceda a él con `cd`. Después, ejecute:
+
 ```shell
 wavec run main.wave
 ```
+
+Salida esperada:
 
 ```text
 Wave: 4 bytes

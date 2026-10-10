@@ -1,17 +1,11 @@
 {
-  "schema_version": 1,
-  "source_sha": "553c6c2a31dbc9c1741806ad59ffbf3cb434be40",
-  "generation": "553c6c2a31dbc9c1741806ad59ffbf3cb434be40-37139520320-1",
+  "schema_version": 2,
   "compiler_version": "0.2.1-pre-beta",
+  "tag": "v0.2.1-pre-beta",
   "target": "x86_64-linux-gnu",
-  "manifest": {
-    "name": "nightly-553c6c2a31dbc9c1741806ad59ffbf3cb434be40-37139520320-1.json",
-    "sha256": "510ad0c022c34ae8152614228b7a5bf4c5dd364b3423d45784b78147f75de783",
-    "size": 6505
-  },
   "archive": {
-    "name": "wave-nightly-553c6c2a31dbc9c1741806ad59ffbf3cb434be40-37139520320-1-x86_64-linux-gnu.tar.gz",
-    "sha256": "c7fe11a2ed1be378c62bd3c55e34b25d92cca9ea8018e6a98c01d9cfc66055d9",
-    "size": 241886874
+    "name": "wave-v0.2.1-pre-beta-x86_64-linux-gnu.tar.gz",
+    "sha256": "4e5daf46a93414e00b8ea073eda09e4b7aa7d248cc03f2aeb965a36fc9b0fef0",
+    "size": 241886649
   }
 }

@@ -1,0 +1,94 @@
+name: Wave Playground
+
+on:
+  pull_request:
+    paths:
+      - 'playground/**'
+      - 'http/**'
+      - 'wave/source-analyzer/**'
+      - 'native/tests/source_analyzer_smoke.c'
+      - 'native/include/wave_source_analyzer.h'
+      - 'translate/src/**'
+      - 'translate/tests/test_http.py'
+      - 'frontend/src/services/playground/**'
+      - 'frontend/tests/playground*'
+      - 'wavedoc/**'
+      - 'frontend/src/services/documentMarkdown.ts'
+      - 'wave-version'
+      - 'tools/check-wave-version.py'
+      - 'tools/test-wave-version.py'
+      - 'Dockerfile'
+      - 'compose.yml'
+      - '.github/workflows/playground-ci.yml'
+  push:
+    branches: [master]
+    paths:
+      - 'playground/**'
+      - 'http/**'
+      - 'wave/source-analyzer/**'
+      - 'native/tests/source_analyzer_smoke.c'
+      - 'native/include/wave_source_analyzer.h'
+      - 'translate/src/**'
+      - 'translate/tests/test_http.py'
+      - 'frontend/src/services/playground/**'
+      - 'frontend/tests/playground*'
+      - 'wavedoc/**'
+      - 'frontend/src/services/documentMarkdown.ts'
+      - 'wave-version'
+      - 'tools/check-wave-version.py'
+      - 'tools/test-wave-version.py'
+      - 'Dockerfile'
+      - 'compose.yml'
+      - '.github/workflows/playground-ci.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  compile-and-run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Build and start the isolated Wave service
+        run: |
+          docker compose up --build -d playground
+          container=$(docker compose ps -q playground)
+          address=$(docker inspect --format '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' "$container")
+          echo "PLAYGROUND_URL=http://$address:8092" >> "$GITHUB_ENV"
+          curl --retry 15 --retry-delay 1 --retry-connrefused --fail "http://$address:8092/healthz"
+      - name: Test the shared HTTP library and Translation consumer
+        run: |
+          container=$(docker compose ps -q playground)
+          sdk="$RUNNER_TEMP/wave-http-sdk"
+          docker cp "$container:/opt/wave" "$sdk"
+          python3 tools/test-wave-version.py
+          python3 tools/check-wave-version.py "$sdk/wavec"
+          "$sdk/wavec" --std-root "$sdk/std" --dep "wave_http=$PWD/http" build http/tests/request.wave --target-dir /tmp/http-tests-build -o /tmp/http-tests
+          /tmp/http-tests
+          "$sdk/wavec" --std-root "$sdk/std" --dep "wave_http=$PWD/http" build http/examples/hello.wave --target-dir /tmp/http-example-build -o /tmp/wave-http-example
+          python3 http/tests/test_server.py
+          "$sdk/wavec" --std-root "$sdk/std" --dep "wave_http=$PWD/http" build translate/src/main.wave --target-dir /tmp/translate-build -o /tmp/wave-translation-server
+          python3 translate/tests/test_http.py
+      - name: Test Wave source highlighting
+        run: |
+          sdk="$RUNNER_TEMP/wave-http-sdk"
+          "$sdk/wavec" --std-root "$sdk/std" build wave/source-analyzer/main.wave --emit=obj --target-dir /tmp/highlight-build -o /tmp/highlight.o
+          cc -Inative/include native/tests/source_analyzer_smoke.c /tmp/highlight.o -o /tmp/highlight-test
+          /tmp/highlight-test
+      - name: Test real compilation and browser host execution
+        run: |
+          python3 playground/tests/test_server.py
+          python3 playground/tests/test_http.py
+          node --experimental-strip-types --test frontend/tests/playground-live.test.ts
+          docker compose exec -T playground test ! -e /work/injected
+          docker compose exec -T playground test ! -e /work/job
+      - name: Service logs
+        if: failure()
+        run: docker compose logs playground
+      - name: Stop CI service
+        if: always()
+        run: docker compose down

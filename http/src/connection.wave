@@ -1,0 +1,128 @@
+import("std::net::tcp")::{TcpStream, tcp_close, tcp_shutdown_write, tcp_read_timeout, tcp_write_timeout};
+import("std::net::error")::{NetIoResult, NET_ERROR_NONE, NET_ERROR_TIMED_OUT};
+import("std::time::clock")::{time_now_monotonic_ns};
+import("std::string::len")::{len};
+import("./request")::{Request, empty_request, header_end, parse_request, matches};
+
+fun remaining(deadline: i64) -> i32 {
+    var now: i64 = time_now_monotonic_ns();
+    if (now < 0 || now >= deadline) { return 0; }
+    return ((deadline - now) / 1000000 + 1) as i32;
+}
+
+fun send(stream: TcpStream, bytes: ptr<u8>, size: i64, deadline: i64) -> bool {
+    var sent: i64 = 0;
+    while (sent < size) {
+        var wait: i32 = remaining(deadline);
+        if (wait == 0) { return false; }
+        var result: NetIoResult = tcp_write_timeout(stream, &bytes[sent], size - sent, wait);
+        if (result.error.kind != NET_ERROR_NONE || result.count <= 0) { return false; }
+        sent += result.count;
+    }
+    return true;
+}
+
+fun text(stream: TcpStream, value: str, deadline: i64) -> bool {
+    return send(stream, value as ptr<u8>, len(value) as i64, deadline);
+}
+
+fun reason(status: i32) -> str {
+    if (status == 200) { return "OK"; }
+    if (status == 201) { return "Created"; }
+    if (status == 202) { return "Accepted"; }
+    if (status == 204) { return "No Content"; }
+    if (status == 304) { return "Not Modified"; }
+    if (status == 400) { return "Bad Request"; }
+    if (status == 404) { return "Not Found"; }
+    if (status == 405) { return "Method Not Allowed"; }
+    if (status == 408) { return "Request Timeout"; }
+    if (status == 413) { return "Content Too Large"; }
+    if (status == 422) { return "Unprocessable Content"; }
+    if (status == 431) { return "Request Header Fields Too Large"; }
+    if (status == 500) { return "Internal Server Error"; }
+    if (status == 501) { return "Not Implemented"; }
+    if (status == 503) { return "Service Unavailable"; }
+    if (status == 505) { return "HTTP Version Not Supported"; }
+    return "Response";
+}
+
+// content_type and extra_headers are trusted service constants, never raw input.
+// extra_headers is empty or CRLF-terminated, without framing/connection headers.
+pub fun write_response(stream: TcpStream, status: i32, content_type: str, extra_headers: str, data: ptr<u8>, size: i64, head: bool) {
+    if (status < 200 || status > 599 || size < 0) { return; }
+    var deadline: i64 = time_now_monotonic_ns() + 2000000000;
+    var code: array<u8, 3> = [(48 + status / 100) as u8, (48 + (status / 10) % 10) as u8, (48 + status % 10) as u8];
+    if (!text(stream, "HTTP/1.1 ", deadline)) { return; }
+    if (!send(stream, &code[0], 3, deadline)) { return; }
+    if (!text(stream, " ", deadline)) { return; }
+    if (!text(stream, reason(status), deadline)) { return; }
+    if (!text(stream, "\r\n", deadline)) { return; }
+    if (!text(stream, "Connection: close\r\nCache-Control: no-store\r\nX-Content-Type-Options: nosniff\r\nContent-Type: ", deadline)) { return; }
+    if (!text(stream, content_type, deadline)) { return; }
+    if (!text(stream, "\r\n", deadline)) { return; }
+    if (!text(stream, extra_headers, deadline)) { return; }
+    if (status == 204 || status == 304) { text(stream, "\r\n", deadline); return; }
+    if (!text(stream, "Content-Length: ", deadline)) { return; }
+    var digits: array<u8, 20>;
+    var cursor: i64 = 20;
+    var number: i64 = size;
+    while (true) {
+        cursor -= 1;
+        digits[cursor] = (48 + number % 10) as u8;
+        number /= 10;
+        if (number == 0) { break; }
+    }
+    if (!send(stream, &digits[cursor], 20 - cursor, deadline)) { return; }
+    if (!text(stream, "\r\n\r\n", deadline)) { return; }
+    if (!head) { send(stream, data, size, deadline); }
+}
+
+
+// All request slices borrow the caller's buffer. Keep it alive until handled.
+// Reserve 8192 bytes for the head plus max_body bytes for the body.
+pub fun read_request(stream: TcpStream, data: ptr<u8>, capacity: i64, max_body: i64, timeout_ms: i32) -> Request {
+    var request: Request = empty_request();
+    if (capacity < 8192 || max_body < 0 || max_body > capacity - 8192 || timeout_ms <= 0) {
+        request.status = 500;
+        return request;
+    }
+    var used: i64 = 0;
+    var end: i64 = 0;
+    var deadline: i64 = time_now_monotonic_ns() + (timeout_ms as i64) * 1000000;
+    while (true) {
+        var wait: i32 = remaining(deadline);
+        if (wait == 0) { request.status = 408; break; }
+        var limit: i64 = 8192 - used;
+        if (end > 0) { limit = end + request.length - used; }
+        if (limit <= 0) { request.status = 431; break; }
+        var received: NetIoResult = tcp_read_timeout(stream, &data[used], limit, wait);
+        if (received.error.kind == NET_ERROR_TIMED_OUT) { request.status = 408; break; }
+        if (received.error.kind != NET_ERROR_NONE || received.count <= 0) { request.status = 0; break; }
+        used += received.count;
+        if (end == 0) {
+            end = header_end(data, used);
+            if (end > 0) {
+                request = parse_request(data, end, max_body);
+                if (request.status != 200) { break; }
+            }
+        }
+        if (end > 0 && used >= end + request.length) { break; }
+    }
+    // Suppress HEAD response bodies even on timeout or oversized headers.
+    if (used >= 5 && matches(data, 0, 5, "HEAD ", false)) { request.head_only = true; }
+    return request;
+}
+
+pub fun close_connection(stream: TcpStream) {
+    // Drain rejected/pipelined bytes after sending FIN to avoid proxy resets.
+    tcp_shutdown_write(stream);
+    var discarded: array<u8, 4096>;
+    var deadline: i64 = time_now_monotonic_ns() + 100000000;
+    var drained: i64 = 0;
+    while (drained < 40960 && remaining(deadline) > 0) {
+        var part: NetIoResult = tcp_read_timeout(stream, &discarded[0], 4096, remaining(deadline));
+        if (part.error.kind != NET_ERROR_NONE || part.count <= 0) { break; }
+        drained += part.count;
+    }
+    tcp_close(stream);
+}

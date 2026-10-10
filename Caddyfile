@@ -2,11 +2,23 @@
 	encode zstd gzip
 	header {
 		-Server
-		Content-Security-Policy "default-src 'self'; base-uri 'self'; connect-src 'self' https://challenges.cloudflare.com; font-src 'self' data:; form-action 'self'; frame-ancestors 'none'; frame-src https://challenges.cloudflare.com; img-src 'self' data:; object-src 'none'; script-src 'self' https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline'"
+		Content-Security-Policy "default-src 'self'; base-uri 'self'; connect-src 'self' https://challenges.cloudflare.com; font-src 'self' data:; form-action 'self'; frame-ancestors 'none'; frame-src https://challenges.cloudflare.com; img-src 'self' data:; object-src 'none'; script-src 'self' 'wasm-unsafe-eval' https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline'"
 		Permissions-Policy "camera=(), geolocation=(), microphone=()"
 		Referrer-Policy strict-origin-when-cross-origin
 		X-Content-Type-Options nosniff
 		X-Frame-Options DENY
+	}
+	handle /api/playground/compile {
+		@oversized expression `{http.request.header.Content-Length} != "" && int({http.request.header.Content-Length}) > 32768`
+		respond @oversized "Source limit exceeded (32 KiB)." 413
+		request_body {
+			max_size 32KB
+		}
+		reverse_proxy playground:8092 {
+			transport http {
+				response_header_timeout 15s
+			}
+		}
 	}
 	# Keep the public SDK directory separate from all private platform data.
 	handle_path /downloads/toolchains/* {

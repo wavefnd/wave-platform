@@ -149,3 +149,45 @@ Hangul literals used in Unicode examples.
 Automated checks do not establish linguistic quality. Review translated prose
 for terminology, negation, boundary values, ownership, and error semantics. Do
 not remove an explanation or silently change an example to make a check pass.
+
+## Embedded playgrounds
+
+Use `wave playground` for a complete program that can run in the browser. It
+renders an editable, highlighted program with Run, Stop, Reset, and output in
+place. Opening a document never compiles or runs its examples automatically.
+Ordinary `wave` fences remain read-only highlighted code, including fragments,
+invalid examples, and programs needing native OS facilities.
+
+````markdown
+<!-- wave-example: book-hello -->
+```wave playground
+fun main() {
+    println("Hello, Wave!");
+}
+```
+````
+
+The fence works without metadata, but official documentation must keep its
+adjacent `wave-example` marker and set `"playground": true` on the matching entry
+in `wavedoc/examples.json`. The `stdin` field supplies initial input; `stdout` and `exit` remain
+verification data for automated tests. Reset restores the
+original source and input and clears the previous execution result. The same ID
+in translations reuses this metadata; keep the fence modifier in translations.
+
+Enable only single-file programs that fit the browser execution limits and do
+not require files, sockets, external services, or native-only imports. The live
+playground CI compiles each enabled canonical example to Wasm and checks its
+output and exit code, including alternate `runs` from the manifest:
+
+```shell
+python3 tools/test-doc-playgrounds.py
+python3 tools/check-doc-examples.py --links-only
+cd frontend
+npm run test:docs
+node --experimental-strip-types --test tests/playground-live.test.ts
+```
+
+The live test uses the running local service at `http://localhost:8080` unless
+`PLAYGROUND_URL` selects another instance. The document checker also rejects
+unregistered playground fences and cases that require file fixtures or have
+`check`/`reject` modes. Add new examples only after the live test passes.

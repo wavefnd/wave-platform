@@ -4,6 +4,34 @@
   padding: 34px 0 52px;
 }
 
+.portal-intro {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+  gap: 34px 48px;
+  margin-bottom: 38px;
+  padding-bottom: 34px;
+  border-bottom: 1px solid var(--wave-border);
+}
+.portal-intro-copy, .portal-first-program { min-width: 0; }
+.portal-intro h1 { margin: 0 0 16px; color: var(--wave-text); font-size: clamp(28px, 4vw, 40px); line-height: 1.15; letter-spacing: -0.035em; }
+.portal-intro p { margin: 0 0 16px; color: var(--wave-text-secondary); line-height: 1.65; }
+.portal-intro .portal-development-note { color: var(--wave-text-muted); font-size: 13px; }
+.portal-start-links, .community-welcome nav { display: flex; flex-wrap: wrap; gap: 12px 20px; }
+.portal-start-links a, .community-welcome nav a { color: var(--wave-accent); font-weight: 650; text-underline-offset: 3px; }
+.portal-first-program { padding: 20px; border: 1px solid var(--wave-border); border-radius: var(--wave-radius-sm); background: var(--wave-surface); }
+.portal-first-program h2 { margin: 0 0 12px; font-size: 16px; }
+.portal-first-program p { font-size: 13px; }
+.portal-first-program pre { overflow-x: auto; margin: 0 0 14px; padding: 14px; border-radius: var(--wave-radius-sm); background: #1e1e1e; color: #e8e8e8; font: 13px/1.6 var(--wave-font-code); }
+.portal-first-program .portal-example-output { margin-bottom: 0; }
+.portal-example-output samp { font-family: var(--wave-font-code); }
+.document-playground { margin: 18px 0 24px; }
+.community-welcome { padding: 24px 20px; border-bottom: 1px solid var(--wave-border); }
+.community-welcome h2 { margin: 0 0 10px; font-size: 20px; }
+.community-welcome p { margin: 0 0 14px; color: var(--wave-text-secondary); line-height: 1.6; }
+.community-welcome nav { font-size: 13px; }
+.community-welcome .community-language-policy { margin: 16px 0 0; }
+
 .portal-modules {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -647,9 +675,9 @@
 .document-content li { margin: 5px 0; }
 .document-content blockquote { margin: 18px 0; padding: 11px 14px; border-left: 3px solid var(--service-accent); background: var(--wave-accent-soft); color: var(--wave-text-secondary); }
 .document-content blockquote p { margin: 3px 0; }
-.document-content pre { overflow-x: auto; margin: 17px 0 22px; padding: 18px 20px; border: 1px solid var(--wave-code-border); border-radius: 5px; background: var(--wave-code-bg); color: var(--wave-code-text); }
+.document-content pre { overflow-x: auto; margin: 17px 0 22px; padding: 18px 20px; border: 1px solid var(--wave-border); border-radius: 5px; background: var(--wave-bg-subtle); color: var(--wave-text); }
 .document-content pre code { color: inherit; font: 13px/1.65 var(--wave-font-code); font-variant-ligatures: none; white-space: pre; }
-.document-content pre .token.comment { color: var(--wave-code-comment); }.document-content pre .token.keyword { color: var(--wave-code-keyword); }.document-content pre .token.builtin { color: var(--wave-code-type); }.document-content pre .token.string { color: var(--wave-code-string); }.document-content pre .token.number { color: var(--wave-code-type); }.document-content pre .token.operator { color: var(--wave-code-operator); }
+.document-content pre .token.comment { color: var(--wave-syntax-comment); }.document-content pre .token.keyword { color: var(--wave-syntax-keyword); }.document-content pre .token.builtin { color: var(--wave-syntax-type); }.document-content pre .token.string { color: var(--wave-syntax-string); }.document-content pre .token.number { color: var(--wave-syntax-number); }.document-content pre .token.operator { color: var(--wave-syntax-keyword); }
 .document-content table { display: block; max-width: 100%; overflow-x: auto; margin: 18px 0 24px; border-collapse: collapse; font-size: 14px; }
 .document-content table th, .document-content table td { padding: 8px 10px; border: 1px solid var(--wave-border); text-align: left; vertical-align: top; }
 .document-content table th { background: var(--wave-bg-subtle); font-weight: 680; }
@@ -919,6 +947,7 @@
 	.user-activity-row { grid-template-columns: 90px minmax(0, 1fr); }
 	.user-activity-row time { grid-column: 2; }
 	.user-activity-row p { grid-column: 1 / -1; }
+  .portal-intro { grid-template-columns: 1fr; gap: 24px; }
   .portal-modules { grid-template-columns: 1fr; gap: 30px; }
   .portal-module-pair { grid-template-columns: 1fr; gap: 30px; }
   .docs-catalog { grid-template-columns: 1fr; }

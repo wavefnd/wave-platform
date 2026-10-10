@@ -27,7 +27,7 @@ cd wave-study
 편집기로 이 디렉터리에 `main.wave`를 만드십시오. 파일 이름이 `main.wave.txt`가 되지 않도록 확장자를 확인합니다. 아래는 함수 내부 조각이 아니라 파일 전체입니다.
 
 <!-- wave-example: book-hello -->
-```wave
+```wave playground
 fun main() {
     println("Hello, Wave!");
 }
@@ -60,7 +60,7 @@ wavec run main.wave
 출력을 세 번 하도록 바꿔 봅니다. 앞 프로그램과 합치지 말고 main.wave의 내용을 아래 전체 프로그램으로 교체합니다.
 
 <!-- wave-example: book-sequence -->
-```wave
+```wave playground
 fun main() {
     println("start");
     println("working");
@@ -83,7 +83,7 @@ done
 `println`은 마지막에 줄바꿈을 추가합니다. `print`는 자동으로 줄을 바꾸지 않습니다. 작은 조각을 이어서 한 줄을 만드는 데 차이가 드러납니다.
 
 <!-- wave-example: book-print-lines -->
-```wave
+```wave playground
 fun main() {
     print("Wave");
     print(" ");
@@ -106,7 +106,7 @@ second line
 계산 결과를 문자열에 넣으려면 `{}` 자리에 대응하는 값을 전달합니다.
 
 <!-- wave-example: book-format-first -->
-```wave
+```wave playground
 fun main() {
     println("{} + {} = {}", 2, 3, 2 + 3);
 }
@@ -142,7 +142,7 @@ Windows에서는 출력 파일 이름을 `hello.exe`로 지정하고 PowerShell�
 사람은 출력 문장을 읽지만, 셸이나 다른 프로그램은 종료 코드로 성공 여부를 판단할 수 있습니다. 다음 main은 i32를 반환한다고 명시합니다.
 
 <!-- wave-example: book-exit-success -->
-```wave
+```wave playground
 fun main() -> i32 {
     println("completed");
     return 0;
@@ -183,7 +183,7 @@ fun main() {
 ### 풀이: 계산 과정 출력
 
 <!-- wave-example: book-first-solution -->
-```wave
+```wave playground
 fun main() -> i32 {
     println("Learning Wave");
     println("My first program");

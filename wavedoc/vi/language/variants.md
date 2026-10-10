@@ -18,7 +18,7 @@ enum đại diện cho một giá trị số nguyên được đặt tên và va
 Lưu nó vào `main.wave` và chạy nó.
 
 <!-- wave-example: variant-api -->
-```wave
+```wave playground
 variant Result {
     Value(i32), Error(i32)
 }

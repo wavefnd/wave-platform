@@ -1,6 +1,10 @@
 GOCACHE ?= /tmp/wave-platform-gocache
+WAVEC ?= wavec
 
-.PHONY: frontend-install frontend-dev frontend-build test build run clean
+.PHONY: frontend-install frontend-dev frontend-build test build run clean wave-version-check
+
+wave-version-check:
+	python3 tools/check-wave-version.py "$(WAVEC)"
 
 frontend-install:
 	cd frontend && npm install
@@ -18,12 +22,13 @@ test:
 	cd frontend && npm run test:docs
 	cd frontend && npm run test:seo
 	cd frontend && npm run test:toolchains
+	cd frontend && npm run test:playground
 
-build: frontend-build
+build: wave-version-check frontend-build
 	mkdir -p bin
 	GOCACHE=$(GOCACHE) go build -trimpath -o bin/wave-platform ./cmd/server
 
-run: frontend-build
+run: wave-version-check frontend-build
 	GOCACHE=$(GOCACHE) go run ./cmd/server
 
 clean:

@@ -192,7 +192,7 @@ watchEffect(() => {
         <nav class="document-breadcrumb"><RouterLink :to="catalogBase">{{ projectName }} {{ t('docs.title') }}</RouterLink><span>/</span><span>{{ groupName(document.group) }}</span></nav>
         <p v-if="showingEnglishFallback" class="docs-translation-notice" role="status">{{ t('docs.englishFallback') }}</p>
         <header><h1>{{ document.title }}</h1><p>{{ document.summary }}</p></header>
-        <div class="document-content"><MarkdownContent :source="document.markdown" /></div>
+        <div class="document-content"><MarkdownContent :source="document.markdown" runnable /></div>
         <nav class="document-pagination">
           <RouterLink v-if="previous" :to="`${docBase}/${previous.path}`"><small>{{ t('docs.previous') }}</small><span>← {{ previous.title }}</span></RouterLink><span v-else />
           <RouterLink v-if="next" :to="`${docBase}/${next.path}`"><small>{{ t('docs.next') }}</small><span>{{ next.title }} →</span></RouterLink>

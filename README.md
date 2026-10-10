@@ -52,6 +52,16 @@ make run
 
 The development server listens on <http://127.0.0.1:8080>. Run `make frontend-dev` in another terminal when Vite hot reload is needed.
 
+Wave components use the version pinned in `wave-version`, with the matching
+bundled standard library. `make build` and `make run` reject another compiler.
+The homepage, documentation examples, and `/playground` use the Wave compiler
+service included in Docker Compose. See [Playground](playground/README.md) for
+its execution limits and integration checks.
+
+Wave services share the small [HTTP library](http/README.md). Playground and
+Translation remain independent processes with their own routes and lifecycle;
+the Go platform remains a single host application.
+
 ### LLVM toolchain downloads
 
 The `/toolchains` page reads `/downloads/toolchains/index.json`. In development,

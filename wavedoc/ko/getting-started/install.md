@@ -11,7 +11,7 @@ summary: Linux, macOS, Windows에 Wave를 설치하고 첫 프로그램을 실�
 
 ## 설치 정책
 
-설치기는 최신 공개 버전만 설치합니다. 버전 번호가 있는 사전 릴리즈도 대상이며, Draft와 Nightly는 자동 선택하지 않습니다. 이전 버전과 Nightly는 아래 수동 설치 절차를 사용하세요. 최신 버전에 해당 플랫폼의 패키지가 없으면 이전 버전으로 내려가지 않고 종료합니다.
+설치기는 이 플랫폼에서 고정한 Wave 릴리스를 설치합니다. Draft와 Nightly는 자동 선택하지 않습니다. 다른 릴리스는 아래 수동 설치 절차를 사용하세요. 고정된 릴리스에 해당 플랫폼의 패키지가 없으면 다른 버전을 선택하지 않고 종료합니다.
 
 | 운영체제 | 아키텍처 |
 | --- | --- |
@@ -61,6 +61,8 @@ powershell -ExecutionPolicy Bypass -File .\install.ps1
 wavec --version
 ```
 
+원하는 디렉터리에 일반 텍스트 파일 `main.wave`를 만들고 아래 전체 프로그램을 저장하세요. 파일 이름이 `main.wave.txt`가 아닌지 확인하세요.
+
 <!-- wave-example: install-stdlib -->
 ```wave
 import("std::string::len")::{
@@ -72,9 +74,13 @@ fun main() {
 }
 ```
 
+`main.wave`가 있는 디렉터리에서 터미널을 열거나 `cd`로 이동한 뒤 다음 명령을 실행하세요:
+
 ```shell
 wavec run main.wave
 ```
+
+예상 출력:
 
 ```text
 Wave: 4 bytes

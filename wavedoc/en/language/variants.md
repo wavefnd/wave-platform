@@ -18,7 +18,7 @@ enum represents a named integer value, and variant holds payload, which is diffe
 Save it to `main.wave` and run it.
 
 <!-- wave-example: variant-api -->
-```wave
+```wave playground
 variant Result {
     Value(i32), Error(i32)
 }

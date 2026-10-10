@@ -4,11 +4,13 @@ on:
   pull_request:
     paths:
       - 'translate/**'
+      - 'wave-version'
       - '.github/workflows/translation-ci.yml'
   push:
     branches: [master]
     paths:
       - 'translate/**'
+      - 'wave-version'
       - '.github/workflows/translation-ci.yml'
 
 permissions:
@@ -23,7 +25,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Test snapshot retention and build isolation
+      - name: Test pinned release retention and build isolation
         env:
           PYTHONDONTWRITEBYTECODE: '1'
         run: python3 translate/tests/test_tooling.py
