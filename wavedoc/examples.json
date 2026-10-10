@@ -29,7 +29,8 @@
   },
   {
     "id": "variant-api",
-    "stdout": "value=42\n"
+    "stdout": "value=42\n",
+    "playground": true
   },
   {
     "id": "input-calculator",
@@ -98,27 +99,33 @@
   },
   {
     "id": "book-hello",
-    "stdout": "Hello, Wave!\n"
+    "stdout": "Hello, Wave!\n",
+    "playground": true
   },
   {
     "id": "book-sequence",
-    "stdout": "start\nworking\ndone\n"
+    "stdout": "start\nworking\ndone\n",
+    "playground": true
   },
   {
     "id": "book-print-lines",
-    "stdout": "Wave study\nsecond line\n"
+    "stdout": "Wave study\nsecond line\n",
+    "playground": true
   },
   {
     "id": "book-format-first",
-    "stdout": "2 + 3 = 5\n"
+    "stdout": "2 + 3 = 5\n",
+    "playground": true
   },
   {
     "id": "book-exit-success",
-    "stdout": "completed\n"
+    "stdout": "completed\n",
+    "playground": true
   },
   {
     "id": "book-first-solution",
-    "stdout": "Learning Wave\nMy first program\nReady to calculate\n12 * 8 = 96\n"
+    "stdout": "Learning Wave\nMy first program\nReady to calculate\n12 * 8 = 96\n",
+    "playground": true
   },
   {
     "id": "book-variable-first",

@@ -27,7 +27,7 @@ cd wave-study
 エディタでこのディレクトリに`main.wave`を作成します。ファイル名が`main.wave.txt`にならないように拡張子を確認してください。以下は関数の内部フラグメントではなく、ファイル全体です。
 
 <!-- wave-example: book-hello -->
-```wave
+```wave playground
 fun main() {
     println("Hello, Wave!");
 }
@@ -60,7 +60,7 @@ wavec run main.wave
 出力を3回変更するようにしてください。前のプログラムと合わせないで、main.waveの内容を以下のプログラム全体に置き換えてください。
 
 <!-- wave-example: book-sequence -->
-```wave
+```wave playground
 fun main() {
     println("start");
     println("working");
@@ -83,7 +83,7 @@ done
 `println`は最後に改行を追加します。 `print`は自動的に行を変更しません。小さな部分を続けて一行を作るのに違いがあります。
 
 <!-- wave-example: book-print-lines -->
-```wave
+```wave playground
 fun main() {
     print("Wave");
     print(" ");
@@ -106,7 +106,7 @@ second line
 計算結果を文字列に入れるには、`{}`桁に対応する値を渡します。
 
 <!-- wave-example: book-format-first -->
-```wave
+```wave playground
 fun main() {
     println("{} + {} = {}", 2, 3, 2 + 3);
 }
@@ -142,7 +142,7 @@ Windowsでは、出力ファイル名を`hello.exe`に指定し、PowerShellか�
 人は出力文を読みますが、シェルや他のプログラムは終了コードで成功したかどうかを判断できます。次のmainは、i32を返すことを指定します。
 
 <!-- wave-example: book-exit-success -->
-```wave
+```wave playground
 fun main() -> i32 {
     println("completed");
     return 0;
@@ -183,7 +183,7 @@ fun main() {
 ### プール：計算プロセス出力
 
 <!-- wave-example: book-first-solution -->
-```wave
+```wave playground
 fun main() -> i32 {
     println("Learning Wave");
     println("My first program");

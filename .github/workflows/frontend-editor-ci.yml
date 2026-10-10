@@ -30,6 +30,7 @@ jobs:
           python3 tools/test-doc-translations.py
           python3 tools/check-doc-translations.py
           python3 tools/check-doc-examples.py --links-only
+          python3 tools/test-doc-playgrounds.py
 
       - name: Test server transfer with toolchain downloads
         run: python3 tools/test-server-transfer.py

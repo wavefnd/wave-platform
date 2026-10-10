@@ -18,7 +18,7 @@ enum mewakili nilai bilangan bulat bernama, dan variant menampung payload, yang 
 Simpan ke `main.wave` dan jalankan.
 
 <!-- wave-example: variant-api -->
-```wave
+```wave playground
 variant Result {
     Value(i32), Error(i32)
 }

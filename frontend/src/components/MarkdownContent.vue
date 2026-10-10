@@ -1,22 +1,17 @@
 <script setup lang="ts">
 import DOMPurify from 'dompurify'
-import { Marked, Renderer } from 'marked'
-import { gfmHeadingId } from 'marked-gfm-heading-id'
-import { computed } from 'vue'
+import { computed, nextTick, onMounted, ref, shallowRef, useId, watch } from 'vue'
 
 import { grammarForLanguage, normalizeFenceLanguage, Prism } from './source/syntax'
 import { highlightWave } from '../services/waveSyntax'
-import { useI18n } from '../i18n'
+import { renderDocumentMarkdown, type DocumentExample } from '../services/documentMarkdown'
+import WavePlayground from './WavePlayground.vue'
 
+defineOptions({ inheritAttrs: false })
 const props = defineProps<{ source: string; repository?: string; path?: string; reference?: string; runnable?: boolean }>()
-const emit = defineEmits<{ runWave: [source: string] }>()
-const { t } = useI18n()
-function runExample(event: MouseEvent) {
-  if (!props.runnable || !(event.target instanceof Element)) return
-  const button = event.target.closest('button[data-wave-run]')
-  const code = button?.parentElement?.querySelector('pre > code')
-  if (code) emit('runWave', code.textContent ?? '')
-}
+const article = ref<HTMLElement | null>(null)
+const slotPrefix = `wave-example-${useId()}`
+const targets = shallowRef<Array<{ element: HTMLElement; example: DocumentExample }>>([])
 
 function rewriteRelativeLinks(html: string) {
   if (!props.repository || typeof document === 'undefined') return html
@@ -56,24 +51,40 @@ function rewriteRelativeLinks(html: string) {
 }
 
 const rendered = computed(() => {
-  const renderer = new Renderer()
-  renderer.code = ({ text, lang }) => {
-    const language = normalizeFenceLanguage(lang)
-    const grammar = grammarForLanguage(language)
-    const content = language === 'wave' ? highlightWave(text) : grammar ? Prism.highlight(text, grammar, language) : String(Prism.util.encode(text))
-    const languageClass = language ? ` class="language-${language}"` : ''
-    const code = `<pre><code${languageClass}>${content}\n</code></pre>`
-    return props.runnable && language === 'wave'
-      ? `<div class="document-wave-example">${code}<button type="button" data-wave-run>${Prism.util.encode(t('playground.runExample'))}</button></div>`
-      : code
-  }
-  const parser = new Marked(gfmHeadingId(), { async: false, gfm: true, breaks: false, renderer })
-  const html = parser.parse(props.source) as string
-  const sanitized = DOMPurify.sanitize(html, { USE_PROFILES: { html: true } })
-  return rewriteRelativeLinks(sanitized)
+  const result = renderDocumentMarkdown(props.source, {
+    playgrounds: props.runnable ?? false,
+    slotPrefix,
+    renderCode(text, lang) {
+      const language = normalizeFenceLanguage(lang)
+      const grammar = grammarForLanguage(language)
+      const content = language === 'wave' ? highlightWave(text) : grammar ? Prism.highlight(text, grammar, language) : String(Prism.util.encode(text))
+      const languageClass = language ? ` class="language-${language}"` : ''
+      return `<pre><code${languageClass}>${content}\n</code></pre>`
+    },
+  })
+  return { ...result, html: rewriteRelativeLinks(DOMPurify.sanitize(result.html, { USE_PROFILES: { html: true } })) }
 })
+
+let generation = 0
+async function mountExamples() {
+  const current = ++generation
+  const result = rendered.value
+  targets.value = []
+  await nextTick()
+  if (current !== generation || !article.value) return
+  const placeholders = Array.from(article.value.querySelectorAll<HTMLElement>('[data-wave-playground]'))
+  targets.value = result.slots.flatMap((example, index) => {
+    const element = placeholders.find(item => item.dataset.wavePlayground === `${slotPrefix}-${index}`)
+    return element ? [{ element, example }] : []
+  })
+}
+onMounted(mountExamples)
+watch(rendered, mountExamples, { flush: 'post' })
 </script>
 
 <template>
-  <article class="markdown-content markdown-body" @click="runExample" v-html="rendered" />
+  <article ref="article" v-bind="$attrs" class="markdown-content markdown-body" v-html="rendered.html" />
+  <Teleport v-for="(target, index) in targets" :key="index" :to="target.element">
+    <WavePlayground v-bind="target.example" embedded />
+  </Teleport>
 </template>

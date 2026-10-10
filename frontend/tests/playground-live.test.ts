@@ -44,3 +44,27 @@ fun main() -> i32 {
 }`
   assert.deepEqual(await run(source, '안녕하세요 Wave!\n'), { output: '안녕하세요 Wave!\n', status: 0 })
 })
+
+// Every embedded official example is tested with the real Wasm compiler/host,
+// including alternate stdin cases. Merely passing a native build is insufficient.
+test('all embedded documentation examples run with their manifest input and output', async t => {
+  const { readFileSync, readdirSync } = await import('node:fs')
+  const root = new URL('../../wavedoc/', import.meta.url)
+  const cases = JSON.parse(readFileSync(new URL('examples.json', root), 'utf8'))
+  const sources = new Map<string, string>()
+  for (const path of readdirSync(new URL('ko/', root), { recursive: true })) {
+    if (!String(path).endsWith('.md')) continue
+    const text = readFileSync(new URL('ko/' + path, root), 'utf8')
+    for (const match of text.matchAll(/<!-- wave-example: ([a-z0-9-]+) -->\s*```wave[ \t]+playground[ \t]*\n([\s\S]*?)\n```/gi)) sources.set(match[1], match[2])
+  }
+  assert.deepEqual([...sources.keys()].sort(), cases.filter(item => item.playground).map(item => item.id).sort())
+  for (const example of cases.filter(item => item.playground)) {
+    await t.test(example.id, async () => {
+      for (const input of [example, ...(example.runs ?? [])]) {
+        const result = await run(sources.get(example.id)!, input.stdin ?? '')
+        assert.equal(result.status, input.exit ?? 0, example.id)
+        if (input.stdout != null) assert.equal(result.output, input.stdout, example.id)
+      }
+    })
+  }
+})

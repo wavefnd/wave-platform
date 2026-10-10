@@ -25,14 +25,7 @@
 .portal-first-program pre { overflow-x: auto; margin: 0 0 14px; padding: 14px; border-radius: var(--wave-radius-sm); background: #1e1e1e; color: #e8e8e8; font: 13px/1.6 var(--wave-font-code); }
 .portal-first-program .portal-example-output { margin-bottom: 0; }
 .portal-example-output samp { font-family: var(--wave-font-code); }
-.document-wave-example { margin: 16px 0; }
-.document-wave-example > button { padding: 6px 12px; border: 1px solid var(--wave-border); background: var(--wave-surface); color: var(--wave-accent); border-radius: var(--wave-radius-sm); cursor: pointer; }
-.document-playground-dialog { box-sizing: border-box; width: min(850px, calc(100vw - 32px)); max-height: calc(100vh - 32px); padding: 24px; border: 1px solid var(--wave-border); border-radius: var(--wave-radius-sm); background: var(--wave-surface); color: var(--wave-text); }
-.document-playground-dialog::backdrop { background: #0008; }
-.document-playground-dialog > header { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
-.document-playground-dialog h2 { margin: 0; font-size: 20px; }
-.document-playground-dialog > p { font-size: 13px; color: var(--wave-text-secondary); }
-.document-playground-dialog > header > button { border: 1px solid var(--wave-border); background: var(--wave-surface); color: var(--wave-text); padding: 6px 12px; cursor: pointer; }
+.document-playground { margin: 18px 0 24px; }
 .community-welcome { padding: 24px 20px; border-bottom: 1px solid var(--wave-border); }
 .community-welcome h2 { margin: 0 0 10px; font-size: 20px; }
 .community-welcome p { margin: 0 0 14px; color: var(--wave-text-secondary); line-height: 1.6; }

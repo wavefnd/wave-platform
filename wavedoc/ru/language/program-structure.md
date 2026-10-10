@@ -27,7 +27,7 @@ cd wave-study
 Создайте `main.wave` в этом каталоге с помощью своего редактора. Проверьте расширение и убедитесь, что имя файла не `main.wave.txt`. Ниже приведен весь файл, а не только фрагмент внутри функции.
 
 <!-- wave-example: book-hello -->
-```wave
+```wave playground
 fun main() {
     println("Hello, Wave!");
 }
@@ -60,7 +60,7 @@ wavec run main.wave
 Попробуйте изменить его на печать три раза. Не объединяйте с предыдущей программой, а замените содержимое main.wave всей программой ниже.
 
 <!-- wave-example: book-sequence -->
-```wave
+```wave playground
 fun main() {
     println("start");
     println("working");
@@ -83,7 +83,7 @@ done
 `println` добавляет разрыв строки в конце. `print` не меняет строки автоматически. Разница очевидна при соединении небольших частей в одну линию.
 
 <!-- wave-example: book-print-lines -->
-```wave
+```wave playground
 fun main() {
     print("Wave");
     print(" ");
@@ -106,7 +106,7 @@ second line
 Чтобы поместить результат вычисления в строку, передайте значение, соответствующее `{}`.
 
 <!-- wave-example: book-format-first -->
-```wave
+```wave playground
 fun main() {
     println("{} + {} = {}", 2, 3, 2 + 3);
 }
@@ -142,7 +142,7 @@ check проверяет грамматику, типы и т. д., но не п
 Люди читают оператор вывода, но оболочка или другая программа могут определить успех по коду выхода. Следующее указывает, что main возвращает i32.
 
 <!-- wave-example: book-exit-success -->
-```wave
+```wave playground
 fun main() -> i32 {
     println("completed");
     return 0;
@@ -183,7 +183,7 @@ fun main() {
 ### Решение: выходные данные процесса расчета
 
 <!-- wave-example: book-first-solution -->
-```wave
+```wave playground
 fun main() -> i32 {
     println("Learning Wave");
     println("My first program");

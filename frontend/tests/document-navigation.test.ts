@@ -114,7 +114,7 @@ test('home onboarding links select installation, the first lesson, and the cours
 test('home example stays aligned with the complete first-lesson program', () => {
   for (const locale of ['en', 'ko']) {
     const lesson = readFileSync(new URL(`../../wavedoc/${locale}/language/program-structure.md`, import.meta.url), 'utf8')
-    const example = lesson.match(/<!-- wave-example: book-hello -->\s*```wave\n([\s\S]*?)\n```/)
+    const example = lesson.match(/<!-- wave-example: book-hello -->\s*```wave(?: playground)?\n([\s\S]*?)\n```/)
     assert.equal(example?.[1], firstWaveProgram)
   }
 })

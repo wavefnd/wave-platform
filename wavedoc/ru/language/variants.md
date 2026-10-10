@@ -18,7 +18,7 @@ enum представляет именованное целочисленное 
 Сохраните его в `main.wave` и запустите.
 
 <!-- wave-example: variant-api -->
-```wave
+```wave playground
 variant Result {
     Value(i32), Error(i32)
 }

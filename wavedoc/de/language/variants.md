@@ -18,7 +18,7 @@ enum stellt einen benannten ganzzahligen Wert dar und variant enthält payload, 
 Speichern Sie es unter `main.wave` und führen Sie es aus.
 
 <!-- wave-example: variant-api -->
-```wave
+```wave playground
 variant Result {
     Value(i32), Error(i32)
 }

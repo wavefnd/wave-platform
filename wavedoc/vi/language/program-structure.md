@@ -27,7 +27,7 @@ cd wave-study
 Tạo `main.wave` trong thư mục này bằng trình chỉnh sửa của bạn. Kiểm tra phần mở rộng để đảm bảo tên tệp không phải là `main.wave.txt`. Dưới đây là toàn bộ tệp, không chỉ một đoạn bên trong hàm.
 
 <!-- wave-example: book-hello -->
-```wave
+```wave playground
 fun main() {
     println("Hello, Wave!");
 }
@@ -60,7 +60,7 @@ Không kết hợp các lệnh đầu cuối với mã Wave. Nhập `wavec run` 
 Hãy thử thay đổi nó để in ba lần. Không kết hợp với chương trình trước mà thay thế nội dung của main.wave bằng toàn bộ chương trình bên dưới.
 
 <!-- wave-example: book-sequence -->
-```wave
+```wave playground
 fun main() {
     println("start");
     println("working");
@@ -83,7 +83,7 @@ Sau khi kết thúc câu đầu tiên, hãy chuyển sang câu tiếp theo. Khô
 `println` thêm dấu ngắt dòng ở cuối. `print` không tự động chuyển dòng. Sự khác biệt thể hiện rõ ở việc nối các mảnh nhỏ lại để tạo thành một đường nét duy nhất.
 
 <!-- wave-example: book-print-lines -->
-```wave
+```wave playground
 fun main() {
     print("Wave");
     print(" ");
@@ -106,7 +106,7 @@ In ba lần không phải lúc nào cũng có ba dòng. Phân biệt giữa số
 Để đưa kết quả tính toán thành một chuỗi, truyền giá trị tương ứng với `{}`.
 
 <!-- wave-example: book-format-first -->
-```wave
+```wave playground
 fun main() {
     println("{} + {} = {}", 2, 3, 2 + 3);
 }
@@ -142,7 +142,7 @@ Trong Windows, đặt tên tệp đầu ra là `hello.exe` và chạy trong Powe
 Con người đọc câu lệnh đầu ra, nhưng shell hoặc chương trình khác có thể xác định thành công bằng mã thoát. Phần sau đây chỉ định rằng main trả về i32.
 
 <!-- wave-example: book-exit-success -->
-```wave
+```wave playground
 fun main() -> i32 {
     println("completed");
     return 0;
@@ -183,7 +183,7 @@ Cuối câu không có dấu chấm phẩy. Nhìn vào dòng chẩn đoán hiể
 ### Lời giải: Kết quả quá trình tính toán
 
 <!-- wave-example: book-first-solution -->
-```wave
+```wave playground
 fun main() -> i32 {
     println("Learning Wave");
     println("My first program");

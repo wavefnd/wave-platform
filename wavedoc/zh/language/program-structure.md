@@ -27,7 +27,7 @@ cd wave-study
 使用编辑器在此目录中创建`main.wave`。检查扩展名以确保文件名不是`main.wave.txt`。下面是整个文件，而不仅仅是函数内的片段。
 
 <!-- wave-example: book-hello -->
-```wave
+```wave playground
 fun main() {
     println("Hello, Wave!");
 }
@@ -60,7 +60,7 @@ wavec run main.wave
 尝试将其更改为打印三遍。不要与之前的程序合并，而是将main.wave的内容替换为下面的整个程序。
 
 <!-- wave-example: book-sequence -->
-```wave
+```wave playground
 fun main() {
     println("start");
     println("working");
@@ -83,7 +83,7 @@ done
 `println` 在末尾添加换行符。 `print` 不会自动换行。连接小块以创建一条线时，差异很明显。
 
 <!-- wave-example: book-print-lines -->
-```wave
+```wave playground
 fun main() {
     print("Wave");
     print(" ");
@@ -106,7 +106,7 @@ second line
 要将计算结果放入字符串中，请传递`{}`对应的值。
 
 <!-- wave-example: book-format-first -->
-```wave
+```wave playground
 fun main() {
     println("{} + {} = {}", 2, 3, 2 + 3);
 }
@@ -142,7 +142,7 @@ check 检查语法、类型等，但不测试程序的所有输入。例如，�
 人类读取输出语句，但 shell 或其他程序可以通过退出代码确定成功。以下指定 main 返回 i32。
 
 <!-- wave-example: book-exit-success -->
-```wave
+```wave playground
 fun main() -> i32 {
     println("completed");
     return 0;
@@ -183,7 +183,7 @@ fun main() {
 ### 解决方案：计算过程输出
 
 <!-- wave-example: book-first-solution -->
-```wave
+```wave playground
 fun main() -> i32 {
     println("Learning Wave");
     println("My first program");

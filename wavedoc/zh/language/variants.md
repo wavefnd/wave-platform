@@ -18,7 +18,7 @@ enum 表示一个命名的整数值，variant 保存payload，这在每种情况
 保存到`main.wave`并运行。
 
 <!-- wave-example: variant-api -->
-```wave
+```wave playground
 variant Result {
     Value(i32), Error(i32)
 }
