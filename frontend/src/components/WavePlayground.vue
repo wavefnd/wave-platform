@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Play, RotateCcw, SlidersHorizontal, Square } from '@lucide/vue'
 import { computed, onBeforeUnmount, onMounted, ref, useId, watch } from 'vue'
 import { tokenizeWave } from '../services/waveSyntax'
 import { useI18n } from '../i18n'
@@ -20,11 +21,12 @@ function syncScroll() {
 }
 watch(code, syncScroll, { flush: 'post' })
 const stdin = ref(props.stdin ?? '')
+const optionsOpen = ref(!!props.stdin)
 const output = ref('')
 const failure = ref('')
 const phase = ref<'idle' | 'compile' | 'run' | 'done' | 'stopped'>('idle')
 const exitCode = ref<number | null>(null)
-const sourceRows = computed(() => props.compact ? 5 : props.embedded ? Math.min(15, Math.max(5, code.value.split('\n').length)) : 15)
+const sourceRows = computed(() => props.compact || props.embedded ? Math.min(15, Math.max(3, code.value.split('\n').length)) : 15)
 const busy = computed(() => phase.value === 'compile' || phase.value === 'run')
 let resizeObserver: ResizeObserver | null = null
 let generation = 0
@@ -81,7 +83,7 @@ function reset() {
   stop(); code.value = props.source; stdin.value = props.stdin ?? ''
   output.value = ''; failure.value = ''; exitCode.value = null; phase.value = 'idle'
 }
-watch(() => [props.source, props.stdin], reset)
+watch(() => [props.source, props.stdin], () => { reset(); optionsOpen.value = !!props.stdin })
 onMounted(() => {
   resizeObserver = new ResizeObserver(syncScroll)
   if (sourceInput.value) resizeObserver.observe(sourceInput.value)
@@ -92,39 +94,48 @@ onBeforeUnmount(() => { resizeObserver?.disconnect(); generation++; release() })
 
 <template>
   <section class="wave-playground" :class="{ compact, embedded }" :aria-label="t('playground.title')">
-    <div class="playground-file"><label :for="`${id}-source`">main.wave</label><span v-if="!embedded">Wave {{ WAVE_VERSION }}</span></div>
+    <div class="playground-file">
+      <label :for="`${id}-source`">main.wave</label>
+      <span v-if="!embedded && !compact" class="playground-version">Wave {{ WAVE_VERSION }}</span>
+      <div class="playground-actions">
+        <button type="button" :aria-label="t('playground.options')" :title="t('playground.options')" :aria-expanded="optionsOpen" :aria-controls="`${id}-options`" @click="optionsOpen = !optionsOpen"><SlidersHorizontal :size="15" aria-hidden="true" /></button>
+        <button type="button" :aria-label="t('playground.reset')" :title="t('playground.reset')" @click="reset"><RotateCcw :size="15" aria-hidden="true" /></button>
+        <button v-if="busy" type="button" @click="stop"><Square :size="13" aria-hidden="true" />{{ t('playground.stop') }}</button>
+        <button v-else type="button" class="playground-run" @click="run"><Play :size="14" aria-hidden="true" />{{ t('playground.run') }}</button>
+      </div>
+    </div>
     <div class="playground-editor">
       <pre ref="sourceHighlight" class="playground-highlight" aria-hidden="true"><code><span v-for="(segment, index) in highlighted" :key="index" :class="segment.kind ? ['token', segment.kind] : undefined">{{ segment.text }}</span></code></pre>
       <textarea :id="`${id}-source`" ref="sourceInput" v-model="code" class="playground-source" :rows="sourceRows" :disabled="busy" wrap="off" spellcheck="false" autocapitalize="off" autocomplete="off" @scroll="syncScroll" @input="syncScroll" @keydown.ctrl.enter.prevent="run" @keydown.meta.enter.prevent="run" />
     </div>
-    <details class="playground-input" :open="!!props.stdin"><summary>{{ t('playground.stdin') }}</summary><label :for="`${id}-stdin`">{{ t('playground.stdinHelp') }}</label><textarea :id="`${id}-stdin`" v-model="stdin" :disabled="busy" rows="3" maxlength="8192" spellcheck="false" /></details>
-    <div class="playground-actions">
-      <button v-if="busy" type="button" @click="stop">{{ t('playground.stop') }}</button>
-      <button v-else type="button" class="playground-run" @click="run">{{ t('playground.run') }}</button>
-      <button type="button" @click="reset">{{ t('playground.reset') }}</button>
-      <span role="status">{{ t(`playground.${phase === 'run' ? 'running' : phase}`) }}<template v-if="exitCode !== null"> · {{ t('playground.exit') }} {{ exitCode }}</template></span>
-      <RouterLink v-if="compact" to="/playground">{{ t('playground.open') }}</RouterLink>
+    <div v-show="optionsOpen" :id="`${id}-options`" class="playground-input">
+      <label :for="`${id}-stdin`">{{ t('playground.stdin') }}</label>
+      <textarea :id="`${id}-stdin`" v-model="stdin" :disabled="busy" :aria-describedby="`${id}-stdin-help`" rows="3" maxlength="8192" spellcheck="false" />
+      <p :id="`${id}-stdin-help`">{{ t('playground.stdinHelp') }}</p>
+      <p>{{ t('playground.limits') }}</p>
+    </div>
+    <div class="playground-status" :class="{ 'status-hidden': phase === 'idle' || (phase === 'done' && (exitCode === null || exitCode === 0)) }" role="status">
+      {{ t(`playground.${phase === 'run' ? 'running' : phase}`) }}<template v-if="exitCode !== null"> · {{ t('playground.exit') }} {{ exitCode }}</template>
     </div>
     <div v-if="output || failure || phase === 'done'" class="playground-result" :aria-label="t('playground.output')">
       <pre v-if="output">{{ output }}</pre>
       <pre v-if="failure" class="playground-error" role="alert">{{ failure }}</pre>
       <p v-if="!output && !failure">{{ t('playground.noOutput') }}</p>
     </div>
-    <p class="playground-limit">{{ t('playground.limits') }}</p>
+    <RouterLink v-if="compact" class="playground-open" to="/playground">{{ t('playground.open') }} →</RouterLink>
   </section>
 </template>
 
 <style scoped>
-.wave-playground { text-align: left; min-width: 0; color: var(--wave-text); }
-.playground-file, .playground-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
-.playground-file { justify-content: space-between; padding-bottom: 8px; font: 12px var(--wave-font-code); }
-.playground-file span, .playground-actions span { color: var(--wave-text-muted); font-size: 12px; }
+.wave-playground { text-align: left; min-width: 0; color: var(--wave-text); border: 1px solid var(--wave-border); border-radius: var(--wave-radius-sm); }
+.playground-file { display: flex; align-items: center; gap: 12px; padding: 4px 8px 4px 14px; border-bottom: 1px solid var(--wave-border); font: 12px var(--wave-font-code); color: var(--wave-text-muted); }
+.playground-version { font-size: 11px; }
 .wave-playground textarea { display: block; box-sizing: border-box; width: 100%; border: 1px solid var(--wave-border); border-radius: var(--wave-radius-sm); padding: 12px; resize: vertical; font: 13px/1.6 var(--wave-font-code); tab-size: 4; }
-.playground-editor { position: relative; background: #1e1e1e; border-radius: var(--wave-radius-sm); }
+.playground-editor { position: relative; background: #1e1e1e; }
 .wave-playground .playground-source, .wave-playground .playground-highlight { margin: 0; padding: 12px; border: 1px solid var(--wave-border); font: 13px/1.6 var(--wave-font-code); tab-size: 4; white-space: pre; overflow-wrap: normal; word-break: normal; letter-spacing: normal; }
 .wave-playground .playground-highlight { position: absolute; inset: 0; box-sizing: border-box; overflow: hidden; pointer-events: none; color: #e8e8e8; background: transparent; border-radius: var(--wave-radius-sm); }
 .wave-playground .playground-highlight code { font: inherit; color: inherit; background: transparent; padding: 0; font-variant-ligatures: normal; }
-.wave-playground .playground-source { position: relative; background: transparent; color: transparent; caret-color: #e8e8e8; min-height: 140px; }
+.wave-playground .playground-source { position: relative; background: transparent; color: transparent; caret-color: #e8e8e8; min-height: 86px; }
 .playground-source::selection { background: #315b83; color: #fff; }
 .wave-playground .playground-highlight .token.comment { color: var(--wave-code-comment); }
 .wave-playground .playground-highlight .token.keyword { color: var(--wave-code-keyword); }
@@ -136,16 +147,22 @@ onBeforeUnmount(() => { resizeObserver?.disconnect(); generation++; release() })
   .playground-highlight { visibility: hidden; }
 }
 .wave-playground textarea:focus-visible, .wave-playground button:focus-visible { outline: 2px solid var(--wave-accent); outline-offset: 2px; }
-.playground-input { margin: 10px 0; font-size: 12px; }
-.playground-input summary { cursor: pointer; }
-.playground-input label { display: block; margin: 8px 0; color: var(--wave-text-secondary); }
+.playground-input { padding: 12px 14px; border-top: 1px solid var(--wave-border); font-size: 12px; }
+.playground-input label { display: block; margin-bottom: 8px; color: var(--wave-text-secondary); }
+.wave-playground .playground-input p { margin: 8px 0 0; color: var(--wave-text-muted); font-size: 11px; line-height: 1.5; }
 .playground-input textarea { background: var(--wave-surface); color: var(--wave-text); }
-.playground-actions { margin: 12px 0; }
-.playground-actions button { padding: 6px 16px; border: 1px solid var(--wave-border-strong); border-radius: var(--wave-radius-sm); background: var(--wave-surface); color: var(--wave-text); cursor: pointer; font-weight: 600; }
+.playground-actions { display: flex; align-items: center; gap: 2px; margin-left: auto; }
+.playground-actions button { display: inline-flex; align-items: center; justify-content: center; gap: 5px; min-width: 32px; min-height: 32px; padding: 6px 8px; border: 0; border-radius: var(--wave-radius-sm); background: transparent; color: var(--wave-text-muted); cursor: pointer; font-size: 12px; font-family: inherit; white-space: nowrap; }
+.playground-actions button:hover, .playground-actions button[aria-expanded="true"] { background: var(--wave-surface); color: var(--wave-text); }
 .playground-actions .playground-run { color: var(--wave-accent); }
-.playground-actions a { margin-left: auto; font-size: 12px; color: var(--wave-accent); }
-.playground-result { max-height: 280px; overflow: auto; border-top: 1px solid var(--wave-border); padding-top: 10px; }
+.playground-status { padding: 8px 14px; border-top: 1px solid var(--wave-border); font-size: 12px; color: var(--wave-text-muted); }
+.status-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
+.wave-playground .playground-open { display: block; padding: 8px 14px; border-top: 1px solid var(--wave-border); font-size: 12px; color: var(--wave-accent); }
+.wave-playground .playground-source, .wave-playground .playground-highlight { border-color: transparent; border-radius: 0; }
+.wave-playground .playground-source:focus-visible { outline-offset: -2px; }
+.playground-result { max-height: 280px; overflow: auto; border-top: 1px solid var(--wave-border); padding: 4px 14px; }
 .wave-playground .playground-result pre { margin: 0; padding: 8px 0; border: 0; border-radius: 0; background: transparent; color: var(--wave-text); white-space: pre-wrap; overflow-wrap: anywhere; font: 13px/1.6 var(--wave-font-code); }
 .wave-playground .playground-result .playground-error { color: var(--wave-danger, #c93838); }
-.wave-playground .playground-limit { margin: 8px 0 0; color: var(--wave-text-muted); font-size: 11px; line-height: 1.5; }
+.wave-playground .playground-result p { margin: 8px 0; font-size: 12px; color: var(--wave-text-muted); }
+@media (max-width: 420px) { .playground-version { display: none; } }
 </style>
