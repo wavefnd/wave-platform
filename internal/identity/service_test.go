@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/pquerna/otp/totp"
+	"github.com/wavefnd/wave-platform/internal/auth"
 	maildomain "github.com/wavefnd/wave-platform/internal/mail"
 	"github.com/wavefnd/wave-platform/internal/permission"
 	"github.com/wavefnd/wave-platform/internal/storage"
@@ -32,6 +33,16 @@ func newTestIdentity(t *testing.T, database *storage.Database) *Service {
 
 func testRegistration(displayName string) Registration {
 	return Registration{DisplayName: displayName, TOTPSecret: testTOTPSecret, RecoveryEmail: "recovery@example.net"}
+}
+
+func TestTOTPVerificationErrorPreservesStatePersistenceFailure(t *testing.T) {
+	persistenceErr := errors.Join(auth.ErrTOTPStatePersistence, errors.New("injected write failure"))
+	if got := totpVerificationError(persistenceErr); !errors.Is(got, auth.ErrTOTPStatePersistence) || errors.Is(got, ErrInvalidCredentials) {
+		t.Fatalf("totpVerificationError() = %v; want the persistence failure without invalid credentials", got)
+	}
+	if got := totpVerificationError(auth.ErrInvalidTOTP); !errors.Is(got, ErrInvalidCredentials) {
+		t.Fatalf("invalid-code error = %v; want invalid credentials", got)
+	}
 }
 
 func TestRegisterCreatesAddressAuthenticatorMailboxAndSession(t *testing.T) {

@@ -39,6 +39,13 @@ var (
 	ErrAddressChoiceRequired = errors.New("a different Wave mail address is required for this duplicate display name")
 )
 
+func totpVerificationError(err error) error {
+	if errors.Is(err, auth.ErrTOTPStatePersistence) {
+		return err
+	}
+	return ErrInvalidCredentials
+}
+
 const ManagementMailboxAccountID = "role/platform-management"
 const PatchMailboxAccountID = "service/patchs"
 
@@ -422,7 +429,7 @@ func (service *Service) AuthenticateTOTP(identifier, code, userAgent string) (ac
 		return account.Account{}, "", session.Session{}, ErrAccountInactive
 	}
 	if err := service.totp.Verify(item.ID, code); err != nil {
-		return account.Account{}, "", session.Session{}, ErrInvalidCredentials
+		return account.Account{}, "", session.Session{}, totpVerificationError(err)
 	}
 	token, currentSession, err := service.sessions.Create(item.ID, userAgent)
 	return item, token, currentSession, err
@@ -430,7 +437,7 @@ func (service *Service) AuthenticateTOTP(identifier, code, userAgent string) (ac
 
 func (service *Service) BeginTOTPRotation(accountID, currentCode string) (auth.EnrollmentResult, error) {
 	if err := service.totp.Verify(accountID, currentCode); err != nil {
-		return auth.EnrollmentResult{}, ErrInvalidCredentials
+		return auth.EnrollmentResult{}, totpVerificationError(err)
 	}
 	item, err := service.accounts.Account(accountID)
 	if err != nil {
@@ -500,7 +507,7 @@ func (service *Service) SecurityStatus(accountID string) (auth.TOTPFactor, error
 
 func (service *Service) ChangeRecoveryEmail(accountID, currentCode, email string) error {
 	if err := service.totp.Verify(accountID, currentCode); err != nil {
-		return ErrInvalidCredentials
+		return totpVerificationError(err)
 	}
 	return service.sendRecoveryVerification(accountID, email)
 }
@@ -541,7 +548,7 @@ func (service *Service) UpdateProfile(accountID, displayName, bio, timeZone stri
 
 func (service *Service) ChangeWaveAddress(accountID, currentCode, localPart string) (account.Account, error) {
 	if err := service.totp.Verify(accountID, strings.TrimSpace(currentCode)); err != nil {
-		return account.Account{}, ErrInvalidCredentials
+		return account.Account{}, totpVerificationError(err)
 	}
 	localPart, err := account.MailLocalPart(localPart)
 	if err != nil {

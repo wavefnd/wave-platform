@@ -24,12 +24,13 @@ import (
 )
 
 var (
-	ErrTOTPNotConfigured = errors.New("TOTP authentication is not configured")
-	ErrInvalidTOTP       = errors.New("invalid TOTP code")
-	ErrTOTPReplay        = errors.New("TOTP code was already used")
-	ErrTemporarilyLocked = errors.New("authentication temporarily locked")
-	ErrEnrollmentExpired = errors.New("TOTP enrollment expired")
-	ErrRecoveryExpired   = errors.New("recovery request expired")
+	ErrTOTPNotConfigured    = errors.New("TOTP authentication is not configured")
+	ErrInvalidTOTP          = errors.New("invalid TOTP code")
+	ErrTOTPStatePersistence = errors.New("TOTP state persistence failed")
+	ErrTOTPReplay           = errors.New("TOTP code was already used")
+	ErrTemporarilyLocked    = errors.New("authentication temporarily locked")
+	ErrEnrollmentExpired    = errors.New("TOTP enrollment expired")
+	ErrRecoveryExpired      = errors.New("recovery request expired")
 )
 
 const maxFailures = 5
@@ -249,7 +250,9 @@ func (service *TOTPService) Verify(accountID, code string) error {
 			factor.FailedCount = 0
 			factor.LockedUntil = now.Add(15 * time.Minute)
 		}
-		_ = service.put("factor", accountID, factor)
+		if err := service.put("factor", accountID, factor); err != nil {
+			return fmt.Errorf("%w: persist failed-attempt state: %w", ErrTOTPStatePersistence, err)
+		}
 		return ErrInvalidTOTP
 	}
 	if step <= factor.LastUsedStep {

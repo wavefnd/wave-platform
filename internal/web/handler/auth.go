@@ -185,7 +185,7 @@ func (handler AuthHandler) Login(writer http.ResponseWriter, request *http.Reque
 	}
 	item, token, currentSession, err := handler.Service.AuthenticateTOTP(input.Identifier, input.Code, request.UserAgent())
 	if err != nil {
-		writeAPIError(writer, http.StatusUnauthorized, "invalid-credentials", "The username, email address, or authenticator code is incorrect.")
+		handler.writeLoginError(writer, err)
 		return
 	}
 	handler.setCookie(writer, token, currentSession)
@@ -307,7 +307,15 @@ func (handler AuthHandler) ChangeRecoveryEmail(writer http.ResponseWriter, reque
 		return
 	}
 	var input RecoveryEmailRequest
-	if xmlcodec.Decode(request.Body, &input) != nil || handler.Service.ChangeRecoveryEmail(actor.ID, input.Code, input.Email) != nil {
+	if xmlcodec.Decode(request.Body, &input) != nil {
+		writeAPIError(writer, http.StatusUnauthorized, "invalid-code", "The authenticator code or email address is invalid.")
+		return
+	}
+	if err := handler.Service.ChangeRecoveryEmail(actor.ID, input.Code, input.Email); err != nil {
+		if errors.Is(err, auth.ErrTOTPStatePersistence) {
+			handler.writeAuthError(writer, err)
+			return
+		}
 		writeAPIError(writer, http.StatusUnauthorized, "invalid-code", "The authenticator code or email address is invalid.")
 		return
 	}
@@ -368,6 +376,8 @@ func (handler AuthHandler) writeAuthError(writer http.ResponseWriter, err error)
 		writeAPIError(writer, http.StatusConflict, "account-conflict", "That Wave address is already in use.")
 	case errors.Is(err, auth.ErrTOTPNotConfigured):
 		writeAPIError(writer, http.StatusServiceUnavailable, "totp-not-configured", "TOTP authentication is not configured on this server.")
+	case errors.Is(err, auth.ErrTOTPStatePersistence):
+		writeAPIError(writer, http.StatusInternalServerError, "internal-error", "The authentication request could not be completed.")
 	case errors.Is(err, identity.ErrAddressChoiceRequired):
 		writeAPIError(writer, http.StatusConflict, "address-choice-required", err.Error())
 	case errors.Is(err, identity.ErrInvalidRegistration):
@@ -375,6 +385,14 @@ func (handler AuthHandler) writeAuthError(writer http.ResponseWriter, err error)
 	default:
 		writeAPIError(writer, http.StatusUnauthorized, "invalid-credentials", "The authentication request could not be completed.")
 	}
+}
+
+func (handler AuthHandler) writeLoginError(writer http.ResponseWriter, err error) {
+	if errors.Is(err, auth.ErrTOTPStatePersistence) {
+		handler.writeAuthError(writer, err)
+		return
+	}
+	writeAPIError(writer, http.StatusUnauthorized, "invalid-credentials", "The username, email address, or authenticator code is incorrect.")
 }
 
 func (handler AuthHandler) allowMutation(writer http.ResponseWriter, request *http.Request, _ string) bool {

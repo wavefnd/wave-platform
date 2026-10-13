@@ -3,6 +3,7 @@ package handler
 import (
 	"encoding/base64"
 	"encoding/xml"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -10,6 +11,7 @@ import (
 	"time"
 
 	"github.com/pquerna/otp/totp"
+	"github.com/wavefnd/wave-platform/internal/auth"
 	"github.com/wavefnd/wave-platform/internal/identity"
 	"github.com/wavefnd/wave-platform/internal/storage"
 )
@@ -76,6 +78,20 @@ func TestTOTPRegisterCurrentAndLogout(t *testing.T) {
 	handler.Logout(logoutResponse, logoutRequest)
 	if logoutResponse.Code != http.StatusNoContent {
 		t.Fatalf("logout status=%d", logoutResponse.Code)
+	}
+}
+
+func TestWriteAuthErrorReportsTOTPStatePersistenceFailureAsServerError(t *testing.T) {
+	response := httptest.NewRecorder()
+	handler := AuthHandler{}
+	handler.writeLoginError(response, fmt.Errorf("%w: injected write error", auth.ErrTOTPStatePersistence))
+	if response.Code != http.StatusInternalServerError {
+		t.Fatalf("TOTP persistence status = %d, want %d; body=%s", response.Code, http.StatusInternalServerError, response.Body.String())
+	}
+	invalid := httptest.NewRecorder()
+	handler.writeLoginError(invalid, identity.ErrInvalidCredentials)
+	if invalid.Code != http.StatusUnauthorized {
+		t.Fatalf("invalid-code status = %d, want %d; body=%s", invalid.Code, http.StatusUnauthorized, invalid.Body.String())
 	}
 }
 
