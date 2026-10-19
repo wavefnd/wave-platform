@@ -16,6 +16,7 @@ Usage: bash install.sh [latest] [--with-vex | --without-vex] [--no-modify-path]
   --without-vex    Install Wave only.
   --no-modify-path Leave shell configuration unchanged.
   WAVE_INSTALL_DIR overrides the dedicated installation directory (~/.wave/bin).
+  Matching std is also installed at ~/.wave/lib/wave/std for the pinned compiler.
 Older versions and Nightly: download manually from https://github.com/wavefnd/Wave/releases
 HELP
 }
@@ -116,8 +117,8 @@ fun main() -> i32 {
     return 0;
 }
 WAVE
-    # Keep output outside the user's working directory and ignore ambient std overrides.
-    (cd "$work" && "$directory/wavec" run install-smoke.wave --std-root "$directory/std") || return 1
+    # Exercise the same default std lookup used by an ordinary compiler invocation.
+    (cd "$work" && "$directory/wavec" run install-smoke.wave) || return 1
     if [[ "$with_vex" == true ]]; then "$directory/vex" --version || return 1; fi
 }
 main() {
@@ -139,6 +140,7 @@ main() {
     os="$(uname -s)"; arch="$(uname -m)"
     if [[ "$os" == Darwin && "$arch" == x86_64 ]] && [[ "$(sysctl -in sysctl.proc_translated 2>/dev/null || true)" == 1 ]]; then arch=arm64; fi
     resolve_platform "$os" "$arch"
+    [[ "${HOME:-}" == /* ]] || fail 'HOME must be an absolute path for the pinned compiler standard library.'
     INSTALL_DIR="${WAVE_INSTALL_DIR:-$HOME/.wave/bin}"
     INSTALL_DIR="${INSTALL_DIR%/}"
     [[ "$INSTALL_DIR" != *:* && "$INSTALL_DIR" == /* && "$INSTALL_DIR" != / && "$INSTALL_DIR" != "$HOME" && "$INSTALL_DIR" != *$'\n'* && "$INSTALL_DIR" != *$'\r'* ]] || fail 'Use an absolute, dedicated installation directory.'
@@ -159,15 +161,50 @@ main() {
     fi
     info "Wave $wave_version / $WAVE_TARGET"
     info "Install directory: $INSTALL_DIR"
-    local parent
-    parent="$(dirname "$INSTALL_DIR")"; mkdir -p "$parent"
+    local parent std_parent std_lock compiler_compare std_compare
+    STD_DIR="$HOME/.wave/lib/wave/std"
+    [[ ! -L "$STD_DIR" ]] || fail 'The std installation directory must not be a symbolic link.'
+    if [[ -e "$STD_DIR" && ! -f "$STD_DIR/manifest.json" ]]; then
+        fail "Refusing to replace a directory not managed by Wave std: $STD_DIR"
+    fi
+    parent="$(dirname "$INSTALL_DIR")"
+    std_parent="$(dirname "$STD_DIR")"
+    mkdir -p "$parent" "$std_parent"
+    parent="$(cd "$parent" && pwd -P)"
+    std_parent="$(cd "$std_parent" && pwd -P)"
+    INSTALL_DIR="$parent/${INSTALL_DIR##*/}"
+    STD_DIR="$std_parent/std"
+    compiler_compare="$INSTALL_DIR/"
+    std_compare="$STD_DIR/"
+    # macOS volumes may ignore case, including a not-yet-created final component.
+    if [[ "$os" == Darwin ]]; then
+        compiler_compare="$(printf '%s' "$compiler_compare" | LC_ALL=C tr '[:upper:]' '[:lower:]')"
+        std_compare="$(printf '%s' "$std_compare" | LC_ALL=C tr '[:upper:]' '[:lower:]')"
+    fi
+    case "$compiler_compare" in
+        "$std_compare"*) fail 'Compiler and std installation directories must not overlap.' ;;
+    esac
+    case "$std_compare" in
+        "$compiler_compare"*) fail 'Compiler and std installation directories must not overlap.' ;;
+    esac
+    case "$INSTALL_DIR" in
+        /bin|/sbin|/usr/bin|/usr/sbin|/usr/local/bin|/usr/local/sbin)
+            fail 'Do not replace a shared system binary directory.' ;;
+    esac
+    info "Std directory: $STD_DIR"
     LOCK_DIR="$INSTALL_DIR.install-lock"
     mkdir "$LOCK_DIR" 2>/dev/null || fail "Another install may be running ($LOCK_DIR). If it was interrupted, inspect the directory before retrying."
-    TMP_DIR=''; ACTIVATING=false; COMMITTED=false
+    TMP_DIR=''; STD_TMP_DIR=''; STD_LOCK_DIR=''
+    ACTIVATING=false; STD_ACTIVATING=false; COMMITTED=false
     trap cleanup EXIT
     trap 'exit 130' INT
     trap 'exit 143' TERM
+    # Different custom compiler directories still share the pinned compiler's std.
+    std_lock="$STD_DIR.install-lock"
+    mkdir "$std_lock" 2>/dev/null || fail "Another std install may be running ($std_lock). If it was interrupted, inspect the directory before retrying."
+    STD_LOCK_DIR="$std_lock"
     TMP_DIR="$(mktemp -d "$parent/.wave-install.XXXXXX")"
+    STD_TMP_DIR="$(mktemp -d "$std_parent/.wave-std.XXXXXX")"
     info '[1/4] Downloading and verifying packages'
     fetch "https://github.com/wavefnd/Wave/releases/download/$wave_version/$wave_name" -o "$TMP_DIR/wave.tar.gz"
     verify_hash "$TMP_DIR/wave.tar.gz" "$(jq -r '.digest | sub("^sha256:"; "")' <<< "$wave_asset")"
@@ -181,6 +218,9 @@ main() {
     local package="$TMP_DIR/wave/${wave_name%.tar.gz}"
     [[ -f "$package/wavec" && -d "$package/llvm/bin" && -f "$package/std/manifest.json" ]] || fail 'Wave package is missing compiler, LLVM or bundled std.'
     cp -R "$package"/. "$TMP_DIR/stage/"
+    # Stage std beside its destination so activation and recovery stay on one filesystem.
+    mkdir "$STD_TMP_DIR/stage"
+    cp -R "$package/std"/. "$STD_TMP_DIR/stage/"
     if [[ "$install_vex" == true ]]; then
         mkdir "$TMP_DIR/vex"; tar -xzf "$TMP_DIR/vex.tar.gz" -C "$TMP_DIR/vex"
         package="$TMP_DIR/vex/${vex_name%.tar.gz}"
@@ -196,7 +236,10 @@ main() {
     if [[ -d "$INSTALL_DIR" ]]; then mv "$INSTALL_DIR" "$TMP_DIR/previous"; fi
     ACTIVATING=true
     mv "$TMP_DIR/stage" "$INSTALL_DIR"
-    info '[4/4] Checking compiler, bundled std and runtime'
+    if [[ -d "$STD_DIR" ]]; then mv "$STD_DIR" "$STD_TMP_DIR/previous"; fi
+    STD_ACTIVATING=true
+    mv "$STD_TMP_DIR/stage" "$STD_DIR"
+    info '[4/4] Checking compiler, default std and runtime'
     verify_installation "$INSTALL_DIR" "$WAVE_TARGET" "$install_vex" "$TMP_DIR" \
         || fail 'Installation check failed; restoring the previous installation. Check system prerequisites (glibc/system libraries, Apple Command Line Tools, or a compatible FreeBSD base).'
     COMMITTED=true
@@ -206,20 +249,35 @@ main() {
     info "Installed Wave $wave_version."
     if [[ "$install_vex" == true ]]; then info "Installed Vex $vex_version."; fi
 }
-cleanup() {
-    local status=$?
-    trap - EXIT
-    if [[ "$ACTIVATING" == true && "$COMMITTED" != true ]]; then
-        rm -rf "$INSTALL_DIR"
+restore_tree() {
+    local activated="$1" directory="$2" temporary="$3"
+    if [[ "$activated" == true ]] && ! rm -rf "$directory"; then
+        printf '[error] Cannot remove failed installation: %s. Recovery data retained at %s\n' "$directory" "$temporary" >&2
+        return 1
     fi
-    if [[ "$COMMITTED" != true && -n "$TMP_DIR" && -d "$TMP_DIR/previous" ]]; then
-        if ! mv "$TMP_DIR/previous" "$INSTALL_DIR"; then
-            printf '[error] Restore failed. Previous installation retained at %s/previous\n' "$TMP_DIR" >&2
-            rmdir "$LOCK_DIR" 2>/dev/null || true
-            exit 1
+    if [[ -n "$temporary" && -d "$temporary/previous" ]]; then
+        if [[ -e "$directory" || -L "$directory" ]] || ! mv "$temporary/previous" "$directory"; then
+            printf '[error] Restore failed. Previous installation retained at %s/previous\n' "$temporary" >&2
+            return 1
         fi
     fi
-    if [[ -n "$TMP_DIR" ]]; then rm -rf "$TMP_DIR"; fi
+}
+cleanup() {
+    local status=$? keep_compiler=false keep_std=false
+    trap - EXIT
+    if [[ "$COMMITTED" != true ]]; then
+        # Try both recoveries even if one fails; never discard an unrestored backup.
+        restore_tree "$STD_ACTIVATING" "$STD_DIR" "$STD_TMP_DIR" || keep_std=true
+        restore_tree "$ACTIVATING" "$INSTALL_DIR" "$TMP_DIR" || keep_compiler=true
+    fi
+    if [[ "$keep_std" == true || "$keep_compiler" == true ]]; then status=1; fi
+    if [[ -n "$STD_TMP_DIR" && "$keep_std" == false ]]; then
+        rm -rf "$STD_TMP_DIR" || status=1
+    fi
+    if [[ -n "$TMP_DIR" && "$keep_compiler" == false ]]; then
+        rm -rf "$TMP_DIR" || status=1
+    fi
+    if [[ -n "$STD_LOCK_DIR" ]]; then rmdir "$STD_LOCK_DIR" 2>/dev/null || true; fi
     rmdir "$LOCK_DIR" 2>/dev/null || true
     exit "$status"
 }
